@@ -9218,3 +9218,75 @@ fn human_shows_states_and_labels_in_task_language() {
     assert!(out.contains("レビュー待ちの AI の決定"), "{out}");
     assert!(out.contains("待機中"), "{out}");
 }
+
+/// Task-A01-garden385 (decision 0027): `alm human` shows every task's risk as the agent recorded
+/// it, and says so when a task has none; `--json` carries it too (null: not classified).
+#[test]
+fn human_shows_each_tasks_risk_and_marks_the_unclassified() {
+    let repo = filled();
+    ok(&repo, &["task-language", "en"]);
+    ok(&repo, &["ready", "A01-01"]);
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    ok(&repo, &["--as", "a", "classify", "A01-01", "--risk", "high"]);
+    ok(
+        &repo,
+        &["--as", "a", "ai-decided", "A01-01", "Kept it simple"],
+    );
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "test run",
+        ],
+    );
+    ok(
+        &repo,
+        &[
+            "add",
+            "task",
+            "A01-03",
+            "--area",
+            "A01",
+            "--title",
+            "Second task",
+        ],
+    );
+    ok(&repo, &["ready", "A01-03"]);
+    ok(&repo, &["--as", "b", "claim", "A01-03"]);
+    ok(
+        &repo,
+        &["--as", "b", "wait", "A01-03", "--on", "your choice"],
+    );
+
+    let out = String::from_utf8(alm(&repo, &["human"]).stdout).unwrap();
+    // To check and To review list A01-01 (high); To answer lists A01-03 (none recorded).
+    assert_eq!(out.matches("      risk: high\n").count(), 2, "{out}");
+    assert_eq!(out.matches("      risk: not classified\n").count(), 1, "{out}");
+    let line_after = |id: &str| {
+        let mut lines = out.lines().skip_while(|l| !l.starts_with(&format!("  {id}  ")));
+        lines.nth(1).unwrap().to_string()
+    };
+    assert_eq!(line_after("A01-01"), "      risk: high");
+    assert_eq!(line_after("A01-03"), "      risk: not classified");
+
+    let v = ok(&repo, &["human"]);
+    assert_eq!(v["to_check"][0]["risk"], "high");
+    assert_eq!(v["to_review"][0]["risk"], "high");
+    assert_eq!(v["to_answer"][0]["risk"], Value::Null);
+    assert!(v["to_answer"][0].get("risk").is_some(), "{v}");
+
+    // A later classification wins, in the task language like the rest of the line.
+    ok(&repo, &["classify", "A01-01", "--risk", "medium"]);
+    ok(&repo, &["task-language", "zh-CN"]);
+    let out = String::from_utf8(alm(&repo, &["human"]).stdout).unwrap();
+    assert!(out.contains("      风险：中\n"), "{out}");
+    assert!(out.contains("      风险：未分级\n"), "{out}");
+    ok(&repo, &["task-language", "ja"]);
+    let out = String::from_utf8(alm(&repo, &["human"]).stdout).unwrap();
+    assert!(out.contains("      リスク：中\n"), "{out}");
+    assert!(out.contains("      リスク：未分類\n"), "{out}");
+}

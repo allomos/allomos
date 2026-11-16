@@ -2563,6 +2563,11 @@ fn human(
         .collect();
     let system: Vec<String> = sys_locale::get_locales().collect();
     let language = pick_ui_language(&[task_language(&bag.project, &system).language]);
+    // Task-A01-garden385 (decision 0027): every task's risk as the agent recorded it, on a line
+    // under the task; one with none reads "not classified". Shown only, never judged.
+    let classes = allomos_store::classify::by_task(root);
+    let risk_of = |t: &Task| classes.get(&t.id).and_then(|c| c.risk.as_deref());
+    let risk_line = |t: &Task| format!("      {}\n", classify::human_risk_line(risk_of(t), language));
     let mut text = String::new();
     text.push_str(&format!("To check ({})\n", to_check.len()));
     if to_check.is_empty() {
@@ -2570,6 +2575,7 @@ fn human(
     }
     for t in &to_check {
         text.push_str(&format!("  {}\n", human_task_line(t, language)));
+        text.push_str(&risk_line(t));
         let why = t
             .without_human_check
             .as_deref()
@@ -2593,6 +2599,7 @@ fn human(
     }
     for t in &to_answer {
         text.push_str(&format!("  {}\n", human_task_line(t, language)));
+        text.push_str(&risk_line(t));
         for line in stop_lines(bag, t) {
             text.push_str(&format!("      {line}\n"));
         }
@@ -2606,6 +2613,7 @@ fn human(
     }
     for (t, d) in &to_review {
         text.push_str(&format!("  {}\n", human_task_line(t, language)));
+        text.push_str(&risk_line(t));
         for line in decision_lines(d).lines() {
             text.push_str(&format!("    {line}\n"));
         }
@@ -2616,6 +2624,7 @@ fn human(
         bag,
         &tasks,
         &emergencies,
+        &classes,
         language,
     ));
     let emergencies: Vec<&allomos_core::classify::Unapproved> = emergencies
@@ -2628,16 +2637,17 @@ fn human(
     if !to_review.is_empty() {
         text.push_str("Once a person has reviewed a task's AI decisions: `alm reviewed <id>`.\n");
     }
-    let list = |members: &[&Task]| {
-        members
-            .iter()
-            .map(|t| task_json_in(bag, t))
-            .collect::<Vec<_>>()
+    // The risk in `--json` too: null when the task is not classified.
+    let with_risk = |t: &Task| {
+        let mut v = task_json_in(bag, t);
+        v["risk"] = json!(risk_of(t));
+        v
     };
+    let list = |members: &[&Task]| members.iter().map(|t| with_risk(t)).collect::<Vec<_>>();
     let review: Vec<Value> = to_review
         .iter()
         .map(|(t, d)| {
-            let mut v = task_json_in(bag, t);
+            let mut v = with_risk(t);
             v["ai_decisions"] = json!(d);
             v
         })
