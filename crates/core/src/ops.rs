@@ -1613,6 +1613,7 @@ mod tests {
                 handoff: None,
                 audit: None,
                 heartbeat: None,
+                risk: None,
             },
             areas: vec![],
             iterations: vec![],

@@ -118,6 +118,10 @@ pub struct Project {
     /// Task-A01-zero387). Missing: the defaults (10 and 30 minutes).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub heartbeat: Option<crate::heartbeat::Settings>,
+    /// Risk management (decision 0027 § 7, Task-A01-beetle749): the project's own rules for what
+    /// counts as high risk and its two limits. Missing: no rules of its own, both limits off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub risk: Option<crate::risk::Settings>,
     /// Fields this Allomos does not know, kept as they are and written back (Task-A01-piano403).
     #[serde(flatten)]
     pub extra: Extra,
