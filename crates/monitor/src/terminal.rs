@@ -369,12 +369,18 @@ pub fn powershell_script(project: &Path, found: &str, alm_dir: Option<&Path>) ->
     }
 }
 
+/// What a monitored Codex session is started with ahead of its request (Task-A03-plaza436).
+const CODEX_SANDBOX: &str = "--sandbox workspace-write ";
+
 /// The command line that starts a terminal agent with the request read from `file` (and the file
 /// removed once read), for Monitor ready tasks (Task-A03-moth285): `claude --session-id <id>`
 /// takes the session ID Allomos made, so the app knows the session before it claims; Codex picks
 /// its own, and so does Antigravity's `agy`, which takes an initial prompt only after `-i`
 /// (`--prompt-interactive`; Task-A03-queen969). The request goes through a file because a long, many-line request typed into a
-/// terminal window breaks at its first line end.
+/// terminal window breaks at its first line end. Codex always starts in the `workspace-write`
+/// sandbox, whatever the person's own Codex settings say, so it can change files in the project
+/// folder without a person approving each edit (Task-A03-plaza436); its approval policy stays
+/// the person's own.
 pub fn session_command(id: &str, file: &Path, session_id: Option<&str>) -> Option<String> {
     let file = shell_quote(&file.display().to_string());
     let request = format!("\"$(cat {file}; rm -f {file})\"");
@@ -383,7 +389,7 @@ pub fn session_command(id: &str, file: &Path, session_id: Option<&str>) -> Optio
             Some(format!("claude --session-id {} {request}", shell_quote(s)))
         }
         ("claude_cli", None) => Some(format!("claude {request}")),
-        ("codex_cli", _) => Some(format!("codex {request}")),
+        ("codex_cli", _) => Some(format!("codex {CODEX_SANDBOX}{request}")),
         ("antigravity_cli", _) => Some(format!("agy -i {request}")),
         _ => None,
     }
@@ -402,6 +408,7 @@ pub fn powershell_session(
     let file = powershell_quote(&file.display().to_string());
     let session = match (id, session_id) {
         ("claude_cli", Some(s)) => format!("--session-id {} ", powershell_quote(s)),
+        ("codex_cli", _) => CODEX_SANDBOX.to_string(),
         ("antigravity_cli", _) => "-i ".to_string(),
         _ => String::new(),
     };
@@ -602,7 +609,7 @@ mod tests {
         assert_eq!(
             session_command("codex_cli", file, Some("ignored")).as_deref(),
             Some(
-                "codex \"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\""
+                "codex --sandbox workspace-write \"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\""
             )
         );
         assert_eq!(
@@ -622,6 +629,18 @@ mod tests {
                 None
             ),
             r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\agy\bin\agy.exe' -i $request"
+        );
+        assert_eq!(
+            powershell_session(
+                "codex_cli",
+                Path::new(r"C:\p"),
+                r"C:\npm\codex.cmd",
+                Path::new(r"C:\t\r.txt"),
+                Some("ignored"),
+                None,
+                None
+            ),
+            r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\npm\codex.cmd' --sandbox workspace-write $request"
         );
         assert_eq!(session_command("claude_app", file, None), None);
         assert!(plain_session_id("8f0e5a52-1c2d-4e3f-9a0b-1c2d3e4f5a6b"));

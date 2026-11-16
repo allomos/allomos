@@ -594,6 +594,10 @@ and the network is closed, so a Codex session with nobody there to approve (an u
 such as one Monitor ready tasks… starts) cannot pull, commit or push. Allomos's rules for Codex
 let Codex run Git and `alm` without asking; every other command stays in Codex's sandbox.
 
+- **Sessions Monitor ready tasks… starts** use the `workspace-write` sandbox
+  (`codex --sandbox workspace-write`), whatever your own Codex settings say, so they can change
+  files in the project folder without asking; Codex sessions you start yourself keep your
+  settings.
 - **Once per computer, not once per project.** The file below goes in Codex's rules folder as
   `~/.codex/rules/allomos.rules` (`$CODEX_HOME/rules/allomos.rules` when `CODEX_HOME` is set).
   In the Allomos app, the option in Monitor ready tasks… adds it, updates it and removes it.
