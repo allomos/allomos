@@ -16,6 +16,13 @@ pub const FREQUENCIES: [u32; 7] = [1, 5, 10, 30, 60, 90, 120];
 pub const FIRST_FREQUENCY: u32 = 30;
 /// A session with no sign of life this long is shown as stalled; Allomos never ends it.
 pub const STALL_MS: i64 = 30 * 60 * 1000;
+/// A session that has not claimed its task this long after it was started did not start
+/// (A03-otter944): a session that works claims its task within a minute or two.
+pub const NOT_STARTED_MS: i64 = 10 * 60 * 1000;
+/// How often an agent paused because its quota is used up has its quota read again.
+pub const QUOTA_RECHECK_MS: i64 = 10 * 60 * 1000;
+/// How many sessions that did not start the run keeps, for the panel (the newest).
+pub const NOT_STARTED_KEPT: usize = 10;
 /// The agents whose sessions a monitor starts itself, in a terminal.
 pub const TERMINAL_AGENTS: [&str; 3] = ["claude_cli", "codex_cli", "antigravity_cli"];
 
@@ -118,6 +125,52 @@ pub struct Run {
     /// (A03-cart761). They stay in `taken`, so the run does not start a session for them again.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub let_go: Vec<LetGo>,
+    /// The agents given no session for now, and why (agent ID → pause; A03-otter944): their
+    /// quota is used up, or their last session did not start.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub paused: BTreeMap<String, Paused>,
+    /// The sessions that did not start (they never claimed their task), newest last
+    /// (A03-otter944). Their tasks are given out again.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub not_started: Vec<NotStarted>,
+}
+
+/// Why an agent gets no session for now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PauseWhy {
+    /// Its quota is used up: read again every [`QUOTA_RECHECK_MS`] until there is some.
+    Quota,
+    /// Its last session did not claim its task, for no reason the monitor could read: tried again
+    /// at the next check.
+    NoClaim,
+}
+
+/// An agent given no session until `until` (ms).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Paused {
+    pub why: PauseWhy,
+    /// When its quota comes back, as the agent wrote it, when it said.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resets: Option<String>,
+    /// Since when (ms).
+    pub since: i64,
+    /// When it is looked at again (ms).
+    pub until: i64,
+}
+
+/// A session that did not start: it never claimed its task.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NotStarted {
+    pub agent: String,
+    pub id: String,
+    /// When it was started, and when it was found not to have started (ms).
+    pub at: i64,
+    pub found: i64,
+    /// Why, when it could be read: `quota`; else `no_claim`.
+    pub why: PauseWhy,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resets: Option<String>,
 }
 
 /// A finished task's tab waiting to be closed (see [`Run::closing`]).
@@ -164,6 +217,8 @@ impl Run {
             closing: Vec::new(),
             unreadable: None,
             let_go: Vec::new(),
+            paused: BTreeMap::new(),
+            not_started: Vec::new(),
         }
     }
 
@@ -216,7 +271,7 @@ impl Run {
     /// less the sessions at work), in the run's order.
     pub fn free_agents(&self) -> Vec<String> {
         let mut free = Vec::new();
-        for agent in &self.agents {
+        for agent in self.agents.iter().filter(|a| !self.paused.contains_key(*a)) {
             let at_work = self.working.iter().filter(|w| &w.agent == agent).count() as u32;
             for _ in at_work..self.sessions_of(agent) {
                 free.push(agent.clone());
@@ -269,6 +324,73 @@ impl Run {
         }
         self.working = working;
         finished
+    }
+
+    /// The sessions that did not start (A03-otter944): started [`NOT_STARTED_MS`] ago or more and
+    /// their task still ready and never held. They are taken off the sessions at work, and their
+    /// tasks off the taken ones, so they are given out again; returned in the order started.
+    pub fn unclaimed(&mut self, tasks: &[Task], now: i64) -> Vec<Working> {
+        let (gone, kept): (Vec<Working>, Vec<Working>) = self.working.drain(..).partition(|w| {
+            let still_ready = tasks
+                .iter()
+                .any(|t| t.id == w.id && t.state == State::Ready && t.holder.is_none());
+            !w.seen_held && still_ready && now - w.at >= NOT_STARTED_MS
+        });
+        self.working = kept;
+        for w in &gone {
+            self.taken.retain(|id| id != &w.id);
+            self.taken_by.remove(&w.id);
+        }
+        gone
+    }
+
+    /// `w` did not start, for `why` (with the quota's reset time, when read): it is kept for the
+    /// panel, and its agent gets no session until it is looked at again.
+    pub fn did_not_start(&mut self, w: &Working, why: PauseWhy, resets: Option<String>, now: i64) {
+        self.not_started.push(NotStarted {
+            agent: w.agent.clone(),
+            id: w.id.clone(),
+            at: w.at,
+            found: now,
+            why,
+            resets: resets.clone(),
+        });
+        let over = self.not_started.len().saturating_sub(NOT_STARTED_KEPT);
+        self.not_started.drain(..over);
+        self.pause(&w.agent, why, resets, now);
+    }
+
+    /// `agent` gets no session for now: until its quota is read again, or (no reason read) until
+    /// the next check.
+    pub fn pause(&mut self, agent: &str, why: PauseWhy, resets: Option<String>, now: i64) {
+        let until = match why {
+            PauseWhy::Quota => now + QUOTA_RECHECK_MS,
+            PauseWhy::NoClaim => now + i64::from(self.every) * 60_000,
+        };
+        let since = self.paused.get(agent).map_or(now, |p| p.since);
+        self.paused.insert(
+            agent.to_string(),
+            Paused {
+                why,
+                resets,
+                since,
+                until,
+            },
+        );
+    }
+
+    /// The paused agents due to be looked at again (`until` reached), in the run's order.
+    pub fn pauses_due(&self, now: i64) -> Vec<(String, PauseWhy)> {
+        self.paused
+            .iter()
+            .filter(|(_, p)| now >= p.until)
+            .map(|(a, p)| (a.clone(), p.why))
+            .collect()
+    }
+
+    /// `agent` gets sessions again.
+    pub fn resume(&mut self, agent: &str) {
+        self.paused.remove(agent);
     }
 
     /// One check's share-out: each free session slot, in the run's order, gets the first ready
@@ -972,6 +1094,74 @@ mod tests {
         assert_eq!(r.scope, Scope::Iteration { id: "I-2".into() });
         r.set_scope(Scope::All);
         assert_eq!(r.scope, Scope::All);
+    }
+
+    /// A03-otter944: a session that never claims its task did not start; its task is given out
+    /// again, and its agent waits while its quota is used up.
+    #[test]
+    fn a_session_that_never_claims_its_task_did_not_start_and_its_task_goes_out_again() {
+        let mut r = run(&["claude_cli"]);
+        let bag = bag_of(vec![leveled("A01-1", 3)]);
+        let shares = r.share(&bag, 0);
+        assert_eq!(shares.len(), 1);
+        r.take("claude_cli", &shares[0].1, None, None, 0);
+        // Not yet 10 minutes: still waiting for its session to claim it.
+        assert!(r.unclaimed(&bag.tasks, NOT_STARTED_MS - 1).is_empty());
+        assert!(r.share(&bag, 0).is_empty(), "the slot is taken meanwhile");
+        // 10 minutes, still ready and never held: it did not start.
+        let gone = r.unclaimed(&bag.tasks, NOT_STARTED_MS);
+        assert_eq!(gone.len(), 1);
+        assert!(r.working.is_empty() && r.taken.is_empty() && r.taken_by.is_empty());
+        r.did_not_start(
+            &gone[0],
+            PauseWhy::Quota,
+            Some("7:10pm".into()),
+            NOT_STARTED_MS,
+        );
+        assert_eq!(r.not_started[0].id, "A01-1");
+        assert_eq!(r.not_started[0].resets.as_deref(), Some("7:10pm"));
+        // Its quota used up: no session for the agent until it is read again.
+        assert!(r.free_agents().is_empty());
+        assert!(r.share(&bag, 0).is_empty());
+        assert!(
+            r.pauses_due(NOT_STARTED_MS + QUOTA_RECHECK_MS - 1)
+                .is_empty()
+        );
+        let due = r.pauses_due(NOT_STARTED_MS + QUOTA_RECHECK_MS);
+        assert_eq!(due, [("claude_cli".to_string(), PauseWhy::Quota)]);
+        // Back: the same task is given out again.
+        r.resume("claude_cli");
+        let again = r.share(&bag, 0);
+        assert_eq!(again.len(), 1);
+        assert_eq!(again[0].1.id, "A01-1");
+    }
+
+    #[test]
+    fn a_session_that_claimed_its_task_is_not_taken_for_one_that_did_not_start() {
+        let mut r = run(&["claude_cli"]);
+        r.take("claude_cli", &leveled("A01-1", 3), None, None, 0);
+        // Claimed, then released after the claim: finished as before, not "did not start".
+        let held = [task("A01-1", State::InProgress, Some("s"))];
+        assert!(r.unclaimed(&held, 1).is_empty());
+        r.follow(&held, 1);
+        assert!(
+            r.unclaimed(&[task("A01-1", State::Ready, None)], NOT_STARTED_MS)
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn an_agent_paused_for_no_reason_read_is_tried_again_at_the_next_check() {
+        let mut r = run(&["claude_cli", "codex_cli"]);
+        r.pause("codex_cli", PauseWhy::NoClaim, None, 0);
+        assert_eq!(r.free_agents(), ["claude_cli"]);
+        assert_eq!(r.paused["codex_cli"].until, 30 * 60_000);
+        // A second pause keeps when it started.
+        r.pause("codex_cli", PauseWhy::Quota, None, 5);
+        assert_eq!(r.paused["codex_cli"].since, 0);
+        let text = serde_json::to_string(&r).unwrap();
+        assert!(text.contains(r#""paused":{"codex_cli":{"why":"quota""#));
+        assert_eq!(serde_json::from_str::<Run>(&text).unwrap(), r);
     }
 
     #[test]
