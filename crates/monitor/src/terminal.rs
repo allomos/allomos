@@ -374,6 +374,19 @@ const CODEX_SANDBOX: &str = "--sandbox workspace-write ";
 /// Quiet monitored sessions do not ask for approval and can use the network (Task-A03-trail745).
 const CODEX_QUIET_POLICY: &str =
     "--ask-for-approval never --config sandbox_workspace_write.network_access=true ";
+/// The app-access prompt is separate from command approvals. Allow only Allomos, only in the
+/// quiet macOS process; this command-line override does not change the person's Codex settings.
+const CODEX_QUIET_MACOS_APP_ACCESS: &str =
+    "--config 'computer_use.macos.bundle_ids={\"io.allomos\"=\"allow\"}' ";
+
+fn codex_quiet_policy() -> String {
+    let app_access = if cfg!(target_os = "macos") {
+        CODEX_QUIET_MACOS_APP_ACCESS
+    } else {
+        ""
+    };
+    format!("{CODEX_QUIET_POLICY}{app_access}")
+}
 
 /// The command line that starts a terminal agent with the request read from `file` (and the file
 /// removed once read), for Monitor ready tasks (Task-A03-moth285): `claude --session-id <id>`
@@ -383,8 +396,9 @@ const CODEX_QUIET_POLICY: &str =
 /// terminal window breaks at its first line end. Codex always starts in the `workspace-write`
 /// sandbox, whatever the person's own Codex settings say, so it can change files in the project
 /// folder without a person approving each edit (Task-A03-plaza436). Only quiet monitored sessions
-/// set its approval policy to `never` and allow network access in the sandbox (Task-A03-trail745),
-/// so an unattended run can install dependencies without prompting. User settings are untouched.
+/// set its approval policy to `never` and allow network access in the sandbox (Task-A03-trail745).
+/// On macOS they also allow the Allomos app in this process only, so Computer Use does not ask for
+/// app access. User settings are untouched.
 pub fn session_command(id: &str, file: &Path, session_id: Option<&str>) -> Option<String> {
     session_command_with_quiet(id, file, session_id, false)
 }
@@ -404,7 +418,11 @@ fn session_command_with_quiet(
         ("claude_cli", None) => Some(format!("claude {request}")),
         ("codex_cli", _) => Some(format!(
             "codex {CODEX_SANDBOX}{}{request}",
-            if quiet { CODEX_QUIET_POLICY } else { "" }
+            if quiet {
+                codex_quiet_policy()
+            } else {
+                String::new()
+            }
         )),
         ("antigravity_cli", _) => Some(format!("agy -i {request}")),
         _ => None,
@@ -439,7 +457,11 @@ fn powershell_session_with_quiet(
         ("claude_cli", Some(s)) => format!("--session-id {} ", powershell_quote(s)),
         ("codex_cli", _) => format!(
             "{CODEX_SANDBOX}{}",
-            if quiet { CODEX_QUIET_POLICY } else { "" }
+            if quiet {
+                codex_quiet_policy()
+            } else {
+                String::new()
+            }
         ),
         ("antigravity_cli", _) => "-i ".to_string(),
         _ => String::new(),
@@ -703,11 +725,20 @@ mod tests {
     fn quiet_monitor_codex_has_no_approval_prompts_and_its_sandbox_can_use_the_network() {
         let file = Path::new("/tmp/allomos-request-1.txt");
         let request = "\"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\"";
+        let app_access = if cfg!(target_os = "macos") {
+            "--config 'computer_use.macos.bundle_ids={\"io.allomos\"=\"allow\"}' "
+        } else {
+            ""
+        };
         assert_eq!(
             session_command_with_quiet("codex_cli", file, None, true).as_deref(),
             Some(format!(
-                "codex --sandbox workspace-write --ask-for-approval never --config sandbox_workspace_write.network_access=true {request}"
+                "codex --sandbox workspace-write --ask-for-approval never --config sandbox_workspace_write.network_access=true {app_access}{request}"
             ).as_str())
+        );
+        assert_eq!(
+            session_command("codex_cli", file, None).as_deref(),
+            Some(format!("codex --sandbox workspace-write {request}").as_str())
         );
         assert_eq!(
             session_command_with_quiet("claude_cli", file, Some("ab-12"), true).as_deref(),
@@ -729,7 +760,9 @@ mod tests {
                 None,
                 true
             ),
-            r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\npm\codex.cmd' --sandbox workspace-write --ask-for-approval never --config sandbox_workspace_write.network_access=true $request"
+            format!(
+                "Set-Location -LiteralPath 'C:\\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\\t\\r.txt'; Remove-Item -LiteralPath 'C:\\t\\r.txt'; & 'C:\\npm\\codex.cmd' --sandbox workspace-write --ask-for-approval never --config sandbox_workspace_write.network_access=true {app_access}$request"
+            )
         );
     }
 
