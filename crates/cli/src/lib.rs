@@ -2567,7 +2567,12 @@ fn human(
     // under the task; one with none reads "not classified". Shown only, never judged.
     let classes = allomos_store::classify::by_task(root);
     let risk_of = |t: &Task| classes.get(&t.id).and_then(|c| c.risk.as_deref());
-    let risk_line = |t: &Task| format!("      {}\n", classify::human_risk_line(risk_of(t), language));
+    let risk_line = |t: &Task| {
+        format!(
+            "      {}\n",
+            classify::human_risk_line(risk_of(t), language)
+        )
+    };
     let mut text = String::new();
     text.push_str(&format!("To check ({})\n", to_check.len()));
     if to_check.is_empty() {

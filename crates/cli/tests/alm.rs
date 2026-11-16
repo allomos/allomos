@@ -9227,7 +9227,10 @@ fn human_shows_each_tasks_risk_and_marks_the_unclassified() {
     ok(&repo, &["task-language", "en"]);
     ok(&repo, &["ready", "A01-01"]);
     ok(&repo, &["--as", "a", "claim", "A01-01"]);
-    ok(&repo, &["--as", "a", "classify", "A01-01", "--risk", "high"]);
+    ok(
+        &repo,
+        &["--as", "a", "classify", "A01-01", "--risk", "high"],
+    );
     ok(
         &repo,
         &["--as", "a", "ai-decided", "A01-01", "Kept it simple"],
@@ -9265,9 +9268,15 @@ fn human_shows_each_tasks_risk_and_marks_the_unclassified() {
     let out = String::from_utf8(alm(&repo, &["human"]).stdout).unwrap();
     // To check and To review list A01-01 (high); To answer lists A01-03 (none recorded).
     assert_eq!(out.matches("      risk: high\n").count(), 2, "{out}");
-    assert_eq!(out.matches("      risk: not classified\n").count(), 1, "{out}");
+    assert_eq!(
+        out.matches("      risk: not classified\n").count(),
+        1,
+        "{out}"
+    );
     let line_after = |id: &str| {
-        let mut lines = out.lines().skip_while(|l| !l.starts_with(&format!("  {id}  ")));
+        let mut lines = out
+            .lines()
+            .skip_while(|l| !l.starts_with(&format!("  {id}  ")));
         lines.nth(1).unwrap().to_string()
     };
     assert_eq!(line_after("A01-01"), "      risk: high");

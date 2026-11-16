@@ -1951,7 +1951,11 @@ struct BeforeBlocked {
 fn state_before_blocked(history: &[allomos_core::event::Event], task: &Task) -> BeforeBlocked {
     use allomos_core::State;
     let held = task.holder.is_some();
-    let fallback = if held { State::InProgress } else { State::Ready };
+    let fallback = if held {
+        State::InProgress
+    } else {
+        State::Ready
+    };
     let text = |v: &Option<serde_json::Value>| {
         v.as_ref()
             .and_then(|v| v.as_str())
@@ -1962,9 +1966,9 @@ fn state_before_blocked(history: &[allomos_core::event::Event], task: &Task) -> 
         .iter()
         .filter(|e| e.kind == Kind::Task && e.id.as_deref() == Some(task.id.as_str()))
         .filter(|e| {
-            e.changes
-                .iter()
-                .any(|c| c.field == "state" && c.to.as_ref().and_then(|v| v.as_str()) == Some("blocked"))
+            e.changes.iter().any(|c| {
+                c.field == "state" && c.to.as_ref().and_then(|v| v.as_str()) == Some("blocked")
+            })
         })
         .max_by(|a, b| a.at.cmp(&b.at));
     let Some(event) = found else {
@@ -3125,14 +3129,13 @@ mod tests {
         // 02: backlog before. 03: waiting on Ann before. 04: no history. 05: held, no history.
         // 06: ready before, blocked twice (the later change counts).
         let actor = Actor::alm(Some("s"));
-        let change_of = |field: &str, from: Option<&str>, to: Option<&str>| {
-            allomos_core::event::Change {
+        let change_of =
+            |field: &str, from: Option<&str>, to: Option<&str>| allomos_core::event::Change {
                 extra: Default::default(),
                 field: field.into(),
                 from: from.map(|v| serde_json::json!(v)),
                 to: to.map(|v| serde_json::json!(v)),
-            }
-        };
+            };
         let mut bag = lock.load().taskbag.unwrap();
         for t in bag.tasks.iter_mut().filter(|t| t.id != "A01-01") {
             let changes = match t.id.as_str() {
@@ -3194,7 +3197,10 @@ mod tests {
         let bag = loaded.taskbag.unwrap();
         let t = |id: &str| bag.tasks.iter().find(|t| t.id == id).unwrap().clone();
         assert_eq!(
-            (t("A01-03").waiting_on.as_deref(), t("A01-03").who.as_deref()),
+            (
+                t("A01-03").waiting_on.as_deref(),
+                t("A01-03").who.as_deref()
+            ),
             (Some("the licence"), Some("Ann"))
         );
         for id in &ids[1..] {
@@ -3204,7 +3210,11 @@ mod tests {
         }
         let e = &events::history(&root, "A01-02").events[0];
         assert_eq!(e.command, "upgrade");
-        assert!(allomos_core::event::reason(e).unwrap().starts_with("upgrade:"));
+        assert!(
+            allomos_core::event::reason(e)
+                .unwrap()
+                .starts_with("upgrade:")
+        );
         // Up to date now: nothing more to upgrade.
         assert!(
             upgrade(&root, Actor::alm(Some("s")), Duration::ZERO)
