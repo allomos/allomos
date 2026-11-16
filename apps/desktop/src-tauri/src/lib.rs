@@ -2939,11 +2939,15 @@ mod tests {
         timed("task_history", &mut || {
             task_history(root.clone(), id.clone());
         });
-        timed("edit_task (state: ready)", &mut || {
-            let edit =
-                serde_json::from_value(serde_json::json!({ "field": "state", "state": "ready" }))
-                    .unwrap();
-            edit_task_as(&root, Some("Will"), &id, &edit).unwrap();
+        let state = |state: &str| -> allomos_core::ops::Edit {
+            serde_json::from_value(serde_json::json!({ "field": "state", "state": state })).unwrap()
+        };
+        // Since Task-A01-parade485: the change and its answer are all the window waits for.
+        timed("edit_task with its answer (state: ready; all it takes now)", &mut || {
+            change_task_as(&root, Some("Will"), &id, &state("ready")).unwrap();
+        });
+        timed("edit_task, the change alone (state: backlog)", &mut || {
+            edit_task_as(&root, Some("Will"), &id, &state("backlog")).unwrap();
         });
         // Until Task-A01-parade485 the window then asked for the fingerprint and read the whole
         // taskbag again; since then the change's answer is all it needs.
