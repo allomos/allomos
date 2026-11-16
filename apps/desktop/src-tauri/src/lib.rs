@@ -2945,8 +2945,13 @@ mod tests {
                     .unwrap();
             edit_task_as(&root, Some("Will"), &id, &edit).unwrap();
         });
+        // Until Task-A01-parade485 the window then asked for the fingerprint and read the whole
+        // taskbag again; since then the change's answer is all it needs.
+        timed("taskbag_stamp (before A01-parade485: after the change)", &mut || {
+            taskbag_stamp(root.clone());
+        });
         timed(
-            "open_taskbag again (the reload after the change)",
+            "open_taskbag again (before A01-parade485: the reload after the change)",
             &mut || {
                 open_taskbag(root.clone());
             },
