@@ -39,7 +39,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v38)
+## Tasks: Allomos (v39)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -182,6 +182,13 @@ the project notes (below).
   Whoever continues reads it with `alm next` or `alm show <id>`. There are no handoff files: if
   `alm next` finds old ones in the taskbag's `handoffs/`, the taskbag needs updating (**Update
   the taskbag…** in the Allomos app, or `alm move-in`).
+- Write for a person first. A person reads every handoff note, every AI decision and every set
+  of check steps, so each keeps one order. First, one sentence in plain words that a person can
+  act on: where the work stands, or what was decided, as they would see it. Then what the person
+  has to do, or that there is nothing to do; check steps say about how many minutes they take
+  and which step matters most. Last, the technical detail: commit IDs, commands, task IDs, file
+  names. Never open with a commit ID, a command or a file name. Details: `alm guide workflow`,
+  step 5.
 - Quota: each time you read your usage (in Claude Code: `get_usage`), at the handoff gate's check
   and whenever `alm` asks, report the figure with `alm quota --agent <your agent's id, e.g.
   claude-code or codex> --left <percent> [--resets <local date and time>] [--account <name, only
