@@ -1827,6 +1827,10 @@ fn quoted(arg: &str) -> String {
     }
 }
 
+/// Said after every change's Git commands (Task-A01-flour637): what is not in the list stays
+/// where it is, whoever made it.
+const SAVE_AS_PRINTED: &str = "Run the commands as printed, never `git add -A`, `git add .` or `git commit -a` in the taskbag: those also take changes others have not shared yet (the person's changes in the Allomos app, other sessions' changes).\n";
+
 /// `git add`, `git commit` (with the two message lines) and, unless `push` is false, `git push`,
 /// run in `taskbag` and naming exactly `files` (relative to it).
 fn git_commands(
@@ -1933,6 +1937,9 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
         }
         if !commands.is_empty() {
             text.push_str("Save only these files; leave other changes as they are.\n");
+            // Task-A01-flour637: a beat saved with `git commit -a` took along changes the
+            // person had made in the app, without their events.
+            text.push_str(SAVE_AS_PRINTED);
         }
         done.fields["changed_files"] = json!(files);
         done.fields["git_commands"] = json!(commands);

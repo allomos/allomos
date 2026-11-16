@@ -592,6 +592,98 @@ fn walk(dir: &Path) -> Vec<PathBuf> {
     all
 }
 
+/// A heartbeat saved with the commands `alm beat` prints holds only the heartbeat's own files
+/// (Task-A01-flour637): a change someone else has not shared yet stays out of the commit and
+/// stays in the taskbag. The reminder to push work in progress, with its `git add -A` for the
+/// working branch's worktree, comes after the taskbag's commands and says it is not for the
+/// taskbag.
+#[test]
+fn a_beat_saved_as_printed_leaves_unshared_changes_alone() {
+    let repo = tmp("beat-scope");
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .current_dir(&repo)
+            .args(["-c", "user.name=t", "-c", "user.email=t@example.invalid"])
+            .args(["-c", "commit.gpgsign=false"])
+            .args(args)
+            .output()
+    };
+    match git(&["init", "-q"]) {
+        Ok(o) if o.status.success() => {}
+        _ => return, // No Git on this machine: nothing to check.
+    }
+    ok(&repo, &["init"]);
+    ok(&repo, &["add", "area", "A01", "One"]);
+    for id in ["A01-01", "A01-02"] {
+        ok(&repo, &["add", "task", id, "--area", "A01", "--title", "T"]);
+        ok(&repo, &["ready", id]);
+    }
+    let t0 = "2026-11-09T14:00:00Z";
+    ok_at(&repo, t0, &["--as", "s1", "claim", "A01-01"]);
+    assert!(git(&["add", "-A"]).unwrap().status.success());
+    assert!(
+        git(&["commit", "-q", "-m", "start"])
+            .unwrap()
+            .status
+            .success()
+    );
+
+    // Someone else's change, not shared yet: a tracked file changed and a new event file.
+    ok_at(&repo, t0, &["note", "A01-02", "not shared yet"]);
+    let dirty = |git: &dyn Fn(&[&str]) -> std::io::Result<Output>| -> Vec<String> {
+        let out = git(&["status", "--porcelain", "-uall"]).unwrap();
+        String::from_utf8(out.stdout)
+            .unwrap()
+            .lines()
+            .map(String::from)
+            .collect()
+    };
+    let others = dirty(&git);
+    assert!(
+        others.iter().any(|l| l.ends_with("tasks/A01-02/task.json")) && others.len() >= 2,
+        "{others:?}"
+    );
+
+    // The beat, saved exactly as printed (without the push: there is no remote here).
+    let t1 = "2026-11-09T14:10:00Z";
+    let v = ok_at(&repo, t1, &["--as", "s1", "beat", "--busy", "15m"]);
+    assert_eq!(v["changed_files"], json!(["tasks/A01-01/task.json"]), "{v}");
+    for c in v["git_commands"].as_array().unwrap() {
+        let c = c.as_str().unwrap();
+        if c.ends_with(" push") {
+            continue;
+        }
+        let c = c.replacen(
+            "git -C",
+            "git -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false -C",
+            1,
+        );
+        let out = Command::new("sh").args(["-c", &c]).output().unwrap();
+        assert!(out.status.success(), "{c}: {out:?}");
+    }
+    let out = git(&["show", "--name-only", "--format=", "HEAD"]).unwrap();
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap().trim(),
+        ".allomos/taskbag/tasks/A01-01/task.json"
+    );
+    // The other change is still there, as it was.
+    assert_eq!(dirty(&git), others);
+
+    // In words: the taskbag's files first, how not to save them, then the working branch.
+    let out = alm_at(&repo, "2026-11-09T14:20:00Z", &["--as", "s1", "beat"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    let only = text.find("Save only these files").expect(&text);
+    let never = text
+        .find("never `git add -A`, `git add .` or `git commit -a` in the taskbag")
+        .expect(&text);
+    let wip = text.find("    git add -A\n").expect(&text);
+    assert!(only < never && never < wip, "{text}");
+    assert!(
+        text.contains("in that branch's worktree, never in the taskbag"),
+        "{text}"
+    );
+}
+
 /// In a real Git repository, `git status` shows only the taskbag's text files: never the lock.
 #[test]
 fn git_sees_only_text_files() {

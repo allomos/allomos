@@ -211,7 +211,9 @@ Exit codes: 0 done, 1 refused by a rule, 2 wrong usage, 3 taskbag busy or not wr
 `alm` never runs or reads your version control tool. After a change it prints \"Save this change
 in your version control tool and share it\", the files that change wrote, and, \"For Git:\", the
 exact `git add`, `git commit` and `git push` commands for them (`--json`: `changed_files` and
-`git_commands`); save and share them yourself and leave other changes as they are. `alm claim`
+`git_commands`); save and share them yourself and leave other changes as they are: run the
+commands as printed, never `git add -A`, `git add .` or `git commit -a` in the taskbag, which
+also take changes others have not shared yet. `alm claim`
 asks you to share at once, before you start the work. Changes the person made in the Allomos app
 and not shared yet come with their own files and commands, to save as the person's. `alm init`
 prints none: save the new taskbag yourself.
@@ -646,7 +648,10 @@ const WORKFLOW: &str = "# How to work the tasks
    `alm` tells you when a task was taken over from you. Send a heartbeat at least every 10
    minutes (the project's interval; `alm heartbeat-settings` shows it): `alm beat --as <your
    session name>` beats every task you hold in one change; save and share it as `alm` prints,
-   since a heartbeat counts only once shared. Under half the interval after the last one it
+   since a heartbeat counts only once shared. Save only the files it lists, with the commands as
+   printed: never `git add -A`, `git add .` or `git commit -a` in the taskbag, which also take
+   changes others have not shared yet (the person's changes in the Allomos app, other sessions'
+   changes), often without the events that record them. Under half the interval after the last one it
    writes nothing, so running it often costs nothing. Any change you make to your task (`label`,
    `note`, `handoff`, …) beats along with it; reading never does. Before a long step that runs
    no `alm` command for longer than the interval (a long build, a long test run, waiting for a
@@ -2298,6 +2303,24 @@ mod tests {
     /// (AGENTS.md) and `alm guide workflow` both tell every agent, with commands only, to pass
     /// `--as`, beat every 10 minutes and share it, declare long steps with `--busy`, find and take
     /// over lost tasks, and stop when a task was taken over from it.
+    /// A heartbeat is saved with only its own files (Task-A01-flour637): the workflow and the
+    /// commands guide name the Git commands that would take along what others have not shared.
+    #[test]
+    fn guides_say_to_save_only_the_listed_files() {
+        let flat = |t: &str| t.split_whitespace().collect::<Vec<_>>().join(" ");
+        for topic in ["workflow", "commands"] {
+            let text = flat(guide(Some(topic)).unwrap().as_str());
+            assert!(
+                text.contains("never `git add -A`, `git add .` or `git commit -a` in the taskbag"),
+                "{topic}: {text}"
+            );
+            assert!(
+                text.contains("changes others have not shared yet"),
+                "{topic}"
+            );
+        }
+    }
+
     #[test]
     fn brief_and_workflow_carry_the_heartbeat_rules() {
         let flat = |t: &str| t.split_whitespace().collect::<Vec<_>>().join(" ");

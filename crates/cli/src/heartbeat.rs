@@ -110,8 +110,11 @@ pub(crate) fn beat(
             "A heartbeat counts only once it is shared: save and share it now (other sessions judge from what they pulled).\n",
         );
     }
+    // Said after the taskbag's own commands (Task-A01-flour637): the heartbeat's files come
+    // first, and `git add -A` is not read as the way to save them.
+    let mut after = String::new();
     let push_work = if beaten.push_work {
-        push_work_reminder(&root, &beaten.beats, me.unwrap_or("?"), &mut text)
+        push_work_reminder(&root, &beaten.beats, me.unwrap_or("?"), &mut after)
     } else {
         Vec::new()
     };
@@ -119,13 +122,16 @@ pub(crate) fn beat(
         json!({ "taskbag": root, "beats": list, "push_work": push_work }),
         text,
     );
+    done.after = after;
     done.issues = beaten.issues;
     Ok(done)
 }
 
 /// The reminder to push work in progress with each heartbeat (Task-A01-butter895): what to do and,
 /// for each task beaten for, the Git commands on its working branch. Said on every beat, also one
-/// too soon to write: an automatic heartbeat may have written the last one.
+/// too soon to write: an automatic heartbeat may have written the last one. `git add -A` belongs
+/// to the working branch's worktree only, and the words say so (Task-A01-flour637): run in the
+/// taskbag, it takes along changes others have not shared yet.
 fn push_work_reminder(
     root: &Path,
     beats: &[heartbeat::Beat],
@@ -137,7 +143,7 @@ fn push_work_reminder(
     }
     let branches = allomos_store::branches(root);
     text.push_str(
-        "Also save and share your work in progress on the working branch, half-finished too, with WIP in the commit message: only what is pushed reaches a session on another computer (project setting, `alm heartbeat-settings`). Nothing new since the last time: nothing to do. For Git, in that branch's worktree:\n",
+        "Also save and share your work in progress on the working branch, half-finished too, with WIP in the commit message: only what is pushed reaches a session on another computer (project setting, `alm heartbeat-settings`). Nothing new since the last time: nothing to do. For Git, in that branch's worktree, never in the taskbag (there, save only the files a change lists):\n",
     );
     let mut list = Vec::new();
     for b in beats {
