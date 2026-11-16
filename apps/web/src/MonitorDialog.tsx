@@ -176,58 +176,62 @@ export function MonitorDialog({
   const offer = codexChosen && codex ? codexOffer(codex) : null;
   const never = t("monitor.codex_rules_never");
   const nothing = t("monitor.codex_rules_none");
-  // Allomos's rules for Codex, shown right under the checked Codex row (Task-A03-jewel909).
-  const codexRules =
-    offer && codex ? (
-      <div className="codex-rules">
-        {offer === "newer" ? (
-          <p className="small hint">{t("monitor.codex_rules_newer", { path: codex.path, version: codex.state === "newer" ? codex.version : codex.shipped })}</p>
-        ) : (
-          <>
-            {codex.state === "older" && (
-              <p className="small hint">
-                {t("monitor.codex_rules_changed_by", {
-                  from: codex.version,
-                  to: codex.shipped,
-                  added: rulesList(codex.changes.added, never, nothing),
-                  removed: rulesList(codex.changes.removed, never, nothing),
-                })}
-              </p>
-            )}
-            {codex.state === "changed" && (
-              <p className="small hint">
-                {t("monitor.codex_rules_edited", {
-                  path: codex.path,
-                  version: codex.shipped,
-                  added: rulesList(codex.changes.added, never, nothing),
-                  removed: rulesList(codex.changes.removed, never, nothing),
-                })}
-              </p>
-            )}
-            <label>
-              <input type="checkbox" checked={codexOn} onChange={(e) => setCodexOn(e.target.checked)} />{" "}
-              <strong>
-                {offer === "changed"
-                  ? t("monitor.codex_rules_replace", { version: codex.shipped })
-                  : t(`monitor.codex_rules_${offer}`, { path: codex.path, version: codex.shipped })}
-              </strong>
-            </label>
-            <p className="muted small">{t("monitor.codex_rules_note")}</p>
-            <details>
-              <summary>{t("monitor.codex_rules_show")}</summary>
-              <ul className="small">
-                {codex.rules.map((r) => (
-                  <li key={`${r.decision} ${r.command}`}>
-                    <code>{ruleText(r, never)}</code>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          </>
-        )}
-        {codexError && <p className="error small">{codexError}</p>}
-      </div>
-    ) : null;
+  // Codex's note and Allomos's rules for Codex, shown right under the checked Codex row (Task-A03-jewel909).
+  const codexRules = codexChosen ? (
+    <>
+      <p className="banner update">{t("monitor.permissions_codex_cli")}</p>
+      {offer && codex && (
+        <div className="codex-rules">
+          {offer === "newer" ? (
+            <p className="small hint">{t("monitor.codex_rules_newer", { path: codex.path, version: codex.state === "newer" ? codex.version : codex.shipped })}</p>
+          ) : (
+            <>
+              {codex.state === "older" && (
+                <p className="small hint">
+                  {t("monitor.codex_rules_changed_by", {
+                    from: codex.version,
+                    to: codex.shipped,
+                    added: rulesList(codex.changes.added, never, nothing),
+                    removed: rulesList(codex.changes.removed, never, nothing),
+                  })}
+                </p>
+              )}
+              {codex.state === "changed" && (
+                <p className="small hint">
+                  {t("monitor.codex_rules_edited", {
+                    path: codex.path,
+                    version: codex.shipped,
+                    added: rulesList(codex.changes.added, never, nothing),
+                    removed: rulesList(codex.changes.removed, never, nothing),
+                  })}
+                </p>
+              )}
+              <label>
+                <input type="checkbox" checked={codexOn} onChange={(e) => setCodexOn(e.target.checked)} />{" "}
+                <strong>
+                  {offer === "changed"
+                    ? t("monitor.codex_rules_replace", { version: codex.shipped })
+                    : t(`monitor.codex_rules_${offer}`, { path: codex.path, version: codex.shipped })}
+                </strong>
+              </label>
+              <p className="muted small">{t("monitor.codex_rules_note")}</p>
+              <details>
+                <summary>{t("monitor.codex_rules_show")}</summary>
+                <ul className="small">
+                  {codex.rules.map((r) => (
+                    <li key={`${r.decision} ${r.command}`}>
+                      <code>{ruleText(r, never)}</code>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            </>
+          )}
+          {codexError && <p className="error small">{codexError}</p>}
+        </div>
+      )}
+    </>
+  ) : null;
   const start = async () => {
     if (!canStart || starting) return;
     const action = offer ? codexActionAtStart(offer, codexOn) : null;
@@ -405,7 +409,7 @@ export function MonitorDialog({
               <Markdown source={modes} onLink={() => undefined} />
             </details>
           )}
-          {picked.map((a) => (
+          {picked.filter((a) => baseAgent(a) !== "codex_cli").map((a) => (
             <p key={a} className="banner update">
               {picked.length > 1 && <strong>{labelOf(a, t(nameKey(a)))}: </strong>}
               {t(`monitor.permissions_${baseAgent(a)}` as Key)}
