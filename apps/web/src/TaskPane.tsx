@@ -80,6 +80,7 @@ export function TaskPane({
   onHandOver,
   onApprove,
   onWithdraw,
+  onOpenTask,
   lostAfter,
   lastChange,
 }: {
@@ -127,6 +128,8 @@ export function TaskPane({
   onApprove?: (shown: string, expires: string | null, ready: boolean) => Promise<void>;
   /** Withdraws approval `id`, with why (Task-A01-baker800). Desktop only. Rejects with a Problem. */
   onWithdraw?: (id: string, reason: string) => Promise<void>;
+  /** Opens another task in the same detail pane. */
+  onOpenTask: (id: string) => void;
   /** The project's lost limit, in minutes (Task-A01-kernel761). */
   lostAfter: number;
   /** When the task last changed (UTC): where its holder never beat, the lost limit counts from it. */
@@ -652,7 +655,7 @@ export function TaskPane({
     [t("pane.who"), task.state === "waiting" ? (task.who ?? t("task.you")) : null, null],
     [
       t("pane.blocked_by"),
-      (task.blocked_by ?? []).length ? <BlockerList parts={blockerParts(task, tasks, t)} /> : null,
+      (task.blocked_by ?? []).length ? <BlockerList parts={blockerParts(task, tasks, t)} onOpenTask={onOpenTask} /> : null,
       "blocked_by",
     ],
     [t("pane.next"), task.next_dependency, "next_dependency"],
@@ -698,7 +701,7 @@ export function TaskPane({
         return (
           <section key={p} className="pane-focus">
             <h3>{t("pane.blocked_by")}</h3>
-            <p>{(task.blocked_by ?? []).length ? <BlockerList parts={blockerParts(task, tasks, t)} /> : "—"}</p>
+            <p>{(task.blocked_by ?? []).length ? <BlockerList parts={blockerParts(task, tasks, t)} onOpenTask={onOpenTask} /> : "—"}</p>
           </section>
         );
       case "handoff":

@@ -347,16 +347,30 @@ function StopRow({ fact, state, blockerTitle, onOpenTask }: { fact: StopFact; st
 export function BlockerList({ parts, title, onOpenTask }: { parts: BlockerPart[]; title?: (id: string) => string; onOpenTask?: (id: string) => void }) {
   return (
     <>
-      {parts.map((b, i) => (
-        <span key={b.id}>
-          {i > 0 && <span className="muted">, </span>}
-          {onOpenTask && b.title !== null ? (
-            <button type="button" className={`row-blocker row-blocker-link ${b.finished ? "finished" : "open"}`} title={title?.(b.id) ?? b.title ?? undefined} onKeyDown={ownKeys} onClick={(e) => { e.stopPropagation(); onOpenTask(b.id); }}>{b.text}</button>
-          ) : (
-            <span className={`row-blocker ${b.finished ? "finished" : "open"}`} title={title?.(b.id) ?? b.title ?? undefined}>{b.text}</span>
-          )}
-        </span>
-      ))}
+      {parts.map((b, i) => {
+        const tone = b.finished ? "finished" : "open";
+        return (
+          <span key={b.id}>
+            {i > 0 && <span className="muted">, </span>}
+            {onOpenTask && b.title !== null && b.text.startsWith(b.id) ? (
+              <>
+                <button
+                  type="button"
+                  className={`row-blocker row-blocker-link ${tone}`}
+                  title={title?.(b.id) ?? b.title}
+                  onKeyDown={ownKeys}
+                  onClick={(e) => { e.stopPropagation(); onOpenTask(b.id); }}
+                >
+                  {b.id}
+                </button>
+                <span className={`row-blocker ${tone}`}>{b.text.slice(b.id.length)}</span>
+              </>
+            ) : (
+              <span className={`row-blocker ${tone}`} title={title?.(b.id) ?? b.title ?? undefined}>{b.text}</span>
+            )}
+          </span>
+        );
+      })}
     </>
   );
 }

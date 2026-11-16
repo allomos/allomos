@@ -505,6 +505,8 @@ button.primary.danger { background: var(--err); border-color: var(--err); color:
 /* Task-A01-border342: Blocked by names every blocker; one not finished in the blocked colour, a finished one in the done colour. */
 .row-blocker.open { color: var(--s-blocked); }
 .row-blocker.finished { color: var(--s-done); }
+.row-blocker-link { border: 0; border-radius: 0; background: transparent; padding: 0; font: inherit; text-align: inherit; }
+.row-blocker-link:hover { text-decoration: underline; }
 .row-stop-text.clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
 /* Task-A01-cell542: every state its own colour, wherever a state is shown; Task-A01-yard163: brighter,
    and the state word itself (.state-word) on a light tint of its colour (.tint). The filter
@@ -908,6 +910,8 @@ button.tree-fold:hover { background: color-mix(in srgb, var(--c) 22%, var(--row-
 button.tree-fold:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .tree-fold svg { width: 8px; height: 8px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .tree-note { display: inline-block; margin-left: 8px; font-size: 11.5px; line-height: 1.5; padding: 0 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; vertical-align: 1px; }
+.tree-note.tree-dependency { background: transparent; font: 400 11.5px/1.5 var(--font); }
+.tree-note.tree-dependency:hover { color: var(--accent-ink); }
 .tree-note.tree-more { font-variant-numeric: tabular-nums; border-color: var(--accent); color: var(--accent-ink); }
 .task.tree-parent-finished .title { color: var(--muted); }
 /* Task-A01-lens781: the Show filter, ticks in two groups (states, labels with Yes and No). */
