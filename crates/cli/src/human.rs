@@ -10,9 +10,7 @@ use allomos_core::{Problem, Task, Taskbag};
 use allomos_store::{pick_ui_language, task_language};
 use serde_json::{Value, json};
 
-use crate::{
-    Done, classify, decision_lines, human_task_line, indent, stop_lines, task_json_in,
-};
+use crate::{Done, classify, decision_lines, human_task_line, indent, stop_lines, task_json_in};
 
 /// "check + review 2 AI decisions": what the person has to do about one task, in the task
 /// language like the state and the labels of its line.
@@ -221,7 +219,7 @@ pub(crate) fn human(
     let of_kind = |kind: Todo| -> Vec<Value> {
         rows.iter()
             .filter(|r| r.todo.contains(&kind))
-            .filter_map(|r| task_of(r))
+            .filter_map(&task_of)
             .map(|t| {
                 let mut v = with_risk(t);
                 if kind == Todo::Review {

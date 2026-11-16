@@ -45,10 +45,7 @@ pub enum Todo {
 impl Todo {
     /// An agent is waiting for it (the first group of the queue).
     pub fn agent_waiting(self) -> bool {
-        matches!(
-            self,
-            Todo::Answer | Todo::Approve | Todo::ApproveAfterwards
-        )
+        matches!(self, Todo::Answer | Todo::Approve | Todo::ApproveAfterwards)
     }
 }
 
@@ -267,7 +264,10 @@ mod tests {
             serde_json::from_value(json!({ "id": id, "name": id, "order": order })).unwrap()
         };
         Taskbag {
-            project: serde_json::from_value(json!({ "format": crate::FORMAT, "id": "P", "name": "P" })).unwrap(),
+            project: serde_json::from_value(
+                json!({ "format": crate::FORMAT, "id": "P", "name": "P" }),
+            )
+            .unwrap(),
             areas: Vec::new(),
             iterations: vec![iteration("I1", 1), iteration("I2", 2)],
             tasks,
@@ -309,7 +309,12 @@ mod tests {
             .collect()
     }
 
-    fn queue(bag: &Taskbag, events: &[Event], unapproved: &[Unapproved], asked: &[Asked]) -> Vec<Row> {
+    fn queue(
+        bag: &Taskbag,
+        events: &[Event],
+        unapproved: &[Unapproved],
+        asked: &[Asked],
+    ) -> Vec<Row> {
         let tasks: Vec<&Task> = bag.tasks.iter().collect();
         let decisions: BTreeMap<String, Vec<Decision>> = crate::decision::pending(events)
             .into_iter()
@@ -359,7 +364,10 @@ mod tests {
         assert_eq!(rows[0].decisions, 2);
         assert!(!rows[0].agent_waiting);
         // The earliest of the two: the label came before the task was finished.
-        assert_eq!(rows[0].waiting_since.as_deref(), Some("2026-11-01T09:00:00Z"));
+        assert_eq!(
+            rows[0].waiting_since.as_deref(),
+            Some("2026-11-01T09:00:00Z")
+        );
         assert_eq!(
             serde_json::to_value(&rows[0]).unwrap()["todo"],
             json!(["check", "review"])
@@ -396,7 +404,10 @@ mod tests {
         assert_eq!(rows[0].todo, [Todo::Answer]);
         assert_eq!(rows[1].todo, [Todo::ApproveAfterwards]);
         assert_eq!(rows[2].todo, [Todo::Approve]);
-        assert_eq!(rows[2].waiting_since.as_deref(), Some("2026-11-07T00:00:00Z"));
+        assert_eq!(
+            rows[2].waiting_since.as_deref(),
+            Some("2026-11-07T00:00:00Z")
+        );
         assert!(rows[..3].iter().all(|r| r.agent_waiting));
     }
 
@@ -407,7 +418,11 @@ mod tests {
             task("A01-02", "waiting", json!({})),
             task("A01-03", "waiting", json!({})),
             task("A01-04", "ready", json!({ "blocked_by": ["A01-03"] })),
-            task("A01-05", "backlog", json!({ "blocked_by": ["A01-03", "A01-02"] })),
+            task(
+                "A01-05",
+                "backlog",
+                json!({ "blocked_by": ["A01-03", "A01-02"] }),
+            ),
             // A finished task no longer counts as held back.
             task("A01-06", "dropped", json!({ "blocked_by": ["A01-01"] })),
         ]);
@@ -525,6 +540,10 @@ mod tests {
             }
         );
         assert_eq!(t["A01-02"], Times::default());
-        assert_eq!(t["A01-03"], Times::default(), "reopened: no longer to check");
+        assert_eq!(
+            t["A01-03"],
+            Times::default(),
+            "reopened: no longer to check"
+        );
     }
 }

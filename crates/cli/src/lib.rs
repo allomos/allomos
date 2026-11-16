@@ -4628,10 +4628,12 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         } => {
             let root = locate(cli, cwd)?;
             let (bag, issues) = taskbag_of(&root, load(&root))?;
-            human::human(&root, &bag, iteration.as_deref(), area.as_deref(), *steps).map(|mut done| {
-                done.issues = issues;
-                done
-            })
+            human::human(&root, &bag, iteration.as_deref(), area.as_deref(), *steps).map(
+                |mut done| {
+                    done.issues = issues;
+                    done
+                },
+            )
         }
         Command::Title {
             id,

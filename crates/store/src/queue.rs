@@ -30,11 +30,8 @@ pub fn read(root: &Path, bag: &Taskbag) -> Read {
     let events = events::list(root).0;
     let today = crate::classify::today();
     let classes = classify::recorded(&events);
-    let unapproved = classify::unapproved(
-        &classes,
-        &approval::by_task(&events, bag, &today),
-        &today,
-    );
+    let unapproved =
+        classify::unapproved(&classes, &approval::by_task(&events, bag, &today), &today);
     Read {
         decisions: decision::pending(&events)
             .into_iter()
