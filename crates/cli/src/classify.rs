@@ -6,8 +6,7 @@ use std::path::Path;
 
 use allomos_core::Problem;
 use allomos_core::approval::Recorded as Approval;
-use allomos_core::classify::{self, Classification, Given, Unapproved};
-use allomos_core::{Task, Taskbag};
+use allomos_core::classify::{self, Classification, Given};
 use allomos_store::events::Actor;
 use serde_json::json;
 
@@ -148,45 +147,4 @@ pub(crate) fn human_risk_line(risk: Option<&str>, language: &str) -> String {
         (Some(other), _) => other,
     };
     format!("{word}{sep}{level}")
-}
-
-/// `alm human`'s section: emergencies not approved afterwards, overdue ones marked.
-pub(crate) fn human_section(
-    bag: &Taskbag,
-    tasks: &[&Task],
-    list: &[Unapproved],
-    risks: &std::collections::BTreeMap<String, Classification>,
-    language: &str,
-) -> String {
-    let shown: Vec<&Unapproved> = list
-        .iter()
-        .filter(|u| tasks.iter().any(|t| t.id == u.task))
-        .collect();
-    let mut text = format!(
-        "\nTo approve afterwards: emergency changes ({})\n",
-        shown.len()
-    );
-    if shown.is_empty() {
-        text.push_str("  Nothing to approve afterwards.\n");
-    }
-    for u in &shown {
-        match bag.tasks.iter().find(|t| t.id == u.task) {
-            Some(t) => text.push_str(&format!("  {}\n", crate::human_task_line(t, language))),
-            None => text.push_str(&format!("  {}\n", u.task)),
-        }
-        let risk = risks.get(&u.task).and_then(|c| c.risk.as_deref());
-        text.push_str(&format!("      {}\n", human_risk_line(risk, language)));
-        let due = u.due.as_deref().unwrap_or("no deadline recorded");
-        text.push_str(&format!(
-            "      emergency since {}; approval due by {due}{}\n",
-            u.since,
-            if u.overdue { " (past due)" } else { "" }
-        ));
-    }
-    if !shown.is_empty() {
-        text.push_str(
-            "Once the approver approves one: `alm approve <id> --words \"<their words>\"`.\n",
-        );
-    }
-    text
 }
