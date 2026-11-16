@@ -205,6 +205,9 @@ export interface Run {
   /** The agents with a free session slot that no ready task in their levels fitted at the last
    * check: they got no session (Task-A03-wave335). */
   noTask: TerminalAgent[];
+  /** The tasks it let go because another session holds them, the latest few (A03-cart761):
+   * their rows are gone and their slots free; the panel says why. */
+  letGo: LetGo[];
   /** The agents the person could choose when the run started, offered again in the status bar. */
   offered: TerminalAgent[];
   quiet: boolean;
@@ -292,6 +295,15 @@ const takenByAgent = (map: unknown): Record<string, TerminalAgent> => {
   return out;
 };
 
+/** A task a run stopped following because another session holds it (A03-cart761). */
+export interface LetGo {
+  id: string;
+  /** The agent whose session the run had started for it. */
+  agent: TerminalAgent;
+  /** Who holds it now (the other session's name). */
+  holder: string;
+}
+
 /** One entry of `monitor_runs` (as `alm monitor status --json` lists it): a run, or a process
  * whose record is missing. `active` is the active iteration, to name the scope "current". */
 export function readEntry(e: any, active: string | null | undefined): Run | LostRun | null {
@@ -312,6 +324,12 @@ export function readEntry(e: any, active: string | null | undefined): Run | Lost
     sessions: sessionCounts(r.sessions),
     difficulties: difficultyRanges(r.difficulties),
     noTask: agents(r.no_task),
+    letGo: (Array.isArray(r.let_go) ? r.let_go : [])
+      .map((l: any): LetGo | null => {
+        const agent = asAgent(l?.agent);
+        return agent && typeof l.id === "string" && typeof l.holder === "string" ? { id: l.id, agent, holder: l.holder } : null;
+      })
+      .filter((l: LetGo | null): l is LetGo => l !== null),
     offered: agents(r.offered),
     quiet: Boolean(r.quiet),
     every,

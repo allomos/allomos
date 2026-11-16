@@ -1364,6 +1364,7 @@
   "monitor.group_removed": "已从监测去掉，做完手上的任务就停",
   "monitor.group_no_task": "难度范围内没有就绪任务，没有开会话。",
   "monitor.group_idle": "没有会话在做。",
+  "monitor.let_go": "{id} 已被 {holder} 认领（别的会话），不再算在这里。",
   "monitor.next_check": "下次检查 {time}",
   "monitor.edit_button": "编辑监测…",
   "monitor.stop_monitor": "■ 停止监测",
