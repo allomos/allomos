@@ -156,7 +156,7 @@ export function TaskRow({
       <div className="task-body">
         <span className="title">
           <Highlight text={task.title} terms={terms} />
-          {tree && <TreeNotes tree={tree} />}
+          {tree && <TreeNotes tree={tree} onOpenTask={onSelect} />}
         </span>
         <dl className="row-facts">
           {facts.map(([name, value, title]) => (
@@ -167,7 +167,7 @@ export function TaskRow({
           ))}
         </dl>
         {stops.map((fact) => (
-          <StopRow key={fact.kind} fact={fact} state={task.state} blockerTitle={blockerTitle} />
+          <StopRow key={fact.kind} fact={fact} state={task.state} blockerTitle={blockerTitle} onOpenTask={onSelect} />
         ))}
         <DescriptionHit text={task.description ?? ""} terms={terms} />
         <DescriptionHit text={task.handoff_note ?? ""} terms={terms} where="search.in_handoff" />
@@ -253,13 +253,15 @@ function TreeLead({ tree }: { tree: TreeMark }) {
 
 /** After the title in the dependency tree: how many tasks its fold hides. Its blockers are all in
  * Blocked by (Task-A01-border342), not here. */
-function TreeNotes({ tree }: { tree: TreeMark }) {
+function TreeNotes({ tree, onOpenTask }: { tree: TreeMark; onOpenTask: (id: string) => void }) {
   const { t } = useI18n();
   const { row } = tree;
-  if (row.hidden === 0) return null;
+  if (row.hidden === 0 && row.also.length === 0 && row.outside.length === 0) return null;
   return (
-    <span className="tree-note tree-more" title={t("tree.more_title", { count: row.hidden })}>
-      +{row.hidden}
+    <span className="tree-notes">
+      {row.also.map((id) => <button type="button" key={`also-${id}`} className="tree-note tree-dependency" onKeyDown={ownKeys} onClick={(e) => { e.stopPropagation(); onOpenTask(id); }}>{t("tree.also", { id })}</button>)}
+      {row.outside.map((id) => <button type="button" key={`outside-${id}`} className="tree-note tree-dependency" onKeyDown={ownKeys} onClick={(e) => { e.stopPropagation(); onOpenTask(id); }}>{t("tree.outside", { id })}</button>)}
+      {row.hidden > 0 && <span className="tree-note tree-more" title={t("tree.more_title", { count: row.hidden })}>+{row.hidden}</span>}
     </span>
   );
 }
@@ -306,7 +308,7 @@ function Holder({ task, onOpenSession, onError }: { task: Task; onOpenSession?: 
  * cut, and the choice is not remembered. Waiting on is in the state's colour. Blocked by names
  * every blocker (Task-A01-border342): those not finished first, in the blocked colour, then the
  * finished in the done colour; hovering one shows its title and the group it is in. */
-function StopRow({ fact, state, blockerTitle }: { fact: StopFact; state: Task["state"]; blockerTitle?: (id: string) => string }) {
+function StopRow({ fact, state, blockerTitle, onOpenTask }: { fact: StopFact; state: Task["state"]; blockerTitle?: (id: string) => string; onOpenTask: (id: string) => void }) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -325,7 +327,7 @@ function StopRow({ fact, state, blockerTitle }: { fact: StopFact; state: Task["s
     <div className="row-stop">
       <div className="row-stop-name">{t(fact.name)}</div>
       <div ref={ref} className={`row-stop-text${fact.parts ? "" : ` s-${state}-text`}${open ? "" : " clamped"}`}>
-        {fact.parts ? <BlockerList parts={fact.parts} title={blockerTitle} /> : fact.text}
+        {fact.parts ? <BlockerList parts={fact.parts} title={blockerTitle} onOpenTask={onOpenTask} /> : fact.text}
       </div>
       {cut && (
         <button type="button" className="link small" onKeyDown={ownKeys} onClick={(e) => {
@@ -342,15 +344,17 @@ function StopRow({ fact, state, blockerTitle }: { fact: StopFact; state: Task["s
 /** A task's blockers as the list and the task pane show them (Task-A01-border342), in the order
  * `blockerParts` gives: one not finished in the blocked colour, a finished one in the done colour.
  * Hovering one shows `title(id)`, or its title alone without it. */
-export function BlockerList({ parts, title }: { parts: BlockerPart[]; title?: (id: string) => string }) {
+export function BlockerList({ parts, title, onOpenTask }: { parts: BlockerPart[]; title?: (id: string) => string; onOpenTask?: (id: string) => void }) {
   return (
     <>
       {parts.map((b, i) => (
         <span key={b.id}>
           {i > 0 && <span className="muted">, </span>}
-          <span className={`row-blocker ${b.finished ? "finished" : "open"}`} title={title?.(b.id) ?? b.title ?? undefined}>
-            {b.text}
-          </span>
+          {onOpenTask && b.title !== null ? (
+            <button type="button" className={`row-blocker row-blocker-link ${b.finished ? "finished" : "open"}`} title={title?.(b.id) ?? b.title ?? undefined} onKeyDown={ownKeys} onClick={(e) => { e.stopPropagation(); onOpenTask(b.id); }}>{b.text}</button>
+          ) : (
+            <span className={`row-blocker ${b.finished ? "finished" : "open"}`} title={title?.(b.id) ?? b.title ?? undefined}>{b.text}</span>
+          )}
         </span>
       ))}
     </>
