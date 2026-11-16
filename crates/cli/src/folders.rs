@@ -153,14 +153,21 @@ fn folder_files_text(
     f: &allomos_store::folders::FolderInfo,
     files: &[String],
     subject: &str,
+    plain: bool,
 ) -> String {
     if files.is_empty() {
         return String::new();
     }
     let dir = f.full.display();
     let list = files.join(" ");
+    // For Codex (`plain`, Task-A01-flame635) without `-C`: the heading names the folder.
+    let (heading, git) = if plain {
+        (crate::git_heading(&f.full, true), "git".to_string())
+    } else {
+        ("For Git:\n".to_string(), format!("git -C {dir}"))
+    };
     format!(
-        "\nAlso changed in folder {} ({dir}): {}. Save and share them in that folder's version control. For Git:\n  git -C {dir} add -- {list}\n  git -C {dir} commit -m \"{subject}\" -- {list}\n  git -C {dir} push\n",
+        "\nAlso changed in folder {} ({dir}): {}. Save and share them in that folder's version control. {heading}  {git} add -- {list}\n  {git} commit -m \"{subject}\" -- {list}\n  {git} push\n",
         f.name,
         files.join(", ")
     )
@@ -172,6 +179,7 @@ pub(crate) fn folder(
     me: Option<&str>,
     what: &crate::FolderWhat,
     cwd: &Path,
+    plain: bool,
 ) -> Result<Done, Problem> {
     use crate::FolderWhat;
     use allomos_store::folders;
@@ -193,6 +201,7 @@ pub(crate) fn folder(
             &c.folder,
             &c.files,
             &format!("alm: {command}"),
+            plain,
         ));
         Done::new(
             json!({ "taskbag": root, "folder": c.folder, "folder_files": c.files, "tasks": c.tasks }),

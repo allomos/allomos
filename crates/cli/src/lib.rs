@@ -22,8 +22,8 @@ use allomos_store::{
     add_agent_instructions, agent_section, agent_section_for, agent_setup_request, default_root,
     events, find_taskbag, guide, guide_topic, id_from_name, init_with_labels, load, localized,
     pick_ui_language, picked_folder, plain_path, post_confirm, project_folder_of, quota_ask,
-    quota_reports, read_answer, read_text, requests_dir, saved_ui_language, task_language,
-    taskbag_of, tidy, versions, was_seen, with_written_files, withdraw_confirm,
+    quota_is_codex, quota_reports, read_answer, read_text, requests_dir, saved_ui_language,
+    task_language, taskbag_of, tidy, versions, was_seen, with_written_files, withdraw_confirm,
 };
 use clap::{Parser, Subcommand, error::ErrorKind};
 use serde_json::{Value, json};
@@ -1577,7 +1577,7 @@ fn reply(args: Vec<OsString>, cwd: &Path) -> Reply {
     });
     let code = match result {
         Ok(mut done) => {
-            share(&cli, &before, &written, &mut done);
+            share(&cli, cwd, &before, &written, &mut done);
             // A command that moves a task on asks for a fresh quota report when the agent's is
             // missing or old (Task-A03-flour054): alm tells; the agent reads its usage.
             let moves_on = matches!(
@@ -1831,19 +1831,78 @@ fn quoted(arg: &str) -> String {
 /// where it is, whoever made it.
 const SAVE_AS_PRINTED: &str = "Run the commands as printed, never `git add -A`, `git add .` or `git commit -a` in the taskbag: those also take changes others have not shared yet (the person's changes in the Allomos app, other sessions' changes).\n";
 
+/// Whether the session running this command is Codex for certain (Task-A01-flame635): then the
+/// Git commands alm prints are plain (`git add …`, run in the folder it names), because
+/// `git -C <folder> …` matches none of Allomos's rules for Codex. The agent is the session agent
+/// of the task the command acts on (unless another session holds that task), else that of a task
+/// this session holds, else what the session name says for certain. Unsure is not Codex.
+pub(crate) fn for_codex(cli: &Cli, cwd: &Path) -> bool {
+    let me = cli.holder.as_deref();
+    let tasks = locate(cli, cwd)
+        .ok()
+        .and_then(|root| load(&root).taskbag)
+        .map(|bag| bag.tasks)
+        .unwrap_or_default();
+    let agent_of = |t: &Task| {
+        t.session
+            .as_ref()
+            .and_then(|s| s.agent.clone())
+            .filter(|a| !a.trim().is_empty())
+    };
+    let others = |t: &&Task| t.holder.is_some() && me.is_some() && t.holder.as_deref() != me;
+    let target = cli
+        .command
+        .target()
+        .and_then(|id| tasks.iter().find(|t| t.id == id))
+        .filter(|t| !others(t))
+        .and_then(agent_of);
+    let held = || {
+        let me = me?;
+        tasks
+            .iter()
+            .filter(|t| t.state == State::InProgress && t.holder.as_deref() == Some(me))
+            .find_map(agent_of)
+    };
+    quota_is_codex(target.or_else(held).as_deref(), me)
+}
+
+/// Said to Codex after the commands of a change (Task-A01-flame635, the unattended trial): it
+/// wrote `git status --short && git add … && git commit … && git push`, and a line with one
+/// command the rules do not name runs in the sandbox as a whole, where Git cannot write.
+const CODEX_ON_ITS_OWN: &str = "Codex: run every Git command on a line of its own, your own Git commands too (commit, push, merge, worktree): no `&&`, `;` or pipes, and nothing else on the line. Joined with a command that Allomos's rules for Codex do not name (`git status`, a test, `chmod`), the whole line runs in the sandbox, where Git cannot write.\n";
+
+/// The line above printed Git commands: `For Git:`, or for Codex (`plain`) the folder to run
+/// them in, since they do not name it themselves.
+pub(crate) fn git_heading(folder: &Path, plain: bool) -> String {
+    if plain {
+        format!(
+            "For Git, in {} (run each command on its own, with that folder as its working folder):\n",
+            quoted(&plain_path(folder).display().to_string())
+        )
+    } else {
+        "For Git:\n".to_string()
+    }
+}
+
 /// `git add`, `git commit` (with the two message lines) and, unless `push` is false, `git push`,
-/// run in `taskbag` and naming exactly `files` (relative to it).
+/// run in `taskbag` and naming exactly `files` (relative to it). `plain` (for Codex,
+/// [`for_codex`]): without `-C <taskbag>`; [`git_heading`] names the folder instead.
 fn git_commands(
     taskbag: &Path,
     files: &[String],
     subject: &str,
     who: &str,
     push: bool,
+    plain: bool,
 ) -> Vec<String> {
-    let at = format!(
-        "git -C {}",
-        quoted(&plain_path(taskbag).display().to_string())
-    );
+    let at = if plain {
+        "git".to_string()
+    } else {
+        format!(
+            "git -C {}",
+            quoted(&plain_path(taskbag).display().to_string())
+        )
+    };
     let list: Vec<String> = files.iter().map(|f| quoted(f)).collect();
     let list = list.join(" ");
     let mut out = vec![
@@ -1864,7 +1923,7 @@ fn git_commands(
 /// share this change, naming only the files it wrote (`changed_files`, `git_commands`), and
 /// any changes made in the app that are not shared yet (`app_changes`), to commit as the
 /// person's. `alm init` prints none: no agent is connected yet.
-fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
+fn share(cli: &Cli, cwd: &Path, before: &Before, written: &[PathBuf], done: &mut Done) {
     let Some(root) = done.fields["taskbag"].as_str().map(PathBuf::from) else {
         return;
     };
@@ -1884,6 +1943,11 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
         .collect();
     files.sort();
     files.dedup();
+    // Read after the change, so `alm claim --session-agent codex` already prints the plain form.
+    let plain = (changes || before.app.is_some()) && for_codex(cli, cwd);
+    if changes || before.app.is_some() {
+        done.fields["git_folder"] = json!(plain_path(&root).display().to_string());
+    }
     if changes {
         let command = cli.command.name();
         // Added without an ID: name the one it got.
@@ -1914,13 +1978,13 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
         } else if matches!(cli.command, Command::Claim { .. }) {
             (
                 "Save this change in your version control tool and share it now, before you start the work. Until it is shared, other sessions do not see your claim and may take this task too. Changed files:".to_string(),
-                git_commands(&root, &files, &subject, &who, true),
+                git_commands(&root, &files, &subject, &who, true, plain),
             )
         } else {
             (
                 "Save this change in your version control tool and share it. Changed files:"
                     .to_string(),
-                git_commands(&root, &files, &subject, &who, true),
+                git_commands(&root, &files, &subject, &who, true, plain),
             )
         };
         text.push('\n');
@@ -1930,7 +1994,7 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
             for f in &files {
                 text.push_str(&format!("  {f}\n"));
             }
-            text.push_str("For Git:\n");
+            text.push_str(&git_heading(&root, plain));
         }
         for c in &commands {
             text.push_str(&format!("  {c}\n"));
@@ -1940,6 +2004,9 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
             // Task-A01-flour637: a beat saved with `git commit -a` took along changes the
             // person had made in the app, without their events.
             text.push_str(SAVE_AS_PRINTED);
+            if plain {
+                text.push_str(CODEX_ON_ITS_OWN);
+            }
         }
         done.fields["changed_files"] = json!(files);
         done.fields["git_commands"] = json!(commands);
@@ -1965,6 +2032,7 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
                 "app: changes made in the Allomos app",
                 &format!("By: {by} (Allomos app)"),
                 true,
+                plain,
             );
             text.push_str(&format!(
                 "\n{} change(s) made in the Allomos app by {by} are not shared yet. Save and share them in your version control tool as the person's, on their own (if someone already did, there is nothing to save; that is fine). Changed files:\n",
@@ -1973,7 +2041,7 @@ fn share(cli: &Cli, before: &Before, written: &[PathBuf], done: &mut Done) {
             for f in &rest {
                 text.push_str(&format!("  {f}\n"));
             }
-            text.push_str("For Git:\n");
+            text.push_str(&git_heading(&root, plain));
             for c in &commands {
                 text.push_str(&format!("  {c}\n"));
             }
@@ -4741,10 +4809,15 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 plain_path(&m.source).display()
             ));
             if let Some(path) = &m.reported {
+                let folder = quoted(&plain_path(&m.project).display().to_string());
+                // For Codex without `-C` (Task-A01-flame635): the folder is named in words.
+                let example = if for_codex(cli, cwd) {
+                    format!("in {folder}: git rm -- {}", quoted(path))
+                } else {
+                    format!("git -C {folder} rm -- {}", quoted(path))
+                };
                 text.push_str(&format!(
-                    "alm removes nothing outside the taskbag. When your confirmed plan says so, remove the original from the project folder, for example: git -C {} rm -- {}\n",
-                    quoted(&plain_path(&m.project).display().to_string()),
-                    quoted(path)
+                    "alm removes nothing outside the taskbag. When your confirmed plan says so, remove the original from the project folder, for example: {example}\n"
                 ));
             } else if let Some(original) = &m.original {
                 // Linked from the description, not reported (Task-A01-51).
@@ -4784,7 +4857,9 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         Command::Checkpoint { git_commit } => {
             trail::checkpoint(&locate(cli, cwd)?, git_commit.as_deref())
         }
-        Command::Folder { what } => folders::folder(&locate(cli, cwd)?, me, what, cwd),
+        Command::Folder { what } => {
+            folders::folder(&locate(cli, cwd)?, me, what, cwd, for_codex(cli, cwd))
+        }
         Command::Project { name, id } => {
             let root = locate(cli, cwd)?;
             let lock = Lock::acquire(&root, lock_wait())?;

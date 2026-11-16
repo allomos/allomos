@@ -74,8 +74,8 @@ pub use guide::{
 };
 pub use quota::{
     ASK_AFTER_MINUTES as QUOTA_ASK_AFTER_MINUTES, QuotaAsk, QuotaReport, WINDOWS as QUOTA_WINDOWS,
-    agent_id as quota_agent_id, new_report as new_quota_report, quota_ask, quota_reports,
-    save_quota,
+    agent_id as quota_agent_id, is_codex as quota_is_codex, new_report as new_quota_report,
+    quota_ask, quota_reports, save_quota,
 };
 pub use settings::{
     StartWith, TaskLanguage, UpdateMemory, alm_offer_dismissed_for, auto_check, auto_download,

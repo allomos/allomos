@@ -210,10 +210,13 @@ Exit codes: 0 done, 1 refused by a rule, 2 wrong usage, 3 taskbag busy or not wr
 
 `alm` never runs or reads your version control tool. After a change it prints \"Save this change
 in your version control tool and share it\", the files that change wrote, and, \"For Git:\", the
-exact `git add`, `git commit` and `git push` commands for them (`--json`: `changed_files` and
-`git_commands`); save and share them yourself and leave other changes as they are: run the
-commands as printed, never `git add -A`, `git add .` or `git commit -a` in the taskbag, which
-also take changes others have not shared yet. `alm claim`
+exact `git add`, `git commit` and `git push` commands for them (`--json`: `changed_files`,
+`git_commands` and `git_folder`, the folder they run in); save and share them yourself and leave
+other changes as they are: run the commands as printed, never `git add -A`, `git add .` or
+`git commit -a` in the taskbag, which also take changes others have not shared yet. When the
+agent is Codex for certain (the task was claimed with `--session-agent codex`), the commands
+come without `git -C <folder>`, under \"For Git, in <folder> …\": run each on its own, with
+that folder as its working folder. `alm claim`
 asks you to share at once, before you start the work. Changes the person made in the Allomos app
 and not shared yet come with their own files and commands, to save as the person's. `alm init`
 prints none: save the new taskbag yourself.
@@ -608,7 +611,13 @@ let Codex run Git and `alm` without asking; every other command stays in Codex's
 - **How Codex matches a rule:** a command that starts with the rule's words, run on its own.
   Run each Git and `alm` command on its own (no `&&`, `;` or pipes): a command joined with others
   runs in the sandbox. `git -C <folder> …` does not match: run `git …` in that folder instead.
-  The commands `alm` prints are examples; write them in this form.
+- **What `alm` prints for Codex:** on a task claimed with `--session-agent codex`, the Git
+  commands `alm` prints are ready to run as they are: plain `git add`, `git commit` and
+  `git push`, under a line that names the folder (`For Git, in <folder> …`). Run each one on its
+  own, with that folder as its working folder. Pass `--session-agent codex` when you claim:
+  that is how `alm` knows (a session name starting with `codex` tells it too). Where `alm`
+  still prints `git -C <folder> …` (it could not tell the agent is Codex), write the command in
+  the plain form yourself.
 - **Which `alm`:** the rules name no path for `alm`, so they cover the one in the installed
   Allomos app and a development build alike. Use the `alm` the person or the request names, and
   when a command or field is unknown, check `alm --version` (or `which alm`) first.
@@ -719,7 +728,9 @@ const WORKFLOW: &str = "# How to work the tasks
    repository to get around it: the other sessions would go on reading the stale one. Run each
    Git and `alm` command on its own (no `&&`, `;` or pipes): a command joined with others runs
    in the sandbox. Unattended Codex does not use `git -C <folder>`: it runs `git …` in that
-   folder. **Which `alm`:** use the one the person or the request names; when a command or
+   folder. On a task claimed with `--session-agent codex`, `alm` prints its Git commands in
+   that form already, under a line naming the folder (`For Git, in <folder> …`): run each as
+   it is, with that folder as its working folder. **Which `alm`:** use the one the person or the request names; when a command or
    field is unknown, check `alm --version` (or `which alm`) first.
    When you claim, pass what the Allomos app needs to reopen your session: `--session-agent
    <your agent's id>`, `--session-id <your session's ID>`, and whatever else your agent needs to
