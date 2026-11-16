@@ -20,7 +20,7 @@ import { sessionPlace } from "./sessionFlow";
 import { chipLabels, decisionsToReview, humanCheckNote, isBlocked, toCheck, toReview, type StopFact } from "./stopFlow";
 import { localTime } from "./timeFlow";
 import { difficultyOf, difficultyText } from "./difficultyFlow";
-import { riskClass, riskText } from "./riskFlow";
+import { riskClass, riskText } from "./taskRiskFlow";
 import type { TreeRow } from "./depTreeFlow";
 import type { Edit, Task } from "./types";
 import { StateMenu } from "./StateMenu";
@@ -99,7 +99,7 @@ export function TaskRow({
     t("pane.difficulty_title"),
   ]);
   // Task-A01-garden385 (decision 0027): the risk an agent recorded; none reads "Not classified".
-  facts.push([t("pane.risk"), <span className={riskClass(task)}>{riskText(task, t)}</span>, t("pane.risk_title")]);
+  facts.push([t("task.risk"), <span className={riskClass(task)}>{riskText(task, t)}</span>, t("task.risk_title")]);
   // Labels only when the task has some (Task-A01-cell542): every label it carries (decision 0020);
   // "AI decisions to review" as its own fact below. The details pane always shows them.
   if (chipLabels(task).length > 0) facts.push([t("pane.label"), <LabelChips task={task} />]);

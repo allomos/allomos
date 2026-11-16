@@ -381,6 +381,9 @@ pub fn validate_taskbag(
     if let Some(h) = &project.heartbeat {
         unknown_notes("project.json", "heartbeat.", &h.extra, &[], &mut issues);
     }
+    if let Some(r) = &project.risk {
+        unknown_notes("project.json", "risk.", &r.extra, &[], &mut issues);
+    }
     for (file, area) in areas {
         unknown_notes(file, "", &area.extra, &[], &mut issues);
     }

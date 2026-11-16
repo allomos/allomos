@@ -9,6 +9,7 @@
 // the Update the Taskbag notice), and its location with Show in Finder (Task-A05-camera758). Tasks
 // sets the language tasks are written in, has Translate the taskbag… (Task-A05-board831), and shows
 // the project's label table, where its own labels can be changed (Task-A05-yeti951, decision 0020).
+// Risk management holds the rules for high risk and the two limits (decision 0027, Task-A01-beetle749).
 // Handoff holds the handoff rules (Task-A05-yacht960). Heartbeat holds the heartbeat interval and
 // the lost limit (Task-A01-osprey500). Project folders binds, renames, locates
 // and unbinds the taskbag's folders (Task-A05-plaza078). Agents shows in which folders each agent
@@ -20,6 +21,7 @@ import { AgentsSection } from "./AgentsSection";
 import { AppGeneralSection, ThisComputerPart } from "./AppSettings";
 import { HandoffSection } from "./HandoffSettings";
 import { HeartbeatSection } from "./HeartbeatSettings";
+import { RiskSection } from "./RiskSettings";
 import { AuditSection } from "./AuditSettings";
 import { ProjectFolders } from "./ProjectFolders";
 import { LANGUAGE_NAMES, useI18n, useTaskT, type Key } from "./i18n";
@@ -33,7 +35,7 @@ import { isProblem, type LabelEntry, type VersionCheck } from "./types";
 import { movingTasks, updateNotice, upgradeFrom } from "./versionFlow";
 
 const APP_SECTIONS = ["general", "computer"] as const;
-const SECTIONS = ["general", "folders", "agents", "tasks", "handoff", "heartbeat", "audit"] as const;
+const SECTIONS = ["general", "folders", "agents", "tasks", "handoff", "heartbeat", "risk", "audit"] as const;
 type Section = (typeof SECTIONS)[number];
 /** The chosen section: one of the Allomos group's or of the taskbag's. */
 type Chosen = { group: "app"; section: (typeof APP_SECTIONS)[number] } | { group: "taskbag"; section: Section };
@@ -439,6 +441,7 @@ function TaskbagSection({ messenger, taskbag, section, fileManagerKey }: { messe
       {section === "agents" && <AgentsSection messenger={messenger} root={root} onSetUp={onSetUpAgent} />}
       {section === "handoff" && <HandoffSection messenger={messenger} root={root} />}
       {section === "heartbeat" && <HeartbeatSection messenger={messenger} root={root} onChanged={onChanged} />}
+      {section === "risk" && <RiskSection messenger={messenger} root={root} />}
       {section === "audit" && <AuditSection messenger={messenger} root={root} fileManagerKey={fileManagerKey} />}
       {section === "folders" && <ProjectFolders messenger={messenger} root={root} fileManagerKey={fileManagerKey} onChanged={onChanged} />}
     </>

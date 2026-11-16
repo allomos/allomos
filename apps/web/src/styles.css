@@ -706,6 +706,16 @@ button.primary.danger { background: var(--err); border-color: var(--err); color:
 .dialog .form .override-row input[type="number"] { width: 96px; }
 .dialog .form .overrides { margin: 0; padding-left: 18px; font-size: 13px; }
 .settings-section .handoff-settings { width: 100%; display: grid; gap: 8px; }
+/* Project settings → Risk management (Task-A01-beetle749): the fixed rules with their short names,
+   the project's own rules each with its buttons at the end of the line. */
+.risk-settings .risk-rules { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.risk-settings .risk-rules li { display: flex; align-items: baseline; gap: 8px; }
+.risk-settings .risk-rules li > span, .risk-settings .risk-rules li > input { flex: 1 1 auto; min-width: 0; }
+.risk-settings .risk-rules.fixed code { flex: 0 0 auto; color: var(--muted, inherit); }
+.risk-settings .risk-rules input[type="text"], .risk-settings .risk-add input[type="text"] {
+  font: 13px var(--font); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px;
+}
+.risk-settings .risk-add input[type="text"] { flex: 1 1 auto; min-width: 0; }
 /* Project settings → Audit (Task-A01-frolic587): a radio choice sits on one line like a checkbox;
    turning a control off or down is shown in the warning colour (decision 0021 § 6). */
 .settings-section .audit-settings { width: 100%; display: grid; gap: 8px; }

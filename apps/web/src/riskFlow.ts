@@ -1,28 +1,43 @@
-// A task's risk in the list and the pane (Task-A01-garden385, decision 0027): high, medium or low,
-// recorded by the agent that worked on the task (`alm classify`). It lives in the history, not in
-// task.json, and is put on the task when the taskbag is opened. Allomos only shows it: a task
-// with none reads "Not classified", it is never guessed.
+// The Risk management section of the taskbag's settings (decision 0027 § 6, Task-A01-beetle749):
+// what an edit of the project's own rules sends. A rule is one sentence on one line, written for
+// the agent that classifies a task; an empty one and one the project already has are not sent
+// (crates/core/src/risk.rs leaves them out too). Kept apart from React so it can be tested with
+// Node alone.
 
-import type { Key } from "./i18n";
-import type { Task } from "./types";
-
-/** The levels, lowest first (crates/core/src/classify.rs). */
-export const RISKS = ["low", "medium", "high"] as const;
-export type Risk = (typeof RISKS)[number];
-
-/** The task's risk; null when none is recorded (or the value is not a level). */
-export function riskOf(task: Pick<Task, "risk">): Risk | null {
-  return RISKS.find((r) => r === task.risk) ?? null;
+/** The settings as the desktop app sends them (apps/desktop/src-tauri/src/risk_settings.rs). */
+export interface RiskSettings {
+  /** The fixed rules for high risk, by short name (H1…H7); the app words them. */
+  fixed: string[];
+  /** The project's own rules, one sentence each. */
+  rules: string[];
+  /** Limit 1: a high-risk task cannot be finished without the human check. */
+  high_needs_human_check: boolean;
+  /** Limit 2: in a quiet run, an agent does not merge a high-risk task itself. */
+  high_needs_approver_merge: boolean;
 }
 
-type T = (key: Key, params?: Record<string, string | number>) => string;
-
-/** The risk as the list and the pane show it: "High", or "Not classified". */
-export function riskText(task: Pick<Task, "risk">, t: T): string {
-  return t(`risk.${riskOf(task) ?? "none"}` as Key);
+/** A rule as it is kept: on one line, without spaces around it. */
+export function cleanRule(text: string): string {
+  return text.split(/\s+/).filter(Boolean).join(" ");
 }
 
-/** The class of the risk's word: a high one stands out, an unclassified one is greyed. */
-export function riskClass(task: Pick<Task, "risk">): string {
-  return `risk risk-${riskOf(task) ?? "none"}`;
+/** The rules with one added at the end, or null when it is empty or already there. */
+export function addRule(rules: string[], text: string): string[] | null {
+  const rule = cleanRule(text);
+  if (!rule || rules.includes(rule)) return null;
+  return [...rules, rule];
+}
+
+/** The rules with the one at `index` reworded, or null when the new wording is empty or another
+ * rule already says it. The same wording as before is a change of nothing: the rules as they are. */
+export function changeRule(rules: string[], index: number, text: string): string[] | null {
+  const rule = cleanRule(text);
+  if (!rule || index < 0 || index >= rules.length) return null;
+  if (rules.some((r, i) => i !== index && r === rule)) return null;
+  return rules.map((r, i) => (i === index ? rule : r));
+}
+
+/** The rules without the one at `index`. */
+export function removeRule(rules: string[], index: number): string[] {
+  return rules.filter((_, i) => i !== index);
 }
