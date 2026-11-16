@@ -27,11 +27,13 @@ import { groupCount } from "./groupCountFlow";
 import { collapsedWhileSearching, searchGroups, searchTerms, taskMatches } from "./searchFlow";
 import { ListBanners, RefreshLine, SearchBox, isSearchShortcut } from "./Search";
 import { whatChanged, type Refreshed } from "./refreshFlow";
+import { withTaskChange, type TaskChange } from "./taskChangeFlow";
 import {
   allTicked,
   filterGroups,
   hiddenByFilter,
   hiddenText,
+  decorated,
   isAll,
   readFilter,
   storeFilter,
@@ -366,6 +368,8 @@ export function App({
   const followBusy = useRef(false);
   /** A notice came while a comparison was going on: compare again after it. */
   const followAgain = useRef(false);
+  /** How many changes to one task this window is writing just now (Task-A01-parade485). */
+  const writing = useRef(0);
   /** Goes up each time a comparison found the taskbag changed. */
   const [taskbagChanges, setTaskbagChanges] = useState(0);
   const [pushed, setPushed] = useState(false);
@@ -374,7 +378,9 @@ export function App({
   }, [root]);
   const follow = useCallback(() => {
     if (!root) return;
-    if (followBusy.current) {
+    // A change this window is writing tells its own fingerprint when it is done: comparing in
+    // the middle of it would take the window's own write for another session's (A01-parade485).
+    if (followBusy.current || writing.current > 0) {
       followAgain.current = true;
       return;
     }
@@ -598,6 +604,33 @@ export function App({
       if (stamp !== null) stampRef.current = stamp;
     },
     [messenger],
+  );
+
+  /** A change to one task made in this window (Task-A01-parade485): the task is replaced in the
+   * list as it is, with no reading of the whole taskbag, unless only reading it again can tell
+   * (`withTaskChange` says when); the fingerprint moves on, so the follow does not take this
+   * window's own write for another session's. */
+  const changeTask = useCallback(
+    async (root: string, write: () => Promise<TaskChange>) => {
+      writing.current += 1;
+      try {
+        const change = await write();
+        const now = openedRef.current;
+        if (now?.root !== root) return;
+        const next = withTaskChange(now, change, stampRef.current, decorated);
+        if (next) {
+          setOpened(next);
+          stampRef.current = change.stamp_after;
+        } else await readAgain(root).catch(() => undefined);
+      } finally {
+        writing.current -= 1;
+        if (writing.current === 0 && followAgain.current) {
+          followAgain.current = false;
+          followRef.current();
+        }
+      }
+    },
+    [readAgain],
   );
 
   // The start page's Open recent… dialog (Task-A01-43): the same list as File → Open Recent, read
@@ -842,15 +875,8 @@ export function App({
             onNotice={(message) => setNotices((list) => [...list, { text: message }])}
             hideOlder={olderShown}
             canOpenSessions={!companion}
-            onReload={async () => {
-              // After a change made in this window: read again, and note the stamp so the follow
-              // does not read it a second time and call it automatic (Task-A01-47).
-              const stamp = await messenger.taskbagStamp(opened.root).catch(() => null);
-              const fresh = await messenger.openTaskbag(opened.root);
-              if (openedRef.current?.root !== fresh.root) return;
-              setOpened(fresh);
-              if (stamp !== null) stampRef.current = stamp;
-            }}
+            onReload={() => readAgain(opened.root)}
+            onChangeTask={(write) => changeTask(opened.root, write)}
             refreshed={refreshed}
             onRefresh={async () => {
               // Refresh now (Task-A01-47): always read again, then say what differs from before.
@@ -1319,6 +1345,7 @@ function TaskbagView({
   hideOlder,
   canOpenSessions,
   onReload,
+  onChangeTask,
   refreshed,
   onRefresh,
 }: {
@@ -1335,6 +1362,9 @@ function TaskbagView({
   canOpenSessions: boolean;
   /** Reads the taskbag again now, after a change made in this window. */
   onReload: () => Promise<void>;
+  /** Makes a change to one task and shows it in place, without reading the whole taskbag again
+   * (Task-A01-parade485). Rejects as `write` does. */
+  onChangeTask: (write: () => Promise<TaskChange>) => Promise<void>;
   /** When the list was last read and how (Task-A01-47). */
   refreshed: Refreshed | null;
   /** Refresh now: reads the taskbag again and reports what changed. */
@@ -1413,7 +1443,8 @@ function TaskbagView({
     return () => {
       live = false;
     };
-  }, [messenger, opened]);
+    // Not after a change to one task shown in place (Task-A01-parade485): the project is the same.
+  }, [messenger, opened.root, box?.project]);
   const folderKey = `${FOLDER_FILTER_KEY}:${opened.root}`;
   const [storedFolder, setStoredFolder] = useState<string | null>(() => {
     try {
@@ -1682,10 +1713,9 @@ function TaskbagView({
       <WhoLine name={ownerName} onSave={saveOwnerName} />
     </div>
   );
-  const editTask = async (id: string, edit: Edit) => {
-    await messenger.editTask(opened.root, id, edit);
-    await onReload().catch(() => undefined);
-  };
+  // One task changed: shown in place (Task-A01-parade485). The changes below it reach further
+  // (an iteration, approvals, AI decisions) and read the whole taskbag again, as before.
+  const editTask = (id: string, edit: Edit) => onChangeTask(() => messenger.editTask(opened.root, id, edit));
   // The task pane's "New…" iteration (Task-A01-39): added, then the task planned in it.
   const planInNewIteration = async (id: string, iteration: NewIteration) => {
     await messenger.addIterationAndPlan(opened.root, id, iteration);
@@ -1722,7 +1752,8 @@ function TaskbagView({
     return () => {
       live = false;
     };
-  }, [messenger, opened]);
+    // Not after a change to one task shown in place (Task-A01-parade485): no ID was taken.
+  }, [messenger, opened.root, box?.areas, box?.iterations, box?.tasks.length]);
   const add = async (request: AddRequest) => {
     let shown: string | null = null;
     if (request.kind === "task") {

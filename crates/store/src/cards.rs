@@ -89,6 +89,21 @@ pub fn outside_of(root: &Path, bag: &Taskbag) -> Vec<Outside> {
         .collect()
 }
 
+/// The card file `task`'s `Card:` link points to when it is outside the taskbag, as
+/// [`outside_of`] lists it for a task no agent reported (Task-A01-parade485: after a change to
+/// one task, without reading the history). An agent's report, which wins, is not looked for.
+pub fn linked_outside(root: &Path, task: &Task) -> Option<Outside> {
+    let places = Places::of(root);
+    let file = places.linked_file(task)?;
+    Some(Outside {
+        task: task.id.clone(),
+        path: places.shown(&file),
+        source: Source::Link,
+        at: None,
+        by: None,
+    })
+}
+
 /// The taskbag and its project folder, made absolute, for reading card links.
 struct Places {
     root: PathBuf,

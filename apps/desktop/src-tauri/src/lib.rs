@@ -20,6 +20,7 @@ mod pairing;
 mod risk_settings;
 mod sessions;
 mod tab_drag;
+mod task_change;
 mod taskbag_watch;
 mod update;
 mod window_list;
@@ -340,16 +341,18 @@ fn edit_task_as(
     id: &str,
     edit: &allomos_core::ops::Edit,
 ) -> Result<allomos_core::Task, Problem> {
-    let actor = app_actor(name)?;
-    let task = allomos_store::change_task(root, actor, LOCK_WAIT, |bag| {
-        allomos_core::ops::edit(bag, id, actor.by, edit)
-    })
-    .map(|c| c.task)?;
-    // The person's check: the outside witness may make a checkpoint (Task-A01-bake791).
-    if matches!(edit, allomos_core::ops::Edit::Checked { .. }) {
-        audit::after_approval(root);
-    }
-    Ok(task)
+    change_task_as(root, name, id, edit).map(|change| change.task)
+}
+
+/// [`edit_task_as`], with what the window needs to show the change without reading the whole
+/// taskbag again (Task-A01-parade485).
+fn change_task_as(
+    root: &Path,
+    name: Option<&str>,
+    id: &str,
+    edit: &allomos_core::ops::Edit,
+) -> Result<task_change::TaskChange, Problem> {
+    task_change::edit(root, app_actor(name)?, LOCK_WAIT, id, edit)
 }
 
 /// The person has reviewed task `id`'s AI decisions (Task-A03-19): the same change as
@@ -456,8 +459,8 @@ fn edit_task(
     root: PathBuf,
     id: String,
     edit: allomos_core::ops::Edit,
-) -> Result<allomos_core::Task, Problem> {
-    edit_task_as(
+) -> Result<task_change::TaskChange, Problem> {
+    change_task_as(
         &root,
         allomos_store::saved_owner_name().as_deref(),
         &id,
@@ -495,7 +498,7 @@ fn companion_change(
         "edit_task" => {
             let edit: allomos_core::ops::Edit = arg(&args, "edit")?;
             let id: String = arg(&args, "id")?;
-            json(serde_json::to_value(edit_task_as(root, name, &id, &edit)?))
+            json(serde_json::to_value(change_task_as(root, name, &id, &edit)?))
         }
         "review_ai_decisions" => {
             review_as(root, name, &arg::<String>(&args, "id")?)?;
@@ -2936,14 +2939,23 @@ mod tests {
         timed("task_history", &mut || {
             task_history(root.clone(), id.clone());
         });
-        timed("edit_task (state: ready)", &mut || {
-            let edit =
-                serde_json::from_value(serde_json::json!({ "field": "state", "state": "ready" }))
-                    .unwrap();
-            edit_task_as(&root, Some("Will"), &id, &edit).unwrap();
+        let state = |state: &str| -> allomos_core::ops::Edit {
+            serde_json::from_value(serde_json::json!({ "field": "state", "state": state })).unwrap()
+        };
+        // Since Task-A01-parade485: the change and its answer are all the window waits for.
+        timed("edit_task with its answer (state: ready; all it takes now)", &mut || {
+            change_task_as(&root, Some("Will"), &id, &state("ready")).unwrap();
+        });
+        timed("edit_task, the change alone (state: backlog)", &mut || {
+            edit_task_as(&root, Some("Will"), &id, &state("backlog")).unwrap();
+        });
+        // Until Task-A01-parade485 the window then asked for the fingerprint and read the whole
+        // taskbag again; since then the change's answer is all it needs.
+        timed("taskbag_stamp (before A01-parade485: after the change)", &mut || {
+            taskbag_stamp(root.clone());
         });
         timed(
-            "open_taskbag again (the reload after the change)",
+            "open_taskbag again (before A01-parade485: the reload after the change)",
             &mut || {
                 open_taskbag(root.clone());
             },

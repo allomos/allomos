@@ -2492,11 +2492,53 @@ pub fn change_task(
     wait: Duration,
     rule: impl FnOnce(&Taskbag) -> Result<(allomos_core::ops::Outcome, &'static str), Problem>,
 ) -> Result<Changed, Problem> {
+    change_task_under_lock(root, actor, wait, rule, false).map(|alone| alone.changed)
+}
+
+/// What [`change_task_alone`] did: the change, and what a window needs to show it without reading
+/// the whole taskbag again (Task-A01-parade485).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChangedAlone {
+    pub changed: Changed,
+    /// When the change was recorded (its event's `at`, UTC): the task's new "last changed". None
+    /// when nothing changed, so no event was written.
+    pub at: Option<String>,
+    /// The change also wrote `project.json` (a label new to the label table): more than this one
+    /// task changed.
+    pub project_changed: bool,
+    /// The taskbag's fingerprint ([`stamp`]) just before the change was written and just after,
+    /// both taken under the lock, so no other writer's change falls between them: a window whose
+    /// last fingerprint is `stamp_before` has seen everything but this change.
+    pub stamp_before: u64,
+    pub stamp_after: u64,
+}
+
+/// [`change_task`] for a window that shows the taskbag (Task-A01-parade485): the same change, the
+/// same way, and with it what the window needs to update this one task in place.
+pub fn change_task_alone(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    rule: impl FnOnce(&Taskbag) -> Result<(allomos_core::ops::Outcome, &'static str), Problem>,
+) -> Result<ChangedAlone, Problem> {
+    change_task_under_lock(root, actor, wait, rule, true)
+}
+
+fn change_task_under_lock(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    rule: impl FnOnce(&Taskbag) -> Result<(allomos_core::ops::Outcome, &'static str), Problem>,
+    stamps: bool,
+) -> Result<ChangedAlone, Problem> {
     let (lock, bag, issues) = lock_for_change(root, wait)?;
     let (mut outcome, command) = rule(&bag)?;
+    // Only a window asks for the fingerprints: `alm` does not pay for them.
+    let stamp_before = if stamps { stamp(root) } else { 0 };
     // A label the table does not list yet is added to it, and `alm` says so (decision 0020, 5).
     let mut project = bag.project.clone();
     let added = allomos_core::labels::add_found(&mut project, &outcome.task.labels);
+    let project_changed = !added.is_empty();
     if !added.is_empty() {
         let event = actor.event(
             "labels",
@@ -2529,12 +2571,19 @@ pub fn change_task(
         }
         Ok(())
     })?;
+    let stamp_after = if stamps { stamp(root) } else { 0 };
     let unblocked = freed_by(&bag, &outcome.task);
-    Ok(Changed {
-        task: outcome.task,
-        warnings: outcome.warnings,
-        issues,
-        unblocked,
+    Ok(ChangedAlone {
+        at: (!event.changes.is_empty()).then(|| event.at.clone()),
+        project_changed,
+        stamp_before,
+        stamp_after,
+        changed: Changed {
+            task: outcome.task,
+            warnings: outcome.warnings,
+            issues,
+            unblocked,
+        },
     })
 }
 
