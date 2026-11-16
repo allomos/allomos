@@ -7,6 +7,7 @@ sidebar:
 
 每个版本在这里都有一页，说明新增了什么、修好了什么。最新的版本排在侧边栏最前面。
 
+- [0.1.68](/allomos/zh-cn/release-notes/v0-1-68/)
 - [0.1.67](/allomos/zh-cn/release-notes/v0-1-67/)
 - [0.1.66](/allomos/zh-cn/release-notes/v0-1-66/)
 - [0.1.65](/allomos/zh-cn/release-notes/v0-1-65/)
