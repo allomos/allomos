@@ -1463,9 +1463,7 @@ pub fn rename_project(
 pub fn make_ready(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
     let mut task = find_task_to_move(taskbag, id)?;
     check_holder(&task, me)?;
-    if task.holder.is_some()
-        || !matches!(task.state, State::Backlog | State::Waiting)
-    {
+    if task.holder.is_some() || !matches!(task.state, State::Backlog | State::Waiting) {
         return Err(Problem::CannotMakeReady {
             id: task.id.clone(),
             state: task.state.as_str().to_string(),
@@ -1484,9 +1482,7 @@ pub fn make_ready(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outco
 pub fn back_to_backlog(taskbag: &Taskbag, id: &str, me: Option<&str>) -> Result<Outcome, Problem> {
     let mut task = find_task_to_move(taskbag, id)?;
     check_holder(&task, me)?;
-    if task.holder.is_some()
-        || !matches!(task.state, State::Ready | State::Waiting)
-    {
+    if task.holder.is_some() || !matches!(task.state, State::Ready | State::Waiting) {
         return Err(Problem::CannotBackToBacklog {
             id: task.id.clone(),
             state: task.state.as_str().to_string(),
@@ -1837,7 +1833,10 @@ mod tests {
             })
         );
         let u = unblock(&s, "A01-01", None, &by(&["A01-03"])).unwrap().task;
-        assert_eq!((u.state, u.blocked_by.clone()), (State::Ready, by(&["A01-02", "A02-01"])));
+        assert_eq!(
+            (u.state, u.blocked_by.clone()),
+            (State::Ready, by(&["A01-02", "A02-01"]))
+        );
         // Unblock with no name: all of them; the state stays. No blockers: refused.
         let u = unblock(&s, "A01-01", None, &[]).unwrap().task;
         assert_eq!((u.state, u.blocked_by.len()), (State::Ready, 0));
@@ -1854,11 +1853,22 @@ mod tests {
         let b = block(&held, "A01-01", Some("a"), &by(&["A01-03"]))
             .unwrap()
             .task;
-        assert_eq!((b.state, b.holder.as_deref()), (State::InProgress, Some("a")));
+        assert_eq!(
+            (b.state, b.holder.as_deref()),
+            (State::InProgress, Some("a"))
+        );
         // The app's field sets the whole list; none clears it.
-        let e = set_blockers(&s, "A01-01", None, &by(&["A01-03"])).unwrap().task;
+        let e = set_blockers(&s, "A01-01", None, &by(&["A01-03"]))
+            .unwrap()
+            .task;
         assert_eq!(e.blocked_by, by(&["A01-03"]));
-        assert!(set_blockers(&s, "A01-01", None, &[]).unwrap().task.blocked_by.is_empty());
+        assert!(
+            set_blockers(&s, "A01-01", None, &[])
+                .unwrap()
+                .task
+                .blocked_by
+                .is_empty()
+        );
         // Done or dropped tasks cannot be blocked.
         assert_eq!(
             block(&s, "A01-02", None, &by(&["A01-01"]))
@@ -1870,7 +1880,9 @@ mod tests {
         let mut old = s.clone();
         old.project.format = "allomos/8".into();
         assert_eq!(
-            block(&old, "A01-01", None, &by(&["A01-03"])).unwrap_err().code(),
+            block(&old, "A01-01", None, &by(&["A01-03"]))
+                .unwrap_err()
+                .code(),
             "blockers_need_upgrade"
         );
     }

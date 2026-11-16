@@ -166,7 +166,7 @@ pub(crate) fn after_approval(root: &Path) {
 /// audit-settings --witness` does: recorded as an `audit-settings` event. Turning it on needs
 /// `confirmed` (the window's confirmation: only the fingerprint leaves the computer); off needs a
 /// reason. `on` null: keep it on and change only the services. Returns the settings as saved.
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn set_witness(
     root: PathBuf,
     on: Option<bool>,
@@ -220,7 +220,7 @@ pub(crate) struct RedactDone {
 /// every past value of `fields` in task `id`'s history that differs from the current one is
 /// removed, and one `redact` event says which fields and files, who approved it and why, never
 /// the old values. Refused while a legal hold is on, without a field or a reason.
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn redact_task(
     root: PathBuf,
     id: String,
@@ -267,7 +267,7 @@ pub(crate) struct SeenLine {
 }
 
 /// The key and the checkpoints seen, matched to the recent folders the window passes.
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn this_computer(folders: Vec<String>) -> ThisComputerView {
     this_computer_with(&folders)
 }
@@ -308,7 +308,7 @@ fn this_computer_with(folders: &[String]) -> ThisComputerView {
 /// in each taskbag of `folders` (the recent folders the window passes) that has the old key, the
 /// old one is retired and the new one added, each with its signed event. Returns what was done
 /// per taskbag; folders that are not a taskbag are left out.
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn replace_key(folders: Vec<String>) -> Result<allomos_store::Replaced, Problem> {
     let roots = taskbag_roots(&folders);
     allomos_store::replace_key(&roots, allomos_store::Actor::APP, LOCK_WAIT)
@@ -328,7 +328,7 @@ fn taskbag_roots(folders: &[String]) -> Vec<PathBuf> {
 }
 
 /// **Export public key…**: write this computer's public key file where the person chose.
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn export_public_key(path: PathBuf) -> Result<(), Problem> {
     let key = allomos_store::this_computer()
         .key
@@ -341,7 +341,7 @@ pub(crate) fn export_public_key(path: PathBuf) -> Result<(), Problem> {
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn audit_settings(root: PathBuf) -> Result<AuditSettings, Problem> {
     audit_settings_of(&root)
 }
@@ -349,7 +349,7 @@ pub(crate) fn audit_settings(root: PathBuf) -> Result<AuditSettings, Problem> {
 /// Turn separation of duties on or off (Task-A01-grotto036), as `alm audit-settings
 /// --separation-of-duties` does: recorded as an `audit-settings` event; turning it off needs a
 /// reason. Returns the settings as saved.
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn set_separation(
     root: PathBuf,
     on: bool,
@@ -383,7 +383,7 @@ pub(crate) fn set_separation_at(
 /// Change the retention period and the legal hold (Task-A01-stem986), as `alm audit-settings
 /// --retention --legal-hold` does: recorded as an `audit-settings` event; a shorter period and
 /// turning the hold on or off need a reason. `years` null: forever. Returns the settings as saved.
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn set_retention(
     root: PathBuf,
     years: Option<u32>,
@@ -426,7 +426,7 @@ pub(crate) fn set_retention_at(
 
 /// Change the identity level, as `alm audit-settings` does, recorded as an `audit-settings`
 /// event with the reason. Returns the settings as saved.
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn set_identity(
     root: PathBuf,
     level: Option<String>,

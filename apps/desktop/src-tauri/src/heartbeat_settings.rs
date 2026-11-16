@@ -53,7 +53,7 @@ fn of_project(project: &allomos_core::Project) -> HeartbeatSettings {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn heartbeat_settings(root: PathBuf) -> Result<HeartbeatSettings, Problem> {
     settings_of(&root)
 }
@@ -61,7 +61,7 @@ pub(crate) fn heartbeat_settings(root: PathBuf) -> Result<HeartbeatSettings, Pro
 /// Change the heartbeat settings, as `alm heartbeat-settings --interval --lost-after --wip`
 /// does, or put them all back to their defaults (`clear`, as `--clear`). Returns the settings as saved; nothing
 /// is written when they already say that.
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn set_heartbeat_settings(
     root: PathBuf,
     interval: Option<String>,

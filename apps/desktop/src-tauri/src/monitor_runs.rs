@@ -26,7 +26,7 @@ pub const PROCESSES_AGE: std::time::Duration = crate::monitor_loop::IN_USE;
 
 /// The runs of the taskbag at `root` (several may run at once), oldest first, with the
 /// record-missing `alm monitor run` processes that name it.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn monitor_runs(root: PathBuf) -> Vec<serde_json::Value> {
     let Some(dir) = registry::dir() else {
         return Vec::new();
@@ -39,7 +39,7 @@ pub fn monitor_runs(root: PathBuf) -> Vec<serde_json::Value> {
 
 /// Every run this computer runs, oldest first, for the Monitors list (Task-A03-motor529): all
 /// projects', with the record-missing processes; `project` and `taskbag` name each one.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn monitor_all() -> Vec<serde_json::Value> {
     let Some(dir) = registry::dir() else {
         return Vec::new();
@@ -132,7 +132,7 @@ pub async fn monitor_start(
 }
 
 /// Leave `request` (check, stop, undo_stop, every, agents) for run `id`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn monitor_ask(id: String, request: Request) -> Result<(), Problem> {
     if !registry::plain_id(&id) {
         return Err(Problem::BadUsage {
@@ -148,7 +148,7 @@ pub fn monitor_ask(id: String, request: Request) -> Result<(), Problem> {
 
 /// End process `pid`, an `alm monitor run` whose record is missing (it cannot see a request).
 /// Refused for any other process.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn monitor_end_process(pid: u32) -> Result<(), Problem> {
     if !registry::monitor_processes().iter().any(|p| p.pid == pid) {
         return Err(Problem::BadUsage {
@@ -205,7 +205,7 @@ pub async fn monitor_resume(root: PathBuf) -> Result<Vec<String>, Problem> {
 
 /// The last run of the project at `root` as the app's line reads it (`ended` in ms, `scope`,
 /// `taken`, `takenBy`), when one ended on this computer (A03-pocket537).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn monitor_last(root: PathBuf) -> Option<serde_json::Value> {
     let dir = registry::dir()?;
     registry::read_last(&dir, &root).and_then(|l| serde_json::to_value(l).ok())
@@ -220,7 +220,7 @@ pub struct AgentAccounts {
     defaults: BTreeMap<String, String>,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn agent_accounts() -> AgentAccounts {
     let home = allomos_monitor::terminal::home();
     let defaults = ["claude_cli", "codex_cli"]
@@ -239,7 +239,7 @@ pub fn agent_accounts() -> AgentAccounts {
 /// Add an account of an agent: the folder the person picked (its settings and login folder) and
 /// the name they gave it. The folder is checked first (`accounts::check_new`); only the path and
 /// the name are saved, in `agent-accounts.json`, never the login files.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn add_agent_account(agent: String, path: PathBuf, name: String) -> Result<Account, Problem> {
     let file = accounts::file_path().ok_or_else(no_dir)?;
     let mut listed = accounts::load_at(&file);
