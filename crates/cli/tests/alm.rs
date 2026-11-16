@@ -3483,12 +3483,18 @@ fn a_task_finished_without_the_human_check_is_listed_checked_and_cleared() {
     );
     let out = alm(&repo, &["human"]);
     let text = String::from_utf8_lossy(&out.stdout);
-    assert!(text.starts_with("To check (2)\n"), "{text}");
+    assert!(
+        text.starts_with("Agents are waiting for you (1)\n"),
+        "{text}"
+    );
+    assert!(
+        text.contains("\nFinished, for you to look at (2)\n"),
+        "{text}"
+    );
     assert!(
         text.contains("not human-checked: card run, approver away"),
         "{text}"
     );
-    assert!(text.contains("To answer (1)"), "{text}");
     assert!(text.contains("waiting for Ann: approve the card"), "{text}");
     assert!(!text.contains("A01-04"), "backlog is not listed: {text}");
     assert!(!text.contains("1. Open"), "steps only with --steps: {text}");
@@ -3570,7 +3576,7 @@ fn a_task_finished_without_the_human_check_is_listed_checked_and_cleared() {
             .is_none()
     );
     let out = alm(&repo, &["human"]);
-    assert!(String::from_utf8_lossy(&out.stdout).contains("Nothing to check."));
+    assert!(String::from_utf8_lossy(&out.stdout).contains("Nothing to check or review."));
 }
 
 #[test]
@@ -3671,7 +3677,7 @@ fn an_agents_own_decisions_wait_for_review_and_leave_when_reviewed() {
     );
     let out = alm(&repo, &["human"]);
     let text = String::from_utf8_lossy(&out.stdout);
-    assert!(text.contains("To review: AI decisions (2)"), "{text}");
+    assert!(text.contains("To review: AI decisions (2):"), "{text}");
     assert!(
         text.contains("- Layout: one file per command (b, "),
         "{text}"
@@ -3812,7 +3818,7 @@ fn ai_decisions_have_three_kinds_and_details_are_not_reviewed() {
     assert_eq!(v["to_review"][0]["ai_decisions"][0]["kind"], "principle");
     let out = alm(&repo, &["human"]);
     let text = String::from_utf8_lossy(&out.stdout);
-    assert!(text.contains("To review: AI decisions (1)"), "{text}");
+    assert!(text.contains("To review: AI decisions (2):"), "{text}");
     assert!(!text.contains("160px"), "{text}");
     // A review takes all three off, the detail with them; the history keeps them.
     let v = ok(&repo, &["--as", "will", "reviewed", "A01-01"]);
@@ -7370,7 +7376,7 @@ fn a_task_has_a_change_type_and_risk_and_emergencies_are_listed_until_approved_a
     assert_eq!(list[0]["overdue"], true);
     let out = String::from_utf8(alm(&repo, &["human"]).stdout).unwrap();
     assert!(
-        out.contains("To approve afterwards: emergency changes (1)"),
+        out.contains("To approve afterwards: emergency since"),
         "{out}"
     );
     assert!(out.contains("(past due)"), "{out}");
@@ -9266,8 +9272,8 @@ fn human_shows_each_tasks_risk_and_marks_the_unclassified() {
     );
 
     let out = String::from_utf8(alm(&repo, &["human"]).stdout).unwrap();
-    // To check and To review list A01-01 (high); To answer lists A01-03 (none recorded).
-    assert_eq!(out.matches("      risk: high\n").count(), 2, "{out}");
+    // One row each: A01-01 (high, to check and to review) and A01-03 (none recorded).
+    assert_eq!(out.matches("      risk: high\n").count(), 1, "{out}");
     assert_eq!(
         out.matches("      risk: not classified\n").count(),
         1,
@@ -9277,7 +9283,7 @@ fn human_shows_each_tasks_risk_and_marks_the_unclassified() {
         let mut lines = out
             .lines()
             .skip_while(|l| !l.starts_with(&format!("  {id}  ")));
-        lines.nth(1).unwrap().to_string()
+        lines.nth(2).unwrap().to_string()
     };
     assert_eq!(line_after("A01-01"), "      risk: high");
     assert_eq!(line_after("A01-03"), "      risk: not classified");
@@ -9298,4 +9304,135 @@ fn human_shows_each_tasks_risk_and_marks_the_unclassified() {
     let out = String::from_utf8(alm(&repo, &["human"]).stdout).unwrap();
     assert!(out.contains("      リスク：中\n"), "{out}");
     assert!(out.contains("      リスク：未分類\n"), "{out}");
+}
+
+/// `alm human` lists one task once, in the order of decision 0028 (Task-A01-muffin353): what an
+/// agent waits on first (the task holding back more tasks, then the longer wait), then finished
+/// work by the recorded risk, the longer wait first.
+#[test]
+fn human_lists_one_row_a_task_in_the_order_of_decision_0028() {
+    let repo = filled();
+    ok(&repo, &["task-language", "en"]);
+    for id in ["A01-03", "A01-04", "A01-05"] {
+        ok(
+            &repo,
+            &["add", "task", id, "--area", "A01", "--title", "More"],
+        );
+    }
+    for (id, who) in [
+        ("A01-01", "a"),
+        ("A01-02", "b"),
+        ("A02-01", "c"),
+        ("A01-03", "d"),
+        ("A01-04", "e"),
+    ] {
+        ok(&repo, &["ready", id]);
+        ok(&repo, &["--as", who, "claim", id]);
+    }
+    let at = |now: &str, args: &[&str]| ok_at(&repo, now, args);
+    let finish = |now: &str, who: &str, id: &str| {
+        at(
+            now,
+            &["--as", who, "done", id, "--without-human-check", "test"],
+        );
+    };
+    finish("2026-10-30T10:00:00Z", "c", "A02-01");
+    finish("2026-11-01T10:00:00Z", "a", "A01-01");
+    at(
+        "2026-11-01T10:00:01Z",
+        &["--as", "a", "classify", "A01-01", "--risk", "low"],
+    );
+    at(
+        "2026-11-02T10:00:00Z",
+        &["--as", "b", "ai-decided", "A01-02", "Kept it simple"],
+    );
+    at(
+        "2026-11-02T10:00:01Z",
+        &["--as", "b", "classify", "A01-02", "--risk", "high"],
+    );
+    finish("2026-11-03T10:00:00Z", "b", "A01-02");
+    at(
+        "2026-11-04T10:00:00Z",
+        &["--as", "e", "wait", "A01-04", "--on", "which colour"],
+    );
+    at(
+        "2026-11-05T10:00:00Z",
+        &["--as", "d", "wait", "A01-03", "--on", "which name"],
+    );
+    ok(&repo, &["block", "A01-05", "--by", "A01-03"]);
+
+    let v = ok_at(&repo, "2026-11-08T10:00:00Z", &["human"]);
+    let queue = v["queue"].as_array().unwrap();
+    let ids: Vec<&str> = queue.iter().map(|r| r["id"].as_str().unwrap()).collect();
+    // A01-03 holds back A01-05, so it comes before A01-04, which waits longer; then high, low,
+    // not classified, whatever the wait.
+    assert_eq!(ids, ["A01-03", "A01-04", "A01-02", "A01-01", "A02-01"]);
+    assert_eq!(queue[0]["todo"], json!(["answer"]));
+    assert_eq!(queue[0]["agent_waiting"], true);
+    assert_eq!(queue[0]["blocks"], 1);
+    assert_eq!(queue[0]["waiting_since"], "2026-11-05T10:00:00Z");
+    assert_eq!(queue[1]["blocks"], 0);
+    // One row for the task both to check and to review, waiting since the earlier of the two.
+    assert_eq!(queue[2]["todo"], json!(["check", "review"]));
+    assert_eq!(queue[2]["agent_waiting"], false);
+    assert_eq!(queue[2]["risk"], "high");
+    assert_eq!(queue[2]["waiting_since"], "2026-11-02T10:00:00Z");
+    assert_eq!(queue[2]["ai_decisions"].as_array().unwrap().len(), 1);
+    assert_eq!(queue[3]["risk"], "low");
+    assert_eq!(queue[3]["waiting_since"], "2026-11-01T10:00:00Z");
+    assert_eq!(queue[4]["risk"], Value::Null);
+    // The lists by kind follow the same order.
+    let list = |key: &str| -> Vec<&str> {
+        v[key]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["id"].as_str().unwrap())
+            .collect()
+    };
+    assert_eq!(list("to_answer"), ["A01-03", "A01-04"]);
+    assert_eq!(list("to_check"), ["A01-02", "A01-01", "A02-01"]);
+    assert_eq!(list("to_review"), ["A01-02"]);
+
+    let out = alm_at(&repo, "2026-11-08T10:00:00Z", &["human"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    let rows: Vec<&str> = text
+        .lines()
+        .filter(|l| l.starts_with("  A0"))
+        .map(|l| &l[2..8])
+        .collect();
+    assert_eq!(rows, ids, "each task once, in the same order: {text}");
+    assert!(
+        text.starts_with("Agents are waiting for you (2)\n"),
+        "{text}"
+    );
+    assert!(
+        text.contains("\nFinished, for you to look at (3)\n"),
+        "{text}"
+    );
+    assert!(
+        text.contains("      to do: check + review 1 AI decision\n"),
+        "{text}"
+    );
+    assert!(
+        text.contains("      waiting since 2026-11-05T10:00:00Z (3 d); holds back 1 task\n"),
+        "{text}"
+    );
+    assert!(text.contains("      to do: answer\n"), "{text}");
+
+    // The filter keeps the order; in the task language like the rest of the row.
+    let v = ok(&repo, &["human", "--area", "A02"]);
+    assert_eq!(v["queue"].as_array().unwrap().len(), 1);
+    ok(&repo, &["task-language", "zh-CN"]);
+    let text = String::from_utf8(alm(&repo, &["human"]).stdout).unwrap();
+    assert!(
+        text.contains("      要你做：检查 + 审 1 条 AI 决定\n"),
+        "{text}"
+    );
+    ok(&repo, &["task-language", "ja"]);
+    let text = String::from_utf8(alm(&repo, &["human"]).stdout).unwrap();
+    assert!(
+        text.contains("      あなたの作業：確認 + AI の決定 1 件のレビュー\n"),
+        "{text}"
+    );
 }

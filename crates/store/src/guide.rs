@@ -228,11 +228,16 @@ See:
   `--by iteration` lists every iteration, empty ones too, each starting with its place in the
   plan (1, 2, 3…, as the app shows it; `place` in `--json`), counted from the plan's order, so it
   changes after `alm move iteration`, and stays the same with `--iteration <id>`.
-- `alm human [--iteration <id>] [--area <id>] [--steps]`: what needs a person: **To check**
-  (finished without the human check, each with why; `--steps` adds how to check it) and **To
-  answer** (waiting on a person, each with what; backlog tasks are not listed), then
-  **To review: AI decisions** (tasks in any state with decisions not reviewed yet, each listed).
-  `--json`: `to_check`, `to_answer`, `to_review` (each task with its `ai_decisions`).
+- `alm human [--iteration <id>] [--area <id>] [--steps]`: what needs a person, one task at a
+  time with everything to do about it (answer, approve afterwards, check, review its AI
+  decisions), in the order to take them (decision 0028): first the tasks an agent is waiting on
+  (the one holding back more tasks first, then the longer wait), then finished work by the
+  recorded risk (high, medium, low, not classified; the longer wait first), last the earlier
+  iteration. Under a task: why it is to check (`--steps` adds how), what it waits on, and
+  **To review: AI decisions**, each listed. Backlog tasks with nothing to review are not listed.
+  `--json`: `queue` (one task each, in order, with `todo`, `risk`, `waiting_since`, `blocks`,
+  `agent_waiting`, `ai_decisions`), and the same tasks by kind: `to_check`, `to_answer`,
+  `to_review`, `to_approve_afterwards`.
 - `alm show <id>`: one task in full, with its description.
 - `alm history <id>`: every recorded change to the task, newest first: when, who, what changed.
 
