@@ -17,6 +17,7 @@ mod monitor_pause;
 mod monitor_runs;
 mod monitor_update;
 mod pairing;
+mod risk_settings;
 mod sessions;
 mod tab_drag;
 mod taskbag_watch;
@@ -2642,6 +2643,8 @@ pub fn run() {
             set_handoff_rules,
             heartbeat_settings::heartbeat_settings,
             heartbeat_settings::set_heartbeat_settings,
+            risk_settings::risk_settings,
+            risk_settings::set_risk_settings,
             audit_settings,
             set_separation,
             set_witness,

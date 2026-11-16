@@ -2086,11 +2086,7 @@ mod tests {
         let all = guide(None).unwrap();
         assert!(all.contains("# Allomos terms") && all.contains("# How to work the tasks"));
         // The fixed parts are said plainly.
-        assert!(
-            guide(Some("customize"))
-                .unwrap()
-                .contains("The six states")
-        );
+        assert!(guide(Some("customize")).unwrap().contains("The six states"));
         for text in [guide(Some("commands")).unwrap(), crate::agent_section()] {
             assert!(text.contains("alm block <id> --by"), "{text}");
             assert!(text.contains("alm unblock <id>"), "{text}");

@@ -9,6 +9,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import type { FolderInfo as ProjectFolderInfo } from "./folderFlow";
 import type { HeartbeatSettings } from "./heartbeatSettingsFlow";
+import type { RiskSettings } from "./riskFlow";
 import type { CodexRules } from "./codexRulesFlow";
 import type { LadderStep } from "./ladderFlow";
 import type { FormerWorktree } from "./proceedFlow";
@@ -234,6 +235,10 @@ export interface Messenger {
   heartbeatSettings(root: string): Promise<HeartbeatSettings>;
   /** Changes them (whole minutes), or puts both back to their defaults (`clear`); resolves to the settings as saved. Rejects with a Problem. */
   setHeartbeatSettings(root: string, change: { interval?: string; lostAfter?: string; pushWork?: boolean; clear?: boolean }): Promise<HeartbeatSettings>;
+  /** Project settings → Risk management (decision 0027 § 6, Task-A01-beetle749): the fixed rules for high risk, the project's own rules and its two limits. */
+  riskSettings(root: string): Promise<RiskSettings>;
+  /** Changes them: `rules` replaces the project's own rules, each limit given is turned on or off; resolves to the settings as saved. Rejects with a Problem. */
+  setRiskSettings(root: string, change: { rules?: string[]; highNeedsHumanCheck?: boolean; highNeedsApproverMerge?: boolean }): Promise<RiskSettings>;
   /** Project settings → Audit (Task-A01-frolic587): the identity level. */
   auditSettings(root: string): Promise<AuditSettings>;
   /** Changes the identity level, as `alm audit-settings`; resolves to the settings as saved. Rejects with a Problem. */
@@ -603,6 +608,14 @@ export const desktopMessenger: Messenger = {
       lostAfter: c.lostAfter ?? null,
       pushWork: c.pushWork ?? null,
       clear: c.clear ?? false,
+    }),
+  riskSettings: (root) => invoke<RiskSettings>("risk_settings", { root }),
+  setRiskSettings: (root, c) =>
+    invoke<RiskSettings>("set_risk_settings", {
+      root,
+      rules: c.rules ?? null,
+      highNeedsHumanCheck: c.highNeedsHumanCheck ?? null,
+      highNeedsApproverMerge: c.highNeedsApproverMerge ?? null,
     }),
   auditSettings: (root) => invoke<AuditSettings>("audit_settings", { root }),
   setIdentity: (root, c) =>
