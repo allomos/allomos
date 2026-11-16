@@ -385,7 +385,11 @@ const CODEX_QUIET_POLICY: &str =
 /// folder without a person approving each edit (Task-A03-plaza436). Only quiet monitored sessions
 /// set its approval policy to `never` and allow network access in the sandbox (Task-A03-trail745),
 /// so an unattended run can install dependencies without prompting. User settings are untouched.
-pub fn session_command(
+pub fn session_command(id: &str, file: &Path, session_id: Option<&str>) -> Option<String> {
+    session_command_with_quiet(id, file, session_id, false)
+}
+
+fn session_command_with_quiet(
     id: &str,
     file: &Path,
     session_id: Option<&str>,
@@ -409,6 +413,18 @@ pub fn session_command(
 
 /// The same on Windows: PowerShell reads the file into a variable, removes it, and passes it.
 pub fn powershell_session(
+    id: &str,
+    project: &Path,
+    found: &str,
+    file: &Path,
+    session_id: Option<&str>,
+    alm_dir: Option<&Path>,
+    config: Option<(&str, &Path)>,
+) -> String {
+    powershell_session_with_quiet(id, project, found, file, session_id, alm_dir, config, false)
+}
+
+fn powershell_session_with_quiet(
     id: &str,
     project: &Path,
     found: &str,
@@ -494,14 +510,14 @@ pub fn start_session(
         .map(|d| d.as_nanos())
         .unwrap_or_default();
     let file = std::env::temp_dir().join(format!("allomos-request-{stamp}.txt"));
-    let Some(program) = session_command(id, &file, session_id, quiet) else {
+    let Some(program) = session_command_with_quiet(id, &file, session_id, quiet) else {
         return Err(ask_failed(id, "no way to start it"));
     };
     // An extra account's folder variable goes in front of the command, for that command only.
     let program = with_config(&program, config);
     std::fs::write(&file, request).map_err(|e| ask_failed(id, e))?;
     if cfg!(windows) {
-        let script = powershell_session(
+        let script = powershell_session_with_quiet(
             id, project, found, &file, session_id, alm_dir, config, quiet,
         );
         return new_console("powershell.exe")
@@ -621,19 +637,19 @@ mod tests {
     fn monitored_sessions_start_with_the_request_sent() {
         let file = Path::new("/tmp/allomos-request-1.txt");
         assert_eq!(
-            session_command("claude_cli", file, Some("0b1c-2d"), false).as_deref(),
+            session_command("claude_cli", file, Some("0b1c-2d")).as_deref(),
             Some(
                 "claude --session-id '0b1c-2d' \"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\""
             )
         );
         assert_eq!(
-            session_command("codex_cli", file, Some("ignored"), false).as_deref(),
+            session_command("codex_cli", file, Some("ignored")).as_deref(),
             Some(
                 "codex --sandbox workspace-write \"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\""
             )
         );
         assert_eq!(
-            session_command("antigravity_cli", file, Some("ignored"), false).as_deref(),
+            session_command("antigravity_cli", file, Some("ignored")).as_deref(),
             Some(
                 "agy -i \"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\""
             )
@@ -646,8 +662,7 @@ mod tests {
                 Path::new(r"C:\t\r.txt"),
                 None,
                 None,
-                None,
-                false
+                None
             ),
             r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\agy\bin\agy.exe' -i $request"
         );
@@ -659,12 +674,11 @@ mod tests {
                 Path::new(r"C:\t\r.txt"),
                 Some("ignored"),
                 None,
-                None,
-                false
+                None
             ),
             r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\npm\codex.cmd' --sandbox workspace-write $request"
         );
-        assert_eq!(session_command("claude_app", file, None, false), None);
+        assert_eq!(session_command("claude_app", file, None), None);
         assert!(plain_session_id("8f0e5a52-1c2d-4e3f-9a0b-1c2d3e4f5a6b"));
         assert!(!plain_session_id("x; rm -rf ~"));
         assert!(!plain_session_id(""));
@@ -677,8 +691,7 @@ mod tests {
                 Path::new(r"C:\t\r.txt"),
                 Some("ab-12"),
                 None,
-                None,
-                false
+                None
             ),
             format!(
                 r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-12' $request"
@@ -691,22 +704,22 @@ mod tests {
         let file = Path::new("/tmp/allomos-request-1.txt");
         let request = "\"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\"";
         assert_eq!(
-            session_command("codex_cli", file, None, true).as_deref(),
+            session_command_with_quiet("codex_cli", file, None, true).as_deref(),
             Some(format!(
                 "codex --sandbox workspace-write --ask-for-approval never --config sandbox_workspace_write.network_access=true {request}"
             ).as_str())
         );
         assert_eq!(
-            session_command("claude_cli", file, Some("ab-12"), true).as_deref(),
+            session_command_with_quiet("claude_cli", file, Some("ab-12"), true).as_deref(),
             Some(format!("claude --session-id 'ab-12' {request}").as_str())
         );
         assert_eq!(
-            session_command("antigravity_cli", file, None, true).as_deref(),
+            session_command_with_quiet("antigravity_cli", file, None, true).as_deref(),
             Some(format!("agy -i {request}").as_str())
         );
 
         assert_eq!(
-            powershell_session(
+            powershell_session_with_quiet(
                 "codex_cli",
                 Path::new(r"C:\p"),
                 r"C:\npm\codex.cmd",
@@ -736,8 +749,7 @@ mod tests {
                 Path::new(r"C:\t\r.txt"),
                 None,
                 None,
-                Some(("CODEX_HOME", Path::new(r"C:\acct"))),
-                false
+                Some(("CODEX_HOME", Path::new(r"C:\acct")))
             )
             .starts_with(r"${env:CODEX_HOME} = 'C:\acct'; Set-Location -LiteralPath 'C:\p';"),
             true
