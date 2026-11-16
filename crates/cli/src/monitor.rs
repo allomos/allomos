@@ -505,6 +505,12 @@ fn entry_text(e: &Entry, with_project: bool) -> String {
                     words.join(", ")
                 ));
             }
+            for l in &run.let_go {
+                text.push_str(&format!(
+                    "  let go: {} was claimed by {} (another session); its slot is free\n",
+                    l.id, l.holder
+                ));
+            }
             if !run.taken.is_empty() {
                 text.push_str(&format!(
                     "  sessions started for: {}\n",

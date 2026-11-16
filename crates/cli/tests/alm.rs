@@ -592,6 +592,98 @@ fn walk(dir: &Path) -> Vec<PathBuf> {
     all
 }
 
+/// A heartbeat saved with the commands `alm beat` prints holds only the heartbeat's own files
+/// (Task-A01-flour637): a change someone else has not shared yet stays out of the commit and
+/// stays in the taskbag. The reminder to push work in progress, with its `git add -A` for the
+/// working branch's worktree, comes after the taskbag's commands and says it is not for the
+/// taskbag.
+#[test]
+fn a_beat_saved_as_printed_leaves_unshared_changes_alone() {
+    let repo = tmp("beat-scope");
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .current_dir(&repo)
+            .args(["-c", "user.name=t", "-c", "user.email=t@example.invalid"])
+            .args(["-c", "commit.gpgsign=false"])
+            .args(args)
+            .output()
+    };
+    match git(&["init", "-q"]) {
+        Ok(o) if o.status.success() => {}
+        _ => return, // No Git on this machine: nothing to check.
+    }
+    ok(&repo, &["init"]);
+    ok(&repo, &["add", "area", "A01", "One"]);
+    for id in ["A01-01", "A01-02"] {
+        ok(&repo, &["add", "task", id, "--area", "A01", "--title", "T"]);
+        ok(&repo, &["ready", id]);
+    }
+    let t0 = "2026-11-09T14:00:00Z";
+    ok_at(&repo, t0, &["--as", "s1", "claim", "A01-01"]);
+    assert!(git(&["add", "-A"]).unwrap().status.success());
+    assert!(
+        git(&["commit", "-q", "-m", "start"])
+            .unwrap()
+            .status
+            .success()
+    );
+
+    // Someone else's change, not shared yet: a tracked file changed and a new event file.
+    ok_at(&repo, t0, &["note", "A01-02", "not shared yet"]);
+    let dirty = |git: &dyn Fn(&[&str]) -> std::io::Result<Output>| -> Vec<String> {
+        let out = git(&["status", "--porcelain", "-uall"]).unwrap();
+        String::from_utf8(out.stdout)
+            .unwrap()
+            .lines()
+            .map(String::from)
+            .collect()
+    };
+    let others = dirty(&git);
+    assert!(
+        others.iter().any(|l| l.ends_with("tasks/A01-02/task.json")) && others.len() >= 2,
+        "{others:?}"
+    );
+
+    // The beat, saved exactly as printed (without the push: there is no remote here).
+    let t1 = "2026-11-09T14:10:00Z";
+    let v = ok_at(&repo, t1, &["--as", "s1", "beat", "--busy", "15m"]);
+    assert_eq!(v["changed_files"], json!(["tasks/A01-01/task.json"]), "{v}");
+    for c in v["git_commands"].as_array().unwrap() {
+        let c = c.as_str().unwrap();
+        if c.ends_with(" push") {
+            continue;
+        }
+        let c = c.replacen(
+            "git -C",
+            "git -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false -C",
+            1,
+        );
+        let out = Command::new("sh").args(["-c", &c]).output().unwrap();
+        assert!(out.status.success(), "{c}: {out:?}");
+    }
+    let out = git(&["show", "--name-only", "--format=", "HEAD"]).unwrap();
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap().trim(),
+        ".allomos/taskbag/tasks/A01-01/task.json"
+    );
+    // The other change is still there, as it was.
+    assert_eq!(dirty(&git), others);
+
+    // In words: the taskbag's files first, how not to save them, then the working branch.
+    let out = alm_at(&repo, "2026-11-09T14:20:00Z", &["--as", "s1", "beat"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    let only = text.find("Save only these files").expect(&text);
+    let never = text
+        .find("never `git add -A`, `git add .` or `git commit -a` in the taskbag")
+        .expect(&text);
+    let wip = text.find("    git add -A\n").expect(&text);
+    assert!(only < never && never < wip, "{text}");
+    assert!(
+        text.contains("in that branch's worktree, never in the taskbag"),
+        "{text}"
+    );
+}
+
 /// In a real Git repository, `git status` shows only the taskbag's text files: never the lock.
 #[test]
 fn git_sees_only_text_files() {
@@ -858,7 +950,9 @@ fn shell(dir: &Path, c: &str) -> Command {
     }
 }
 
-/// Run the Git commands `alm` printed (its `git_commands`) in `dir`, as an agent would.
+/// Run the Git commands `alm` printed (its `git_commands`) in `dir`, as an agent would. The ones
+/// printed for Codex name no folder (Task-A01-flame635): those run in the folder alm named
+/// (`git_folder`).
 fn run_printed(dir: &Path, v: &Value) {
     let commands = v["git_commands"]
         .as_array()
@@ -866,7 +960,12 @@ fn run_printed(dir: &Path, v: &Value) {
     assert!(!commands.is_empty(), "{v}");
     for c in commands {
         let c = c.as_str().unwrap();
-        let out = shell(dir, c).output().unwrap();
+        let dir = if c.starts_with("git -C ") {
+            dir.to_path_buf()
+        } else {
+            PathBuf::from(v["git_folder"].as_str().unwrap_or_else(|| panic!("{v}")))
+        };
+        let out = shell(&dir, c).output().unwrap();
         assert!(
             out.status.success(),
             "{c}: {}",
@@ -9433,6 +9532,291 @@ fn human_lists_one_row_a_task_in_the_order_of_decision_0028() {
     let text = String::from_utf8(alm(&repo, &["human"]).stdout).unwrap();
     assert!(
         text.contains("      あなたの作業：確認 + AI の決定 1 件のレビュー\n"),
+        "{text}"
+    );
+}
+
+/// Run the Git commands `alm` printed for Codex as Codex does: each on its own, with the folder
+/// alm named (`git_folder`) as its working folder.
+fn run_printed_in_folder(v: &Value, commands: &Value) {
+    let folder = PathBuf::from(v["git_folder"].as_str().unwrap_or_else(|| panic!("{v}")));
+    assert!(folder.is_absolute(), "{v}");
+    let commands = commands.as_array().unwrap_or_else(|| panic!("{v}"));
+    assert!(!commands.is_empty(), "{v}");
+    for c in commands {
+        let c = c.as_str().unwrap();
+        assert!(c.starts_with("git ") && !c.contains("-C"), "{c}");
+        let out = shell(&folder, c).output().unwrap();
+        assert!(
+            out.status.success(),
+            "{c}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+}
+
+/// Task-A01-flame635 (approver 2026-11-16): on a task Codex holds, the Git commands alm prints
+/// carry no `git -C <folder>` (it matches none of Allomos's rules for Codex, so an unattended
+/// Codex stopped to ask): alm names the folder first, then plain `git add`, `git commit` and
+/// `git push`. Any other agent, and an agent alm cannot tell, sees `git -C` as before.
+#[test]
+fn codex_gets_git_commands_without_dash_c_and_the_folder_named_first() {
+    let (repo, remote) = real_repo();
+    ok(&repo, &["init", "--name", "Demo"]);
+    git(&repo, &["add", "--", ".allomos"]);
+    git(&repo, &["commit", "--quiet", "-m", "Add Allomos taskbag"]);
+    let v = ok(&repo, &["add", "area", "A01", "Tracking"]);
+    // Not Codex for certain: as before, and `git_folder` is there all the same.
+    let folder = v["git_folder"].as_str().unwrap().to_string();
+    assert!(
+        Path::new(&folder).is_absolute() && folder.ends_with("taskbag"),
+        "{v}"
+    );
+    assert!(
+        v["git_commands"][0]
+            .as_str()
+            .unwrap()
+            .starts_with("git -C "),
+        "{v}"
+    );
+    run_printed(&repo, &v);
+    for id in ["A01-01", "A01-02", "A01-03"] {
+        let v = ok(&repo, &["add", "task", id, "--area", "A01", "--title", "T"]);
+        run_printed(&repo, &v);
+    }
+    let plain_heading = format!(
+        "\nFor Git, in {folder} (run each command on its own, with that folder as its working folder):\n  git add -- events/"
+    );
+
+    // The claim that says the agent is Codex already prints the plain form.
+    let claim = [
+        "--as",
+        "loop-1",
+        "claim",
+        "A01-01",
+        "--session-agent",
+        "codex",
+        "--session-id",
+        "s1",
+    ];
+    let v = ok(&repo, &claim[..4]);
+    assert!(
+        v["git_commands"][0]
+            .as_str()
+            .unwrap()
+            .starts_with("git -C "),
+        "a session name that names no agent, and no session agent yet: {v}"
+    );
+    run_printed(&repo, &v);
+    ok(
+        &repo,
+        &["--as", "loop-1", "release", "A01-01", "--note", "n"],
+    );
+    let out = alm(&repo, &claim);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains(&plain_heading), "{text}");
+    assert!(!text.contains("git -C"), "{text}");
+    assert!(
+        text.contains("\nSave only these files; leave other changes as they are.\nRun the commands as printed, never `git add -A`, `git add .` or `git commit -a` in the taskbag: those also take changes others have not shared yet (the person's changes in the Allomos app, other sessions' changes).\nCodex: run every Git command on a line of its own, your own Git commands too"),
+        "{text}"
+    );
+    assert!(
+        text.contains("\n  git commit -m \"alm: claim A01-01\" -m \"Agent: loop-1\" -- events/")
+            && text.contains("\n  git push\n"),
+        "{text}"
+    );
+    // The release and the claim, shared the way Codex runs them.
+    let files = git(&repo, &["status", "--porcelain", "--untracked-files=all"]);
+    assert!(!files.is_empty());
+    git(&repo, &["add", "--", ".allomos"]);
+    git(&repo, &["commit", "--quiet", "-m", "release and claim"]);
+
+    // Every later change of that task: label, handoff, beat, done.
+    let changes: [&[&str]; 4] = [
+        &["label", "A01-01", "locally verified by agent"],
+        &["handoff", "A01-01", "--text", "Stopped here."],
+        &["beat", "--doing", "testing"],
+        &["done", "A01-01", "--without-human-check", "why"],
+    ];
+    for change in changes {
+        let mut args = vec!["--as", "loop-1"];
+        args.extend(change);
+        let v = ok(&repo, &args);
+        assert_eq!(v["git_folder"], json!(folder), "{v}");
+        let commands = v["git_commands"].as_array().unwrap();
+        assert_eq!(commands.len(), 3, "{v}");
+        assert!(commands[0].as_str().unwrap().starts_with("git add -- "));
+        assert!(
+            commands[1]
+                .as_str()
+                .unwrap()
+                .starts_with("git commit -m \"alm: "),
+            "{v}"
+        );
+        assert_eq!(commands[2], "git push", "{v}");
+        run_printed_in_folder(&v, &v["git_commands"]);
+        assert_eq!(
+            git(&repo, &["status", "--porcelain", "--untracked-files=all"]),
+            "",
+            "{args:?}"
+        );
+    }
+    // What Codex ran reached the remote.
+    assert_eq!(
+        git(&remote, &["log", "-1", "--format=%s", "main"]),
+        "alm: done A01-01"
+    );
+
+    // Claude Code's task: word for word as before.
+    let out = alm(
+        &repo,
+        &[
+            "--as",
+            "codex-looking-name",
+            "claim",
+            "A01-02",
+            "--session-agent",
+            "claude-code",
+            "--session-id",
+            "s2",
+            "--session-kind",
+            "terminal",
+        ],
+    );
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains(&format!("\nFor Git:\n  git -C {folder} add -- events/"))
+            && text.contains(&format!("\n  git -C {folder} push\n"))
+            && !text.contains("For Git, in ")
+            && !text.contains("Codex: run every"),
+        "{text}"
+    );
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "codex-looking-name",
+            "label",
+            "A01-02",
+            "locally verified by agent",
+        ],
+    );
+    assert_eq!(v["git_folder"], json!(folder), "{v}");
+    for c in v["git_commands"].as_array().unwrap() {
+        assert!(
+            c.as_str()
+                .unwrap()
+                .starts_with(&format!("git -C {folder} ")),
+            "{v}"
+        );
+    }
+    // Another session's change of the task Codex held is not Codex's.
+    let v = ok(&repo, &["--as", "claude/x", "note", "A01-01", "seen"]);
+    assert!(
+        v["git_commands"][0]
+            .as_str()
+            .unwrap()
+            .starts_with("git -C "),
+        "{v}"
+    );
+    // No session agent: a session name that names Codex for certain is enough.
+    let v = ok(&repo, &["--as", "codex/a01-03", "claim", "A01-03"]);
+    assert_eq!(v["git_commands"][2], "git push", "{v}");
+    // A change that is about no task, by a session whose task says it is Codex.
+    ok(
+        &repo,
+        &[
+            "--as",
+            "loop-2",
+            "claim",
+            "A01-03",
+            "--take",
+            "--session-agent",
+            "codex:work",
+        ],
+    );
+    let v = ok(&repo, &["--as", "loop-2", "add", "area", "A02", "Charts"]);
+    assert!(
+        v["git_commands"][0]
+            .as_str()
+            .unwrap()
+            .starts_with("git add -- "),
+        "{v}"
+    );
+    let v = ok(&repo, &["--as", "loop-9", "add", "area", "A03", "Other"]);
+    assert!(
+        v["git_commands"][0]
+            .as_str()
+            .unwrap()
+            .starts_with("git -C "),
+        "{v}"
+    );
+}
+
+/// Task-A01-flame635: changes made in the Allomos app, and the files a project folder change
+/// wrote, come in the plain form too on a task Codex holds.
+#[test]
+fn codex_gets_app_changes_and_folder_changes_without_dash_c() {
+    let repo = filled();
+    let root = repo.join(".allomos/taskbag");
+    let app = allomos_store::Actor {
+        by: Some("Ann"),
+        via: "app",
+    };
+    allomos_store::change_task(&root, app, Duration::from_secs(5), |bag| {
+        allomos_core::ops::make_ready(bag, "A01-02", None).map(|o| (o, "ready"))
+    })
+    .unwrap();
+    let out = alm(
+        &repo,
+        &[
+            "--as",
+            "loop-1",
+            "claim",
+            "A01-01",
+            "--session-agent",
+            "codex",
+        ],
+    );
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert_eq!(text.matches("\nFor Git, in ").count(), 2, "{text}");
+    assert!(
+        text.contains("\n  git commit -m \"app: changes made in the Allomos app\" -m \"By: "),
+        "{text}"
+    );
+    assert!(!text.contains("git -C"), "{text}");
+    // `--json`: the same commands, and the folder they run in.
+    allomos_store::change_task(&root, app, Duration::from_secs(5), |bag| {
+        allomos_core::ops::make_ready(bag, "A02-01", None).map(|o| (o, "ready"))
+    })
+    .unwrap();
+    let v = ok(&repo, &["--as", "loop-1", "next"]);
+    assert!(
+        v["git_folder"].as_str().unwrap().ends_with("taskbag"),
+        "{v}"
+    );
+    let commands = v["app_changes"]["git_commands"].as_array().unwrap();
+    assert!(commands[0].as_str().unwrap().starts_with("git add -- "));
+    assert_eq!(commands[2], "git push", "{v}");
+
+    // A project folder's instruction files.
+    let site = repo.join("site");
+    fs::create_dir(&site).unwrap();
+    let out = alm(&repo, &["--as", "loop-1", "folder", "add", "site"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains("Save and share them in that folder's version control. For Git, in ")
+            && text.contains("site (run each command on its own, with that folder as its working folder):\n  git add -- AGENTS.md CLAUDE.md\n  git commit -m \"alm: folder add\" -- AGENTS.md CLAUDE.md\n  git push\n"),
+        "{text}"
+    );
+    assert!(!text.contains("git -C"), "{text}");
+    // Not Codex: as before.
+    let other = repo.join("docs");
+    fs::create_dir(&other).unwrap();
+    let out = alm(&repo, &["--as", "claude/x", "folder", "add", "docs"]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains("version control. For Git:\n  git -C ") && !text.contains("For Git, in "),
         "{text}"
     );
 }

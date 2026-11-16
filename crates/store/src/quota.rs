@@ -247,6 +247,29 @@ fn known_agent(holder: &str) -> Option<String> {
     matches!(id.as_str(), "claude-code" | "codex" | "antigravity").then_some(id)
 }
 
+/// The agent's id as far as alm can tell: the task's session agent (`--session-agent`, with an
+/// account written after `:` or `/` left off), else what the session name `holder` (`--as`) names
+/// for certain ([`known_agent`]).
+fn sure_agent(session_agent: Option<&str>, holder: Option<&str>) -> Option<String> {
+    session_agent
+        .map(agent_id)
+        .filter(|a| !a.is_empty())
+        .or_else(|| holder.and_then(known_agent))
+}
+
+/// Whether the agent is Codex for certain (Task-A01-flame635): then alm prints its Git commands
+/// without `git -C <folder>`, which matches none of Allomos's rules for Codex, and names the
+/// folder to run them in. Asked like [`quota_ask`] asks who the agent is; unsure is not Codex.
+pub fn is_codex(session_agent: Option<&str>, holder: Option<&str>) -> bool {
+    let base = |id: &str| {
+        id.split_once(':')
+            .map_or(id, |(agent, _)| agent)
+            .to_string()
+    };
+    let agent = session_agent.map(base);
+    sure_agent(agent.as_deref(), holder).as_deref() == Some("codex")
+}
+
 /// What a command that moves a task on asks of the agent, given every report and the time now
 /// (UTC): `None` when the agent's newest 5-hour report is younger than [`ASK_AFTER_MINUTES`],
 /// otherwise the ask. The agent is the task's session agent (`--session-agent`), else what the
@@ -259,10 +282,7 @@ pub fn quota_ask(
     reports: &[QuotaReport],
     now: &str,
 ) -> Option<QuotaAsk> {
-    let agent = session_agent
-        .map(agent_id)
-        .filter(|a| !a.is_empty())
-        .or_else(|| holder.and_then(known_agent));
+    let agent = sure_agent(session_agent, holder);
     let newest = reports
         .iter()
         .filter(|r| r.window == "5h")
@@ -291,6 +311,25 @@ pub fn quota_ask(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn codex_is_told_from_the_session_agent_then_from_a_sure_session_name() {
+        assert!(is_codex(Some("codex"), None));
+        assert!(is_codex(Some("Codex"), Some("loop-hourly")));
+        assert!(is_codex(Some("codex:work"), None));
+        assert!(is_codex(Some("codex/work"), None));
+        assert!(is_codex(Some("codex_cli"), None));
+        // The session agent counts before the session name.
+        assert!(is_codex(Some("codex"), Some("claude/x")));
+        assert!(!is_codex(Some("claude-code"), Some("codex/x")));
+        // No session agent (or a blank one): only a session name that names the agent for certain.
+        assert!(is_codex(None, Some("codex/a01-x")));
+        assert!(is_codex(Some(" "), Some("codex-a01-x")));
+        assert!(!is_codex(None, Some("loop-hourly")));
+        assert!(!is_codex(None, Some("claude-a01-x")));
+        assert!(!is_codex(Some("gemini"), None));
+        assert!(!is_codex(None, None));
+    }
 
     fn report(agent: &str, window: &str, at: &str) -> QuotaReport {
         QuotaReport {

@@ -571,6 +571,9 @@ function RunPanel({
           ) : (
             <p className="muted small monitor-group-note">{t(run.noTask.length ? "monitor.group_no_task" : "monitor.sessions_none")}</p>
           )}
+          {run.letGo.map((l) => (
+            <p key={l.id} className="muted small monitor-let-go">{t("monitor.let_go", { id: l.id, holder: l.holder })}</p>
+          ))}
           {free.length > 0 && !run.stopping && (
             <p className="muted small monitor-next">
               {nextCheck(run) <= now ? t("monitor.sum_checking") : t("monitor.next_check", { time: timeOf(nextCheck(run)) })}
