@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FILTER_STATES, HUMAN_COLUMN, allTicked, blockers, isBlocked, markBlocked, onlyBlocked, stateWord, bothBanner, columnText, emptyBy, filterBanner, filterColumns, filterGroups, filterName, gridTicks, hiddenByFilter, isAll, isTicked, labelText, onTable, rowTicks, searchBanner, sideOf, storeFilter, tableFilter, taskCount, taskListBanners, tickAll, tickCell, tickRow, type StateFilter, type Words, hiddenText, humanCheckNote, keepState, readFilter, stopFact, stopText, toCheck, toReview, withDecisions, PRESETS, SIDES, matchPreset, presetCount, presetFilter, presetName, presetTicks, type Preset } from "../src/stopFlow.ts";
+import { FILTER_STATES, HUMAN_COLUMN, allTicked, blockers, isBlocked, markBlocked, onlyBlocked, stateWord, bothBanner, columnText, emptyBy, filterBanner, filterColumns, filterGroups, filterName, gridTicks, hiddenByFilter, isAll, isTicked, labelText, onTable, rowTicks, searchBanner, sideOf, storeFilter, tableFilter, taskCount, taskListBanners, tickAll, tickCell, tickRow, type StateFilter, type Words, hiddenText, humanCheckNote, keepState, readFilter, blockerParts, stopFacts, stopText, toCheck, toReview, withDecisions, PRESETS, SIDES, matchPreset, presetCount, presetFilter, presetName, presetTicks, type Preset } from "../src/stopFlow.ts";
 import { AI_DECISIONS, BY_HUMAN, DEPLOYED_BY_AGENT, DEPLOYED_BY_HUMAN, LOCALLY_BY_AGENT, LOCALLY_BY_HUMAN } from "../src/stopFlow.ts";
 import type { Opened, State, Task } from "../src/types.ts";
 import en from "../src/i18n/en.json" with { type: "json" };
@@ -39,18 +39,33 @@ test("waiting says who must act: you when no one is named", () => {
   assert.equal(stopText(task({ state: "in_progress" }), all, t), null);
 });
 
-test("the list's stop fact: its name, then its text; a named person leads the text (Task-A01-cactus586)", () => {
-  assert.deepEqual(stopFact(task({ state: "waiting", waiting_on: "approve the card" }), [], t), { name: "pane.waiting_on", text: "approve the card", kind: "waiting" });
-  assert.deepEqual(stopFact(task({ state: "waiting", waiting_on: "reply on licence", who: "Ann" }), [], t), {
-    name: "pane.waiting_on",
-    text: "Waiting for Ann: reply on licence",
-    kind: "waiting",
-  });
-  const blocker = task({ id: "A01-17", state: "in_progress" });
+test("the list's stop facts: its name, then its text; a named person leads the text (Task-A01-cactus586)", () => {
+  assert.deepEqual(stopFacts(task({ state: "waiting", waiting_on: "approve the card" }), [], t), [{ name: "pane.waiting_on", text: "approve the card", kind: "waiting" }]);
+  assert.deepEqual(stopFacts(task({ state: "waiting", waiting_on: "reply on licence", who: "Ann" }), [], t), [
+    { name: "pane.waiting_on", text: "Waiting for Ann: reply on licence", kind: "waiting" },
+  ]);
+  const blocker = task({ id: "A01-17", title: "The blocker", state: "in_progress" });
   const me = task({ state: "backlog", blocked_by: ["A01-17"] });
-  assert.deepEqual(stopFact(me, [blocker, me], t), { name: "pane.blocked_by", text: "A01-17 (In progress)", kind: "blocked" });
-  assert.equal(stopFact(me, [{ ...blocker, state: "done" }, me], t), null, "a finished blocker holds nothing back");
-  assert.equal(stopFact(task({ state: "in_progress" }), [], t), null);
+  assert.deepEqual(stopFacts(me, [blocker, me], t), [
+    { name: "pane.blocked_by", text: "A01-17 (In progress)", kind: "blocked", parts: [{ id: "A01-17", text: "A01-17 (In progress)", finished: false, title: "The blocker" }] },
+  ]);
+  assert.deepEqual(stopFacts(task({ state: "in_progress" }), [], t), []);
+});
+
+test("Blocked by lists every blocker: those not finished first, the finished after (Task-A01-border342)", () => {
+  const a = task({ id: "A-1", title: "One", state: "done" });
+  const b = task({ id: "A-2", title: "Two", state: "ready" });
+  const c = task({ id: "A-3", title: "Three", state: "dropped" });
+  const d = task({ id: "A-4", title: "Four", state: "waiting" });
+  const me = task({ state: "ready", blocked_by: ["A-1", "A-2", "A-3", "A-9", "A-4", "A-2"] });
+  const parts = blockerParts(me, [a, b, c, d, me], t);
+  assert.deepEqual(parts.map((p) => [p.id, p.finished]), [["A-2", false], ["A-9", false], ["A-4", false], ["A-1", true], ["A-3", true]]);
+  assert.deepEqual(parts.map((p) => p.title), ["Two", null, "Four", "One", "Three"]);
+  assert.equal(stopFacts(me, [a, b, c, d, me], t)[0].text, "A-2 (Ready), A-9 (no such task), A-4 (Waiting), A-1 (Done), A-3 (dropped)");
+  // Blockers all finished: the task is not blocked, and the row still names them.
+  const free = task({ state: "ready", blocked_by: ["A-1", "A-3"] });
+  assert.equal(isBlocked(free, [a, c, free]), false);
+  assert.deepEqual(stopFacts(free, [a, c, free], t).map((f) => [f.kind, f.text]), [["blocked", "A-1 (Done), A-3 (dropped)"]]);
 });
 
 test("blocked is worked out from unfinished blockers; the task keeps its own state (decision 0026)", () => {
@@ -78,7 +93,7 @@ test("waiting and blocked at once say both (decision 0026)", () => {
   const blocker = task({ id: "A01-17", state: "ready" });
   const me = task({ state: "waiting", waiting_on: "approve the card", blocked_by: ["A01-17"] });
   assert.equal(stopText(me, [blocker, me], t), "Waiting for you: approve the card · Blocked by A01-17 (Ready)");
-  assert.equal(stopFact(me, [blocker, me], t)?.kind, "waiting", "waiting first");
+  assert.deepEqual(stopFacts(me, [blocker, me], t).map((f) => f.kind), ["waiting", "blocked"], "waiting first");
 });
 
 test("markBlocked keeps each task's open blockers; the list reads them, not the taskbag again", () => {

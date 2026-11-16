@@ -48,9 +48,9 @@ import { paneFocus, type FocusPart } from "./paneFocusFlow";
 import { HandoverButton } from "./HandoverDialog";
 import { ACTIVE_MINUTES, paneAgent, titleOpen, session, sessionPlace } from "./sessionFlow";
 import { agentId, agentName } from "./quotaFlow";
-import { blockerText, blockers, check, checkedLabel, chipLabels, decisionDetails, decisionsToReview, humanCheckNote, labelText, stopText, toCheck, toReview } from "./stopFlow";
+import { blockerParts, check, checkedLabel, chipLabels, decisionDetails, decisionsToReview, humanCheckNote, labelText, stopText, toCheck, toReview } from "./stopFlow";
 import { LabelChips } from "./LabelChips";
-import { checkTitle } from "./TaskRow";
+import { BlockerList, checkTitle } from "./TaskRow";
 import { toggleFolder, type FolderInfo } from "./folderFlow";
 import { LEVELS, difficultyOf, difficultyText, levelText } from "./difficultyFlow";
 import { riskClass, riskText } from "./taskRiskFlow";
@@ -652,7 +652,7 @@ export function TaskPane({
     [t("pane.who"), task.state === "waiting" ? (task.who ?? t("task.you")) : null, null],
     [
       t("pane.blocked_by"),
-      (task.blocked_by ?? []).length ? blockers(task, tasks).map((b) => blockerText(b, t)).join(", ") : null,
+      (task.blocked_by ?? []).length ? <BlockerList parts={blockerParts(task, tasks, t)} /> : null,
       "blocked_by",
     ],
     [t("pane.next"), task.next_dependency, "next_dependency"],
@@ -698,7 +698,7 @@ export function TaskPane({
         return (
           <section key={p} className="pane-focus">
             <h3>{t("pane.blocked_by")}</h3>
-            <p>{(task.blocked_by ?? []).length ? blockers(task, tasks).map((b) => blockerText(b, t)).join(", ") : "—"}</p>
+            <p>{(task.blocked_by ?? []).length ? <BlockerList parts={blockerParts(task, tasks, t)} /> : "—"}</p>
           </section>
         );
       case "handoff":

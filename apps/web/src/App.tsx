@@ -37,7 +37,7 @@ import {
   isAll,
   readFilter,
   storeFilter,
-  stopFact,
+  stopFacts,
   type StopFact,
   tableFilter,
   withBlocked,
@@ -1519,7 +1519,7 @@ function TaskbagView({
     }
   };
   const [treeFolded, setTreeFolded] = useFold(opened.root, "tree");
-  const stop = (task: Task) => stopFact(task, box?.tasks ?? [], t, taskT);
+  const stops = (task: Task) => stopFacts(task, box?.tasks ?? [], t, taskT);
   // The search box (Task-A01-36): the task list's search, emptied when another project opens. Cmd/Ctrl+F focuses it.
   const [query, setQuery] = useState("");
   const terms = searchTerms(query);
@@ -1616,18 +1616,13 @@ function TaskbagView({
         return { ...g, rows, tasks: rows.map((r) => r.task), counted: g.counted ?? g.tasks };
       })
     : found;
-  // A blocker that is not shown in the task's group: "ID · where it is", with the whole story on hover.
-  const outsideMark = (id: string, groupKey: string) => {
+  // A blocker's hover text in Blocked by (Task-A01-border342): its title and the group it is in.
+  const blockerTitle = (id: string) => {
     const blocker = box?.tasks.find((task) => task.id === id);
-    if (!blocker) return { id, text: id, title: t("tree.unknown_title", { id }) };
+    if (!blocker) return t("tree.unknown_title", { id });
     const home = groups.find((g) => g.tasks.includes(blocker));
-    if (!home || home.key === groupKey)
-      return { id, text: t("tree.outside", { id, where: t("tree.not_shown") }), title: t("tree.not_shown_title", { id, title: blocker.title }) };
-    return {
-      id,
-      text: t("tree.outside", { id, where: home.id || home.name }),
-      title: t("tree.outside_title", { id, title: blocker.title, where: [home.id, home.name].filter(Boolean).join(" ") }),
-    };
+    const where = home ? [home.id, home.name].filter(Boolean).join(" ") : "";
+    return where ? t("task.blocker_title", { title: blocker.title, where }) : blocker.title;
   };
   // Tasks in collapsed groups are hidden, so the arrow keys skip them.
   const shown = visibleItems(drawn, folded);
@@ -1937,13 +1932,14 @@ function TaskbagView({
                     g.rows &&
                     ((id) => {
                       const row = g.rows!.find((r) => r.task.id === id);
-                      return row && { row, onFold: () => setTreeFolded((keys) => toggleKey(keys, id)), outside: row.outside.map((o) => outsideMark(o, g.key)) };
+                      return row && { row, onFold: () => setTreeFolded((keys) => toggleKey(keys, id)), };
                     })
                   }
                   counted={g.counted}
                   hidden={!searching && !isAll(stateFilter) ? hiddenByFilter(stateFilter, g.counted ?? []) : undefined}
                   onShowAll={() => chooseFilter(allTicked(ladder))}
-                  stop={stop}
+                  stops={stops}
+                  blockerTitle={blockerTitle}
                   onOpenSession={canOpenSessions ? (id) => messenger.openAgentSession(opened.root, id) : undefined}
                   onProceed={canOpenSessions ? setProceeding : undefined}
                   onError={onError}
@@ -2163,7 +2159,8 @@ function TaskGroup({
   counted,
   hidden,
   onShowAll,
-  stop,
+  stops,
+  blockerTitle,
   selectedId,
   onSelect,
   terms,
@@ -2201,7 +2198,8 @@ function TaskGroup({
   /** Turns the state filter off. */
   onShowAll?: () => void;
   /** Why a stopped task is stopped: its Waiting on or Blocked by fact (Task-A01-cactus586). */
-  stop?: (task: Task) => StopFact | null;
+  stops?: (task: Task) => StopFact[];
+  blockerTitle?: (id: string) => string;
   /** When each task last changed (UTC), by task ID (Task-A01-52), one of each row's facts. */
   modified?: Record<string, string>;
   /** The project's lost limit, in minutes (Task-A01-kernel761). */
@@ -2291,7 +2289,8 @@ function TaskGroup({
               selected={task.id === selectedId}
               onSelect={onSelect}
               terms={terms}
-              stop={stop?.(task) ?? null}
+              stops={stops?.(task) ?? []}
+              blockerTitle={blockerTitle}
               modified={modified?.[task.id]}
               lostAfter={lostAfter}
               onOpenSession={onOpenSession}

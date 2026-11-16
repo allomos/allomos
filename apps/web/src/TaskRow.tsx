@@ -6,8 +6,8 @@
 // (Nobody when no session holds the task), and a task nobody holds that is not finished gets
 // Work on it… after it (Task-A03-galley051); a lost task gets Take over… after its Lost tag
 // (Task-A01-voyage603). In the dependency tree (Task-A01-alpine458) the row is indented under the
-// task that blocks it, with guide lines, a fold button when tasks hang under it, and small marks
-// for its other blockers.
+// task that blocks it, with guide lines and a fold button when tasks hang under it. Every blocker
+// is named in Blocked by (Task-A01-border342), so the title carries no marks for them.
 
 import { useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
@@ -17,7 +17,7 @@ import { LabelChips } from "./LabelChips";
 import { DescriptionHit, Highlight } from "./Search";
 import { canProceed } from "./proceedFlow";
 import { sessionPlace } from "./sessionFlow";
-import { chipLabels, decisionsToReview, humanCheckNote, isBlocked, toCheck, toReview, type StopFact } from "./stopFlow";
+import { chipLabels, decisionsToReview, humanCheckNote, isBlocked, toCheck, toReview, type BlockerPart, type StopFact } from "./stopFlow";
 import { localTime } from "./timeFlow";
 import { difficultyOf, difficultyText } from "./difficultyFlow";
 import { riskClass, riskText } from "./taskRiskFlow";
@@ -31,8 +31,6 @@ export interface TreeMark {
   row: TreeRow;
   /** Folds or opens the tasks under it. */
   onFold: () => void;
-  /** Its blockers that are not shown in this group: the mark's text and its hover text. */
-  outside: { id: string; text: string; title: string }[];
 }
 
 /** Keeps a key on a control inside the row from selecting the task (its click stops itself). */
@@ -43,7 +41,8 @@ export function TaskRow({
   selected,
   onSelect,
   terms,
-  stop,
+  stops,
+  blockerTitle,
   modified,
   lostAfter,
   tree,
@@ -62,8 +61,10 @@ export function TaskRow({
   onSelect: (id: string) => void;
   /** The search's words, marked in the row (Task-A01-36); empty when not searching. */
   terms: string[];
-  /** Why the task is stopped: its Waiting on or Blocked by fact; null when it is not stopped. */
-  stop: StopFact | null;
+  /** Its Waiting on and Blocked by facts; none when it waits on nobody and has no blocker. */
+  stops: StopFact[];
+  /** A blocker's hover text: its title and the group it is in. */
+  blockerTitle?: (id: string) => string;
   /** When the task last changed (UTC) (Task-A01-52). */
   modified?: string;
   /** The project's lost limit, in minutes (Task-A01-kernel761). */
@@ -165,7 +166,9 @@ export function TaskRow({
             </div>
           ))}
         </dl>
-        {stop && <StopRow fact={stop} state={task.state} />}
+        {stops.map((fact) => (
+          <StopRow key={fact.kind} fact={fact} state={task.state} blockerTitle={blockerTitle} />
+        ))}
         <DescriptionHit text={task.description ?? ""} terms={terms} />
         <DescriptionHit text={task.handoff_note ?? ""} terms={terms} where="search.in_handoff" />
       </div>
@@ -248,30 +251,16 @@ function TreeLead({ tree }: { tree: TreeMark }) {
   );
 }
 
-/** After the title in the dependency tree: how many tasks its fold hides, its other blockers in
- * this group ("also depends on"), and its blockers shown elsewhere ("ID · where"). */
+/** After the title in the dependency tree: how many tasks its fold hides. Its blockers are all in
+ * Blocked by (Task-A01-border342), not here. */
 function TreeNotes({ tree }: { tree: TreeMark }) {
   const { t } = useI18n();
   const { row } = tree;
-  const also = row.also.join(t("tree.list_sep"));
+  if (row.hidden === 0) return null;
   return (
-    <>
-      {row.hidden > 0 && (
-        <span className="tree-note tree-more" title={t("tree.more_title", { count: row.hidden })}>
-          +{row.hidden}
-        </span>
-      )}
-      {row.also.length > 0 && (
-        <span className="tree-note" title={t("tree.also_title", { ids: also })}>
-          {t("tree.also", { ids: also })}
-        </span>
-      )}
-      {tree.outside.map((o) => (
-        <span key={o.id} className="tree-note tree-outside" title={o.title}>
-          {o.text}
-        </span>
-      ))}
-    </>
+    <span className="tree-note tree-more" title={t("tree.more_title", { count: row.hidden })}>
+      +{row.hidden}
+    </span>
   );
 }
 
@@ -312,10 +301,12 @@ function Holder({ task, onOpenSession, onError }: { task: Task; onOpenSession?: 
   );
 }
 
-/** Waiting on or Blocked by: the name on a line of its own, the text under it in the state's
- * colour, at most three lines; Show all opens it in place and Show less folds it back. The link
- * shows only when the text is cut, and the choice is not remembered. */
-function StopRow({ fact, state }: { fact: StopFact; state: Task["state"] }) {
+/** Waiting on or Blocked by: the name on a line of its own, the text under it, at most three lines;
+ * Show all opens it in place and Show less folds it back. The link shows only when the text is
+ * cut, and the choice is not remembered. Waiting on is in the state's colour. Blocked by names
+ * every blocker (Task-A01-border342): those not finished first, in the blocked colour, then the
+ * finished in the done colour; hovering one shows its title and the group it is in. */
+function StopRow({ fact, state, blockerTitle }: { fact: StopFact; state: Task["state"]; blockerTitle?: (id: string) => string }) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -333,8 +324,8 @@ function StopRow({ fact, state }: { fact: StopFact; state: Task["state"] }) {
   return (
     <div className="row-stop">
       <div className="row-stop-name">{t(fact.name)}</div>
-      <div ref={ref} className={`row-stop-text s-${fact.kind === "blocked" ? "blocked" : state}-text${open ? "" : " clamped"}`}>
-        {fact.text}
+      <div ref={ref} className={`row-stop-text${fact.parts ? "" : ` s-${state}-text`}${open ? "" : " clamped"}`}>
+        {fact.parts ? <BlockerList parts={fact.parts} title={blockerTitle} /> : fact.text}
       </div>
       {cut && (
         <button type="button" className="link small" onKeyDown={ownKeys} onClick={(e) => {
@@ -345,6 +336,24 @@ function StopRow({ fact, state }: { fact: StopFact; state: Task["state"] }) {
         </button>
       )}
     </div>
+  );
+}
+
+/** A task's blockers as the list and the task pane show them (Task-A01-border342), in the order
+ * `blockerParts` gives: one not finished in the blocked colour, a finished one in the done colour.
+ * Hovering one shows `title(id)`, or its title alone without it. */
+export function BlockerList({ parts, title }: { parts: BlockerPart[]; title?: (id: string) => string }) {
+  return (
+    <>
+      {parts.map((b, i) => (
+        <span key={b.id}>
+          {i > 0 && <span className="muted">, </span>}
+          <span className={`row-blocker ${b.finished ? "finished" : "open"}`} title={title?.(b.id) ?? b.title ?? undefined}>
+            {b.text}
+          </span>
+        </span>
+      ))}
+    </>
   );
 }
 

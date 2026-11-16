@@ -502,6 +502,9 @@ button.primary.danger { background: var(--err); border-color: var(--err); color:
 .row-stop { display: grid; gap: 1px; justify-items: start; font-size: 13px; }
 .row-stop-name { color: var(--muted); font-size: 12px; }
 .row-stop-text { overflow-wrap: anywhere; white-space: pre-line; }
+/* Task-A01-border342: Blocked by names every blocker; one not finished in the blocked colour, a finished one in the done colour. */
+.row-blocker.open { color: var(--s-blocked); }
+.row-blocker.finished { color: var(--s-done); }
 .row-stop-text.clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
 /* Task-A01-cell542: every state its own colour, wherever a state is shown; Task-A01-yard163: brighter,
    and the state word itself (.state-word) on a light tint of its colour (.tint). The filter

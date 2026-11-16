@@ -85,27 +85,39 @@ export function stopText(task: Task, tasks: readonly Task[], t: T, taskT: T = t)
   return lines.length ? lines.join(" · ") : null;
 }
 
-/** A stopped task's fact in the task list (Task-A01-cactus586): its name ("Waiting on", "Blocked by")
- * on a line of its own, its text under it. A person named to act leads the text ("Waiting for Ann: …");
- * `null` when the task is not stopped. */
-export type StopFact = { name: Key; text: string; kind: "waiting" | "blocked" };
+/** One blocker as the task list and the task pane show it (Task-A01-border342): its words
+ * ("A01-17 (In progress)"), whether it has finished (done or dropped), and its title, `null` when
+ * the taskbag has no such task. */
+export type BlockerPart = { id: string; text: string; finished: boolean; title: string | null };
 
-/** Every fact that holds the task back, waiting first: a task can wait on a person and be blocked
- * at once (decision 0026). */
+/** Every blocker of the task, each once: those not finished first, the finished after them, each
+ * half in the order the task lists them (Task-A01-border342). */
+export function blockerParts(task: Task, tasks: readonly Task[], t: T, taskT: T = t): BlockerPart[] {
+  const parts = [...new Set(task.blocked_by ?? [])].map((id): BlockerPart => {
+    const blocker = tasks.find((x) => x.id === id);
+    const b: Blocker = { id, state: blocker?.state ?? null };
+    return { id, text: blockerText(b, t, taskT), finished: finished(b.state), title: blocker?.title ?? null };
+  });
+  return [...parts.filter((b) => !b.finished), ...parts.filter((b) => b.finished)];
+}
+
+/** A task's fact in the task list (Task-A01-cactus586): its name ("Waiting on", "Blocked by") on a
+ * line of its own, its text under it. A person named to act leads the text ("Waiting for Ann: …").
+ * "Blocked by" carries every blocker as `parts`, so the list can colour each one. */
+export type StopFact = { name: Key; text: string; kind: "waiting" | "blocked"; parts?: BlockerPart[] };
+
+/** The task's Waiting on and Blocked by, waiting first: a task can wait on a person and be blocked
+ * at once (decision 0026). Blocked by lists every blocker the task has, finished ones too
+ * (Task-A01-border342), so it shows on a task that is no longer blocked. */
 export function stopFacts(task: Task, tasks: readonly Task[], t: T, taskT: T = t): StopFact[] {
   const facts: StopFact[] = [];
   if (task.state === "waiting") {
     const what = task.waiting_on ?? "";
     facts.push({ name: "pane.waiting_on", text: task.who ? t("task.waiting_for", { who: task.who, what }) : what, kind: "waiting" });
   }
-  const open = openBlockers(task, tasks);
-  if (open.length > 0) facts.push({ name: "pane.blocked_by", text: open.map((b) => blockerText(b, t, taskT)).join(", "), kind: "blocked" });
+  const parts = blockerParts(task, tasks, t, taskT);
+  if (parts.length > 0) facts.push({ name: "pane.blocked_by", text: parts.map((b) => b.text).join(", "), kind: "blocked", parts });
   return facts;
-}
-
-/** The first of them, for places with room for one. */
-export function stopFact(task: Task, tasks: readonly Task[], t: T, taskT: T = t): StopFact | null {
-  return stopFacts(task, tasks, t, taskT)[0] ?? null;
 }
 
 // Labels (decision 0020, Task-A01-petal376): Allomos's five built-in labels, a task's labels, the
