@@ -42,6 +42,7 @@ pub mod events;
 pub mod exceptions;
 mod file_size;
 pub mod folders;
+mod github_release;
 mod guide;
 pub mod handoff;
 mod holding;
@@ -82,10 +83,11 @@ pub use convert::{
 pub use decisions::*;
 pub use events::Actor;
 pub use file_size::{claimed_task_steps, file_size_guide};
+pub use github_release::github_release;
 pub use guide::{
     GOAL_PROMPT_VERSION, GUIDE_TOPICS, LOCALIZED_TOPICS, RUN_MODES_LANGUAGES, added_task_steps,
-    agent_files, discuss_request_in, github_release, goal, goal_request_in, guide, guide_topic,
-    localized, run_modes,
+    agent_files, discuss_request_in, goal, goal_request_in, guide, guide_topic, localized,
+    run_modes,
 };
 pub use holding::*;
 pub use loading::*;
