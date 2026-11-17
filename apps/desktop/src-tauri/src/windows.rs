@@ -106,6 +106,17 @@ impl Windows {
         self.shown().get(label).map_or(0, |s| s.tabs.len())
     }
 
+    /// The project in front in window `label`: the taskbag of its tab in front, with its name.
+    /// None when that tab is the start page, or the window reports no tabs.
+    pub(crate) fn front_project(&self, label: &str) -> Option<crate::for_you::Project> {
+        let shown = self.shown();
+        let tab = shown.get(label).and_then(|s| s.tabs.get(s.active))?;
+        Some(crate::for_you::Project {
+            root: tab.root.clone()?,
+            name: tab.name.clone(),
+        })
+    }
+
     /// Every taskbag a tab shows, for Devices on Your Network.
     pub(crate) fn open_taskbags(&self) -> Vec<PathBuf> {
         let mut roots: Vec<PathBuf> = self
@@ -261,13 +272,16 @@ pub(crate) fn restore(app: &AppHandle) {
 }
 
 /// The label of the project window in front, else the first one.
-/// The About window is not a project window: menu commands skip it (Task-A07-28).
+/// The About window is not a project window: menu commands skip it (Task-A07-28); so is the For
+/// You window (Task-A01-oak609).
 pub(crate) fn focused_window(app: &AppHandle) -> Option<String> {
     let windows = app.webview_windows();
     let projects = || {
         windows
             .iter()
-            .filter(|(label, _)| label.as_str() != crate::ABOUT_WINDOW)
+            .filter(|(label, _)| {
+                label.as_str() != crate::ABOUT_WINDOW && label.as_str() != crate::for_you::WINDOW
+            })
     };
     projects()
         .find(|(_, w)| w.is_focused().unwrap_or(false))

@@ -8,6 +8,7 @@ mod agents;
 mod alm_command;
 mod audit;
 mod codex_rules;
+mod for_you;
 mod former_worktree;
 mod heartbeat_settings;
 mod lan;
@@ -2133,6 +2134,7 @@ struct MenuTexts {
     connect: MenuItem<Wry>,
     move_tasks_in: MenuItem<Wry>,
     lan: MenuItem<Wry>,
+    for_you: MenuItem<Wry>,
     check_updates: MenuItem<Wry>,
     /// Check for Updates… has become **Download Allomos <version>…** (Task-A07-16) or
     /// **Restart to Update to Allomos <version>** (Task-A07-17).
@@ -2316,6 +2318,15 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             view
         }
     };
+    // Task-A01-oak609 (decision 0028): the For You window, before Running Monitors.
+    let for_you = MenuItem::with_id(
+        app,
+        for_you::MENU_ID,
+        "For You",
+        true,
+        Some(for_you::SHORTCUT),
+    )?;
+    view.append(&for_you)?;
     view.append(&monitors)?;
     app.manage(monitor_menu::MonitorMenu { item: monitors });
     // Task-A07-mitten556: on Windows the app lists the open windows in the Window menu itself.
@@ -2336,6 +2347,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         connect: connect_item,
         move_tasks_in,
         lan: lan_item,
+        for_you,
         check_updates,
         update_action: Mutex::new(UpdateAction::Check),
         recent,
@@ -2445,6 +2457,7 @@ struct MenuWords {
     connect: String,
     move_tasks_in: String,
     lan: String,
+    for_you: String,
 }
 
 /// Put the menu's words in the interface's language.
@@ -2459,6 +2472,7 @@ fn set_menu_texts(app: AppHandle, texts: tauri::State<MenuTexts>, words: MenuWor
     let _ = texts.connect.set_text(words.connect);
     let _ = texts.move_tasks_in.set_text(words.move_tasks_in);
     let _ = texts.lan.set_text(words.lan);
+    let _ = texts.for_you.set_text(words.for_you);
     let mut recent = texts.state.lock().unwrap_or_else(|e| e.into_inner());
     recent.clear = words.clear_menu;
     recent.none = words.no_recent;
@@ -2511,6 +2525,7 @@ pub fn run() {
         .manage(taskbag_watch::Following::default())
         .manage(monitor_loop::MonitorLoop::default())
         .manage(Lan::new())
+        .manage(for_you::ForYou::default())
         // The first window starts hidden (tauri.conf.json) and opens sized to its screen.
         .setup(|app| {
             // Reopen windows and tabs (Task-A01-marble320): the other windows open again.
@@ -2549,6 +2564,11 @@ pub fn run() {
                 return;
             }
             if window_list::choose(app, id) {
+                return;
+            }
+            if id == for_you::MENU_ID {
+                // The queue of the project in front in the window in front (Task-A01-oak609).
+                let _ = for_you::open(app, target.as_deref());
                 return;
             }
             if id == monitor_menu::ID {
@@ -2628,6 +2648,10 @@ pub fn run() {
             tab_drag::drag_cancel,
             windows::app_settings,
             windows::set_start_with,
+            for_you::open_for_you,
+            for_you::for_you_project,
+            for_you::set_for_you_title,
+            for_you::human_queue,
             set_auto_check,
             set_auto_download,
             inspect_folder,
