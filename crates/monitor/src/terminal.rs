@@ -490,11 +490,21 @@ fn antigravity_quiet_settings(existing: Option<&str>) -> Option<String> {
 }
 
 fn antigravity_quiet_settings_arg(quote: fn(&str) -> String) -> String {
-    let existing =
-        std::fs::read_to_string(home().join(".gemini/antigravity-cli/settings.json")).ok();
-    antigravity_quiet_settings(existing.as_deref())
-        .map(|settings| format!("--settings {} ", quote(&settings)))
-        .unwrap_or_default()
+    antigravity_quiet_settings_from_read(std::fs::read_to_string(
+        home().join(".gemini/antigravity-cli/settings.json"),
+    ))
+    .map(|settings| format!("--settings {} ", quote(&settings)))
+    .unwrap_or_default()
+}
+
+fn antigravity_quiet_settings_from_read(existing: std::io::Result<String>) -> Option<String> {
+    match existing {
+        Ok(settings) => antigravity_quiet_settings(Some(&settings)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            antigravity_quiet_settings(None)
+        }
+        Err(_) => None,
+    }
 }
 
 /// The command line that starts a terminal agent with the request read from `file` (and the file
@@ -905,6 +915,20 @@ mod tests {
             serde_json::json!(ANTIGRAVITY_ASK_RULES)
         );
         assert!(antigravity_quiet_settings(Some("not json")).is_none());
+        assert!(
+            antigravity_quiet_settings_from_read(Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "not readable",
+            )))
+            .is_none()
+        );
+        assert!(
+            antigravity_quiet_settings_from_read(Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "not present",
+            )))
+            .is_some()
+        );
     }
 
     /// Task-A03-latch882: an Antigravity session adds the taskbag and the taskbag's other project
