@@ -277,11 +277,9 @@ pub(crate) fn restore(app: &AppHandle) {
 pub(crate) fn focused_window(app: &AppHandle) -> Option<String> {
     let windows = app.webview_windows();
     let projects = || {
-        windows
-            .iter()
-            .filter(|(label, _)| {
-                label.as_str() != crate::ABOUT_WINDOW && label.as_str() != crate::for_you::WINDOW
-            })
+        windows.iter().filter(|(label, _)| {
+            label.as_str() != crate::ABOUT_WINDOW && label.as_str() != crate::for_you::WINDOW
+        })
     };
     projects()
         .find(|(_, w)| w.is_focused().unwrap_or(false))
