@@ -264,13 +264,15 @@ function ForYouBody({
         )}
       </nav>
       <div className="for-you-pane">
-        {selected && chosenRow ? (
+        {selected ? (
           <>
+            {chosenRow && (
             <p className="for-you-ask" role="status">
               {askText(chosenRow, t)}
               {chosenRow.todo.includes("approve") && <span className="muted small"> {t("for_you.approve_where")}</span>}
               {chosenRow.todo.includes("approve_afterwards") && <span className="muted small"> {t("for_you.afterwards_where")}</span>}
             </p>
+            )}
             <TaskPane
               task={selected}
               version={opened.versions?.[selected.id] ?? null}
@@ -278,6 +280,8 @@ function ForYouBody({
               area={box?.areas.find((a) => a.id === selected.area)}
               iteration={box?.iterations.find((i) => i.id === selected.iteration)}
               onClose={() => onChoose(null)}
+              // A blocker's link shows that task here too, whether or not it needs the person.
+              onOpenTask={(id) => onChoose(id)}
               onLink={(href) => messenger.openTaskLink(root, selected.id, href).catch(onError)}
               history={history?.id === selected.id ? history.history : null}
               labels={labelNames(box?.project, tasks)}
