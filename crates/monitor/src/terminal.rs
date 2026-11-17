@@ -371,6 +371,22 @@ pub fn powershell_script(project: &Path, found: &str, alm_dir: Option<&Path>) ->
 
 /// What a monitored Codex session is started with ahead of its request (Task-A03-plaza436).
 const CODEX_SANDBOX: &str = "--sandbox workspace-write ";
+/// Quiet monitored sessions do not ask for approval and can use the network (Task-A03-trail745).
+const CODEX_QUIET_POLICY: &str =
+    "--ask-for-approval never --config sandbox_workspace_write.network_access=true ";
+/// The app-access prompt is separate from command approvals. Allow only Allomos, only in the
+/// quiet macOS process; this command-line override does not change the person's Codex settings.
+const CODEX_QUIET_MACOS_APP_ACCESS: &str =
+    "--config 'computer_use.macos.bundle_ids={\"io.allomos\"=\"allow\"}' ";
+
+fn codex_quiet_policy() -> String {
+    let app_access = if cfg!(target_os = "macos") {
+        CODEX_QUIET_MACOS_APP_ACCESS
+    } else {
+        ""
+    };
+    format!("{CODEX_QUIET_POLICY}{app_access}")
+}
 
 /// The command line that starts a terminal agent with the request read from `file` (and the file
 /// removed once read), for Monitor ready tasks (Task-A03-moth285): `claude --session-id <id>`
@@ -379,9 +395,20 @@ const CODEX_SANDBOX: &str = "--sandbox workspace-write ";
 /// (`--prompt-interactive`; Task-A03-queen969). The request goes through a file because a long, many-line request typed into a
 /// terminal window breaks at its first line end. Codex always starts in the `workspace-write`
 /// sandbox, whatever the person's own Codex settings say, so it can change files in the project
-/// folder without a person approving each edit (Task-A03-plaza436); its approval policy stays
-/// the person's own.
+/// folder without a person approving each edit (Task-A03-plaza436). Only quiet monitored sessions
+/// set its approval policy to `never` and allow network access in the sandbox (Task-A03-trail745).
+/// On macOS they also allow the Allomos app in this process only, so Computer Use does not ask for
+/// app access. User settings are untouched.
 pub fn session_command(id: &str, file: &Path, session_id: Option<&str>) -> Option<String> {
+    session_command_with_quiet(id, file, session_id, false)
+}
+
+fn session_command_with_quiet(
+    id: &str,
+    file: &Path,
+    session_id: Option<&str>,
+    quiet: bool,
+) -> Option<String> {
     let file = shell_quote(&file.display().to_string());
     let request = format!("\"$(cat {file}; rm -f {file})\"");
     match (id, session_id) {
@@ -389,7 +416,14 @@ pub fn session_command(id: &str, file: &Path, session_id: Option<&str>) -> Optio
             Some(format!("claude --session-id {} {request}", shell_quote(s)))
         }
         ("claude_cli", None) => Some(format!("claude {request}")),
-        ("codex_cli", _) => Some(format!("codex {CODEX_SANDBOX}{request}")),
+        ("codex_cli", _) => Some(format!(
+            "codex {CODEX_SANDBOX}{}{request}",
+            if quiet {
+                codex_quiet_policy()
+            } else {
+                String::new()
+            }
+        )),
         ("antigravity_cli", _) => Some(format!("agy -i {request}")),
         _ => None,
     }
@@ -405,10 +439,30 @@ pub fn powershell_session(
     alm_dir: Option<&Path>,
     config: Option<(&str, &Path)>,
 ) -> String {
+    powershell_session_with_quiet(id, project, found, file, session_id, alm_dir, config, false)
+}
+
+fn powershell_session_with_quiet(
+    id: &str,
+    project: &Path,
+    found: &str,
+    file: &Path,
+    session_id: Option<&str>,
+    alm_dir: Option<&Path>,
+    config: Option<(&str, &Path)>,
+    quiet: bool,
+) -> String {
     let file = powershell_quote(&file.display().to_string());
     let session = match (id, session_id) {
         ("claude_cli", Some(s)) => format!("--session-id {} ", powershell_quote(s)),
-        ("codex_cli", _) => CODEX_SANDBOX.to_string(),
+        ("codex_cli", _) => format!(
+            "{CODEX_SANDBOX}{}",
+            if quiet {
+                codex_quiet_policy()
+            } else {
+                String::new()
+            }
+        ),
         ("antigravity_cli", _) => "-i ".to_string(),
         _ => String::new(),
     };
@@ -453,7 +507,8 @@ pub fn plain_session_id(id: &str) -> bool {
 
 /// **Monitor ready tasks** (Task-A03-moth285): start a new session of a terminal agent in
 /// `project` with `request` already sent, in a terminal window of its own, so nobody has to press
-/// Return. The agent's own permission settings stay as they are (Allomos never changes them).
+/// Return. It never edits the user's Codex configuration; a quiet monitored Codex session gets
+/// only the per-process approval and network settings approved for this task.
 /// `id` is the agent (`claude_cli`, `codex_cli`, `antigravity_cli`), `found` its command's path;
 /// `alm_dir` the folder of the `alm` the session should use, put first in its `PATH`.
 pub fn start_session(
@@ -464,6 +519,7 @@ pub fn start_session(
     session_id: Option<&str>,
     alm_dir: Option<&Path>,
     config: Option<(&str, &Path)>,
+    quiet: bool,
 ) -> Result<Option<crate::session_tab::SessionTab>, Problem> {
     if !cfg!(any(target_os = "macos", windows)) {
         return Err(ask_failed(id, "not available on this system yet"));
@@ -476,14 +532,16 @@ pub fn start_session(
         .map(|d| d.as_nanos())
         .unwrap_or_default();
     let file = std::env::temp_dir().join(format!("allomos-request-{stamp}.txt"));
-    let Some(program) = session_command(id, &file, session_id) else {
+    let Some(program) = session_command_with_quiet(id, &file, session_id, quiet) else {
         return Err(ask_failed(id, "no way to start it"));
     };
     // An extra account's folder variable goes in front of the command, for that command only.
     let program = with_config(&program, config);
     std::fs::write(&file, request).map_err(|e| ask_failed(id, e))?;
     if cfg!(windows) {
-        let script = powershell_session(id, project, found, &file, session_id, alm_dir, config);
+        let script = powershell_session_with_quiet(
+            id, project, found, &file, session_id, alm_dir, config, quiet,
+        );
         return new_console("powershell.exe")
             .args(["-NoExit", "-NoLogo", "-Command", &script])
             .spawn()
@@ -659,6 +717,51 @@ mod tests {
             ),
             format!(
                 r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-12' $request"
+            )
+        );
+    }
+
+    #[test]
+    fn quiet_monitor_codex_has_no_approval_prompts_and_its_sandbox_can_use_the_network() {
+        let file = Path::new("/tmp/allomos-request-1.txt");
+        let request = "\"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\"";
+        let app_access = if cfg!(target_os = "macos") {
+            "--config 'computer_use.macos.bundle_ids={\"io.allomos\"=\"allow\"}' "
+        } else {
+            ""
+        };
+        assert_eq!(
+            session_command_with_quiet("codex_cli", file, None, true).as_deref(),
+            Some(format!(
+                "codex --sandbox workspace-write --ask-for-approval never --config sandbox_workspace_write.network_access=true {app_access}{request}"
+            ).as_str())
+        );
+        assert_eq!(
+            session_command("codex_cli", file, None).as_deref(),
+            Some(format!("codex --sandbox workspace-write {request}").as_str())
+        );
+        assert_eq!(
+            session_command_with_quiet("claude_cli", file, Some("ab-12"), true).as_deref(),
+            Some(format!("claude --session-id 'ab-12' {request}").as_str())
+        );
+        assert_eq!(
+            session_command_with_quiet("antigravity_cli", file, None, true).as_deref(),
+            Some(format!("agy -i {request}").as_str())
+        );
+
+        assert_eq!(
+            powershell_session_with_quiet(
+                "codex_cli",
+                Path::new(r"C:\p"),
+                r"C:\npm\codex.cmd",
+                Path::new(r"C:\t\r.txt"),
+                None,
+                None,
+                None,
+                true
+            ),
+            format!(
+                "Set-Location -LiteralPath 'C:\\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\\t\\r.txt'; Remove-Item -LiteralPath 'C:\\t\\r.txt'; & 'C:\\npm\\codex.cmd' --sandbox workspace-write --ask-for-approval never --config sandbox_workspace_write.network_access=true {app_access}$request"
             )
         );
     }

@@ -401,6 +401,7 @@ impl Loop {
                     session_id.as_deref(),
                     self.alm_dir.as_deref(),
                     config.as_ref().map(|(var, dir)| (*var, dir.as_path())),
+                    self.record.run.quiet,
                 ),
                 (None, _) => Err(terminal::ask_failed(&agent, "not found on this computer")),
                 (_, Err(why)) => Err(terminal::ask_failed(&agent, why)),
