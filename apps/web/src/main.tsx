@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { AboutWindow } from "./AboutWindow";
 import { CompanionPage } from "./CompanionPage";
 import { ElementLabels } from "./ElementLabels";
+import { ForYouWindow } from "./ForYouWindow";
 import { I18nProvider } from "./i18n";
 import { desktopMessenger, desktopTabs } from "./messenger";
 import { WindowTabs } from "./WindowTabs";
@@ -13,6 +14,8 @@ import "./styles.css";
 // no app to talk to: the companion page.
 const query = new URLSearchParams(window.location.search);
 const about = query.has("about");
+// `?for-you`: the For You window (Task-A01-oak609, decision 0028).
+const forYou = query.has("for-you");
 const inDesktopApp = "__TAURI_INTERNALS__" in window;
 const browserLanguages = () => Promise.resolve([...(navigator.languages ?? [])]);
 
@@ -23,6 +26,8 @@ createRoot(document.getElementById("root")!).render(
         <CompanionPage />
       ) : about ? (
         <AboutWindow messenger={desktopMessenger} />
+      ) : forYou ? (
+        <ForYouWindow messenger={desktopMessenger} />
       ) : (
         <WindowTabs messenger={desktopMessenger} tabs={desktopTabs} settings={desktopTabs} />
       )}

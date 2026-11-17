@@ -28,6 +28,7 @@ export type MonitorRequest =
   /** The run mode new sessions are given (A03-yolk481). */
   | { action: "mode"; quiet: boolean };
 import { withDecisions } from "./stopFlow";
+import type { AskedNow, QueueRow } from "./queueFlow";
 import type { TaskChange } from "./taskChangeFlow";
 import type { StartWith, WindowStart } from "./tabsFlow";
 import type { AgentAccount, AgentAccounts } from "./monitorFlow";
@@ -354,6 +355,17 @@ export interface Messenger {
   agentSetupOf(project: string): Promise<AgentStatus["setup"]>;
   /** Questions an agent asks about `project` with `alm confirm`, oldest first. */
   confirmRequests(project: string): Promise<ConfirmRequest[]>;
+  /** What needs the person in the taskbag at `root`, one row per task, in the order of `alm human`
+   * (decision 0028; Task-A01-oak609). `asked`: the plans waiting for a Go ahead now. */
+  humanQueue(root: string, asked: AskedNow[]): Promise<QueueRow[]>;
+  /** The For You window (Task-A01-oak609): opens it, or brings it forward, on this window's project in front. */
+  openForYou(): Promise<void>;
+  /** The For You window's project, for the window itself; null before it was opened once. */
+  forYouProject(): Promise<ForYouProject | null>;
+  /** Calls `handler` when the For You window is asked to show another project. */
+  onForYouProject(handler: (project: ForYouProject) => void): Promise<() => void>;
+  /** The For You window names itself (in the interface's language). */
+  setForYouTitle(title: string): Promise<void>;
   /** What agents report about the jobs they do in `project` (`alm progress`, Task-A05-08). */
   progressReports(project: string): Promise<Progress[]>;
   /** The person closed a finished (or silent) report: remove it. */
@@ -369,6 +381,12 @@ export interface Messenger {
   setConnectEnabled(enabled: boolean): Promise<void>;
 }
 
+/** The project the For You window shows (Task-A01-oak609). */
+export interface ForYouProject {
+  root: string;
+  name: string | null;
+}
+
 export interface MenuTexts {
   file: string;
   newTab: string;
@@ -380,6 +398,8 @@ export interface MenuTexts {
   connect: string;
   moveTasksIn: string;
   lan: string;
+  /** View → For You (Task-A01-oak609). */
+  forYou: string;
 }
 
 /** A window's tabs (Task-A01-marble320): what only the desktop app's windows do. */
@@ -673,6 +693,11 @@ export const desktopMessenger: Messenger = {
   changeLadder: (root, steps) => invoke<string[]>("change_ladder", { root, steps }),
   taskbagFormat: (root) => invoke<{ format: FormatState; current: string }>("taskbag_format", { root }),
   confirmRequests: (project) => invoke<ConfirmRequest[]>("confirm_requests", { project }),
+  humanQueue: (root, asked) => invoke<QueueRow[]>("human_queue", { root, asked }),
+  openForYou: () => invoke<void>("open_for_you"),
+  forYouProject: () => invoke<ForYouProject | null>("for_you_project"),
+  onForYouProject: (handler) => getCurrentWebviewWindow().listen<ForYouProject>("for_you:project", (e) => handler(e.payload)),
+  setForYouTitle: (title) => invoke<void>("set_for_you_title", { title }),
   progressReports: (project) => invoke<Progress[]>("progress_reports", { project }),
   dismissProgress: (project, id) => invoke<void>("dismiss_progress", { project, id }),
   answerConfirm: (project, id, yes, fingerprint) =>

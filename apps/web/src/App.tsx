@@ -61,6 +61,7 @@ import { projectFolder } from "./paths";
 import { RecentDialog } from "./RecentDialog";
 import { keepListed, noteOpened, readRecent, readRecentInfo, RECENT_INFO_KEY, RECENT_KEY, RECENT_MAX, type RecentInfoMap } from "./recentFlow";
 import { TaskPane } from "./TaskPane";
+import { askedNow } from "./queueFlow";
 import { TaskRow, type TreeMark } from "./TaskRow";
 import { CreateForm, type AddRequest } from "./CreateForm";
 import { baseChoice, type Creating } from "./createFlow";
@@ -546,6 +547,7 @@ export function App({
         connect: t("menu.connect"),
         moveTasksIn: t("menu.move_cards"),
         lan: t("menu.lan"),
+        forYou: t("menu.for_you"),
       })
       .catch(() => undefined);
   }, [messenger, t]);
@@ -693,6 +695,9 @@ export function App({
             )}
           </div>
         )}
+        {/* For You (Task-A01-oak609, decision 0028): the queue of what needs the person, in a
+            window of its own, with how many tasks it lists. The desktop app only. */}
+        {opened?.loaded.taskbag && !companion && <ForYouButton messenger={messenger} opened={opened} />}
         <LanguagePicker />
         {/* New window… became the tab bar's + (Task-A01-marble320). */}
       </header>
@@ -1134,6 +1139,35 @@ function Banner({ kind, onClose, children }: { kind: "ok" | "error"; onClose: ()
         ×
       </button>
     </div>
+  );
+}
+
+/** The top bar's For You button (Task-A01-oak609): opens the For You window on this project, and
+ * shows how many tasks need the person, read again whenever the taskbag is. */
+function ForYouButton({ messenger, opened }: { messenger: Messenger; opened: Opened }) {
+  const { t } = useI18n();
+  const [count, setCount] = useState<number | null>(null);
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const asked = askedNow(await messenger.confirmRequests(projectFolder(opened.root)).catch(() => []));
+      const rows = await messenger.humanQueue(opened.root, asked);
+      if (live) setCount(rows.length);
+    })().catch(() => live && setCount(null));
+    return () => {
+      live = false;
+    };
+  }, [messenger, opened]);
+  return (
+    <button
+      type="button"
+      className="for-you-button"
+      title={t("for_you.button_title")}
+      onClick={() => void messenger.openForYou().catch(() => undefined)}
+    >
+      {t("for_you.name")}
+      {count !== null && count > 0 && <span className="for-you-badge">{count}</span>}
+    </button>
   );
 }
 
