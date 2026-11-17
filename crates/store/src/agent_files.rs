@@ -453,7 +453,8 @@ fn main_setup_steps(
 4. 如果 AGENTS.md 中有其他关于跟踪任务或状态的规则（例如 Markdown 任务看板），把它们改为指向 Allomos，避免规则冲突。不要改动无关内容，也不要重复添加相同的说明。
 5. 共用规则放进 AGENTS.md，每个智能体做一次：运行 `alm --taskbag \"{taskbag}\" guide agent-files` 并照做，为你自己，也为项目里已有的每个智能体规则文件（CLAUDE.md、GEMINI.md、`.cursor/rules/`、`.github/copilot-instructions.md` 之类；这些只是例子）。共用规则移到 AGENTS.md；每个智能体自己的文件只保留指向 AGENTS.md 的一行和真正属于它自己的内容；互相矛盾的规则不要替用户选，列出来问用户；把每个智能体记在任务包 project-notes.md 的 `## Agents set up` 一节下。CLAUDE.md 要包含导入 AGENTS.md 的一行（半角 at 符号后接 AGENTS.md），让 Claude Code 读取 AGENTS.md（如果没有 CLAUDE.md，就新建一个只含这一行的文件）。不要把这一节复制到任何智能体自己的文件里。
 6. 如果项目在版本控制下，用你的版本控制工具只保存 AGENTS.md、CLAUDE.md 和你改过的其他智能体文件，作为一次改动，用 Git 时：`git -C \"{project}\" add AGENTS.md CLAUDE.md <你改过的其他智能体文件> && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md <你改过的其他智能体文件>`；再在任务包里只保存项目笔记，用 Git 时：`git -C \"{taskbag}\" add project-notes.md && git -C \"{taskbag}\" commit -m \"Agents set up\" -- project-notes.md`。其他改动保持原样；除非用户要求，不要共享（推送）。
-7. 告诉用户你改了什么，以及你保存的改动（提交）。"
+7. 文件大小检查，每个项目一次：运行 `alm --taskbag \"{taskbag}\" guide file-size`。任务包 project-notes.md 里还没有 `## File size check` 一节，项目也还没有这样的检查，就用 `alm --taskbag \"{taskbag}\" add task` 为它加一个任务（标题例如“照 alm guide file-size 搭文件大小检查”），留在待办里；现在不要搭。
+8. 告诉用户你改了什么，以及你保存的改动（提交）。"
         ),
         "ja" => format!(
             "Allomos がこのプロジェクトのタスクバッグを用意しました。これからの AI エージェントにそれを伝えてください。
@@ -469,7 +470,8 @@ fn main_setup_steps(
 4. AGENTS.md にタスクや状況の管理についてのほかのルール（たとえば Markdown のタスクボード）があれば、ルールが食い違わないよう Allomos を指すように書き換えます。関係のない部分は変えず、同じ説明を二重に追加しないでください。
 5. 共通ルールを AGENTS.md に置きます（エージェントごとに一度）：`alm --taskbag \"{taskbag}\" guide agent-files` を実行してそのとおりに行います。自分自身について、そしてプロジェクトにすでにあるすべてのエージェント用ルールファイル（CLAUDE.md、GEMINI.md、`.cursor/rules/`、`.github/copilot-instructions.md` など。これは例です）について。共通ルールは AGENTS.md に移し、各エージェント自身のファイルには AGENTS.md を指す行と本当にそのエージェントだけのことを残します。食い違うルールはどちらも選ばず、ユーザーに示して尋ねます。各エージェントをタスクバッグの project-notes.md の `## Agents set up` の節に記録します。CLAUDE.md には AGENTS.md を読み込む行（半角のアットマークに続けて AGENTS.md）があるようにします（Claude Code が AGENTS.md を読むためです。CLAUDE.md がなければその一行だけで作成します）。この節をどのエージェント自身のファイルにもコピーしないでください。
 6. プロジェクトがバージョン管理されていれば、AGENTS.md、CLAUDE.md、変えたほかのエージェントのファイルだけを一つの変更としてバージョン管理ツールで保存します。Git なら：`git -C \"{project}\" add AGENTS.md CLAUDE.md <変えたほかのエージェントのファイル> && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- AGENTS.md CLAUDE.md <変えたほかのエージェントのファイル>`。続いてタスクバッグではプロジェクトノートだけを保存します。Git なら：`git -C \"{taskbag}\" add project-notes.md && git -C \"{taskbag}\" commit -m \"Agents set up\" -- project-notes.md`。ほかの変更はそのままにし、頼まれない限り共有（プッシュ）しません。
-7. 何を変えたか、どんな変更を保存（コミット）したかをユーザーに見せてください。"
+7. ファイルサイズの確認（プロジェクトごとに一度）：`alm --taskbag \"{taskbag}\" guide file-size` を実行します。タスクバッグの project-notes.md にまだ `## File size check` の節がなく、プロジェクトにもその確認がなければ、`alm --taskbag \"{taskbag}\" add task` でそのためのタスクを一つ追加し（タイトルはたとえば「alm guide file-size のとおりファイルサイズの確認を組み込む」）、バックログに置きます。いまは組み込みません。
+8. 何を変えたか、どんな変更を保存（コミット）したかをユーザーに見せてください。"
         ),
         _ => format!(
             "Allomos has set up this project's taskbag. Please now tell future AI agents about it.
@@ -506,7 +508,12 @@ changed> && git -C \"{project}\" commit -m \"Tell AI agents about Allomos\" -- A
 <other agent files you changed>`; then, in the taskbag, only the project notes; for Git: \
 `git -C \"{taskbag}\" add project-notes.md && git -C \"{taskbag}\" commit -m \"Agents set up\" -- \
 project-notes.md`. Leave every other change as it is; do not share (push) unless the person asks.
-7. Show the user what you changed and the changes (commits) you saved."
+7. File-size check, once per project: run `alm --taskbag \"{taskbag}\" guide file-size`. If the \
+taskbag's project-notes.md has no `## File size check` section yet and the project has no such \
+check, add a task for it with `alm --taskbag \"{taskbag}\" add task` (titled, for example, \
+\"Set up the file-size check from alm guide file-size\") and leave it in the backlog; do not build \
+it now.
+8. Show the user what you changed and the changes (commits) you saved."
         ),
     }
 }

@@ -1,5 +1,5 @@
 //! The project's settings: `alm quota`, `alm handoff-rules`, `alm heartbeat-settings`, `alm
-//! audit-settings`, `alm task-language` and `alm labels`.
+//! file-size-settings`, `alm audit-settings`, `alm task-language` and `alm labels`.
 
 use std::path::Path;
 
@@ -127,6 +127,9 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 clear: *clear,
             },
         ),
+        Command::FileSizeSettings { limit, clear } => {
+            file_size_settings(cli, cwd, limit.as_deref(), *clear)
+        }
         Command::AuditSettings {
             identity,
             reauthenticate,
@@ -442,4 +445,61 @@ pub(crate) fn language_line(l: &allomos_store::TaskLanguage) -> String {
         "Write new and changed tasks in: {} ({why}). Keep IDs, commands, code and file names as they are.",
         l.language
     )
+}
+
+/// `alm file-size-settings` (Task-A03-dapper008): show the project's line limit for source files,
+/// or change it. alm keeps and shows the number; it measures no file.
+fn file_size_settings(
+    cli: &Cli,
+    cwd: &Path,
+    limit: Option<&str>,
+    clear: bool,
+) -> Result<Done, Problem> {
+    use allomos_core::file_size;
+    let root = locate(cli, cwd)?;
+    let changing = limit.is_some() || clear;
+    let (project, issues, changed) = if changing {
+        let lock = Lock::acquire(&root, lock_wait())?;
+        let (bag, issues) = taskbag_of(&root, lock.load())?;
+        let project = file_size::set_limit(&bag.project, limit, clear)?;
+        let changed = project != bag.project;
+        if changed {
+            save_project(
+                &lock,
+                cli.holder.as_deref(),
+                "file-size-settings",
+                &bag.project,
+                &project,
+            )?;
+        }
+        (project, issues, changed)
+    } else {
+        let (bag, issues) = taskbag_of(&root, load(&root))?;
+        (bag.project, issues, false)
+    };
+    let applied = file_size::limit(&project);
+    let set = project
+        .file_size
+        .as_ref()
+        .and_then(|s| s.limit_lines)
+        .is_some();
+    let mut text = String::new();
+    if changing && !changed {
+        text.push_str("Nothing changed: the line limit already says that.\n");
+    }
+    text.push_str(&format!(
+        "Line limit for source files: {applied}{}: tests do not count. A source file over it may only get shorter, never longer, task by task; the project's own tests check that (`alm guide file-size`). alm keeps and shows this number; it measures no file.\n",
+        if set { "" } else { " (default)" },
+    ));
+    let mut done = Done::new(
+        json!({
+            "taskbag": root,
+            "file_size": project.file_size,
+            "limit_lines": applied,
+            "default_limit_lines": file_size::DEFAULT_LIMIT,
+        }),
+        text,
+    );
+    done.issues = issues;
+    Ok(done)
 }

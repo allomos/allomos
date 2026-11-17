@@ -209,6 +209,15 @@ pub fn parse_project(file: &str, text: &str) -> Result<Project, Vec<Issue>> {
             }
         }
     }
+    if project.file_size.as_ref().and_then(|s| s.limit_lines) == Some(0) {
+        issues.push(Issue::new(
+            file,
+            Some("file_size.limit_lines"),
+            Problem::FileSizeLimitInvalid {
+                value: "0".to_string(),
+            },
+        ));
+    }
     if let Some(value) = &project.task_language {
         if value != crate::model::TASK_LANGUAGE_UI && !crate::model::valid_language(value) {
             issues.push(Issue::new(
@@ -383,6 +392,9 @@ pub fn validate_taskbag(
     }
     if let Some(r) = &project.risk {
         unknown_notes("project.json", "risk.", &r.extra, &[], &mut issues);
+    }
+    if let Some(f) = &project.file_size {
+        unknown_notes("project.json", "file_size.", &f.extra, &[], &mut issues);
     }
     for (file, area) in areas {
         unknown_notes(file, "", &area.extra, &[], &mut issues);

@@ -8,10 +8,10 @@
 //! (Task-A03-25-01), the goal prompt Allomos types into an agent for the person ([`goal`]).
 //! `github-release` (Task-A03-planet530), which the agent follows when the approver writes
 //! `alm guide github release` in the conversation, is printed in the task language like those, but
-//! so far written only in English ([`github_release`]).
+//! so far written only in English ([`crate::github_release`]).
 
 /// The topics, in the order `alm guide` prints them.
-pub const GUIDE_TOPICS: [&str; 11] = [
+pub const GUIDE_TOPICS: [&str; 12] = [
     "terms",
     "customize",
     "tasks",
@@ -23,10 +23,17 @@ pub const GUIDE_TOPICS: [&str; 11] = [
     "github-release",
     "move-cards",
     "codex-rules",
+    "file-size",
 ];
 
 /// The topics written in every language of [`RUN_MODES_LANGUAGES`], printed in the task language.
-pub const LOCALIZED_TOPICS: [&str; 4] = ["run-modes", "agent-files", "goal", "github-release"];
+pub const LOCALIZED_TOPICS: [&str; 5] = [
+    "run-modes",
+    "agent-files",
+    "goal",
+    "github-release",
+    "file-size",
+];
 
 /// The languages `alm guide run-modes`, `alm guide agent-files` and `alm guide goal` are written in: those of the Allomos app (`en`, `ja`,
 /// `zh-CN`, as [`crate::pick_ui_language`] picks them).
@@ -284,6 +291,10 @@ Work a task:
   `alm heartbeat-settings [--interval <length>] [--lost-after <length>] [--wip on|off]
   [--clear]` shows or changes the two numbers and whether work in progress is pushed at each
   heartbeat (project settings; on by default).
+- `alm file-size-settings [--limit <lines>] [--clear]` shows or changes the project's line limit
+  for source files (1000 by default, tests not counted): a file over it may only get shorter,
+  which the project's own tests check (`alm guide file-size`). alm keeps the number; it measures
+  no file.
 - After `claim`, `session`, `label`, `wait`, `block`, `release`, `handoff` and `done`, `alm` lists
   as Fact lines what the task is missing (`--json`: `missing`, each with `code`, `fact` and `fix`):
   session details the app needs to reopen the session, the working branch of a task that was
@@ -753,16 +764,21 @@ const WORKFLOW: &str = "# How to work the tasks
    session leaves it on a task's branch and several sessions can work at once. Merge from the
    main checkout, where the base is checked out. Once the task's branch is merged into its
    base, remove your own worktree and the merged branch; never another session's.
-   **Before you plan: the size of the files you will change** (Task-A03-tide388; `alm claim`
-   repeats it). A source file your plan changes that is over about 1000 lines (tests do not
-   count; the project notes may name another limit) needs a look: is the part you will change
-   tangled with unrelated things? If so, the plan includes a refactoring of only that part (for
-   example, moved into a module of its own), never the whole file, so files get smaller task by
-   task. By default it is done in the same task, as a commit of its own before the feature
-   commit, with the tests passing and the behaviour unchanged after it. When the refactoring is
-   bigger than the feature itself, or reaches files outside the task, add a task for it first
-   and link them with `alm block <this task> --by <new task>`. alm only reminds: it measures no
-   file and stops nothing.
+   **Before you plan: the size of the files you will change** (Task-A03-tide388,
+   Task-A03-dapper008; `alm claim` repeats it). A source file over the project's line limit
+   (`alm file-size-settings`; 1000 lines by default, tests not counted) must not be longer after
+   any task than before it. How is your call: put the new things somewhere else, or move
+   unrelated old things out of it. The project's own tests check it (`alm guide file-size`; the
+   project notes' `## File size check` says where and how to run it; a project without one sets
+   it up once). A refactoring splits out only the part the task changes, never the whole file, as
+   a commit of its own before the feature commit, with the tests passing and the behaviour
+   unchanged after it; one bigger than the feature itself, or reaching files outside the task, is
+   a task of its own first (`alm block <this task> --by <new task>`). Each time the rule leads to
+   a choice, record it, split or not, and when you raise a baseline number: `alm ai-decided <id>
+   \"file-size: <file>: <lines before> → <lines after> (tests not counted); <what you did>; <if
+   nothing was split, why>\"`, beginning with `file-size:` in every language; find them later by
+   searching the taskbag for `file-size:`. alm only reminds: it measures no file and stops
+   nothing.
 3. As you prove each step, `alm label <id> \"<label>\"`, and keep its next dependency current
    with `alm needs`.
 4. Stopped: when a person (or an outside event) must act, `alm wait <id> --on \"<what>\"
@@ -1340,9 +1356,11 @@ pub fn agent_files(language: &str) -> Option<&'static str> {
 /// (`--without-human-check`) in either run mode, not waiting (Task-A03-31).
 /// 4: "Already started?" plans from a goal task that is still the goal's only task, written first
 /// for discussion (Discuss first in Build a new app…, Task-A03-tundra474).
-pub const GOAL_PROMPT_VERSION: u32 = 4;
+/// 5: the file-size check (`alm guide file-size`) is one of v0.1's first tasks
+/// (Task-A03-dapper008).
+pub const GOAL_PROMPT_VERSION: u32 = 5;
 
-const GOAL_EN: &str = "# Goal run: build an app from a description (goal prompt v4)
+const GOAL_EN: &str = "# Goal run: build an app from a description (goal prompt v5)
 
 For the agent: this is the goal prompt. A person has described an app they want (their words
 come with this prompt). You plan it into areas, iterations and tasks, make the tasks ready
@@ -1381,7 +1399,7 @@ name, a stack, a layout, a detail with a sensible default). Make it and record i
    `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you
    are on>`. Its description (`alm describe <id> --from <file.md>`) holds the spec: what the app
    does and for whom, and the acceptance criteria the finished app must meet, each one a thing a
-   person can try. End it with this line: \"Goal run (goal prompt v4): the person approved this
+   person can try. End it with this line: \"Goal run (goal prompt v5): the person approved this
    plan in advance by submitting the goal on <date>; the agent makes the areas, iterations and
    ready tasks. Outside effects still wait for the approver.\" The title's `Goal:` marks the goal
    task for every later session: keep it.
@@ -1394,7 +1412,9 @@ name, a stack, a layout, a detail with a sensible default). Make it and record i
    are on>` (as `alm guide tasks` says: one observable outcome each, about one session and one
    commit), then `alm plan <id> <iteration>`. The last task of each iteration, in the app's area,
    is that release's acceptance check: try the release against its part of the spec, and write
-   the steps for the person to try it.
+   the steps for the person to try it. One of v0.1's first tasks, before the app's own code grows:
+   set up the file-size check in the project's own tests, as `alm guide file-size` says (files
+   over the project's line limit may only get shorter); every later task runs it with the tests.
 5. **Ready, then order.** `alm ready <id>` for every task, the goal task too. Then
    `alm block <id> --by <task-id>` for each task that needs another first: each acceptance check
    by the other tasks of its iteration, the first tasks of an iteration by the previous
@@ -1447,7 +1467,7 @@ true, and print `alm list --json` to show it. Stop earlier only at the quota gat
 handoff written; given this prompt again, you continue from `alm next`.
 ";
 
-const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal prompt v4)
+const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal prompt v5)
 
 给智能体：这是目标提示。有人描述了他们想要的应用（他们的原话随这段提示一起给出）。你把它规划成
 领域、迭代和任务，自己把任务设为就绪，然后一个迭代接一个迭代地把它做出来，每一步都用 `alm`
@@ -1481,7 +1501,7 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
    `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you
    are on>`。它的描述（`alm describe <id> --from <file.md>`）写规格：应用做什么、为谁做，以及完成的
    应用必须满足的验收标准，每一条都是一个人能亲手试的事。最后加上这一行：
-   “Goal run (goal prompt v4)：这个人在 <date> 提交目标，就是事先批准了这个计划；领域、迭代和
+   “Goal run (goal prompt v5)：这个人在 <date> 提交目标，就是事先批准了这个计划；领域、迭代和
    就绪的任务由智能体来建。对外有影响的事仍然等批准人处理。”标题里的 `Goal:` 让之后的每个会话都能认出目标任务：保留它。
 2. **领域**，按应用的组成部分划分（例如它的界面、数据、服务器）：`alm add area \"<name>\"`。
 3. **迭代**，作为一份发布路线图，每个迭代结束时都有一个对方能试用的版本：
@@ -1490,7 +1510,9 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
 4. **任务**，放进这些迭代：`alm add task --area <id> --title \"<outcome>\" --branch <the branch
    you are on>`（按 `alm guide tasks` 所说：每个任务一个可观察的结果，大约一个会话、一次提交），
    然后 `alm plan <id> <iteration>`。每个迭代的最后一个任务放在应用的领域里，是这次发布的验收检查：
-   对照规格中属于它的部分试用这个版本，并写下让那个人试用的步骤。
+   对照规格中属于它的部分试用这个版本，并写下让那个人试用的步骤。v0.1 最先做的任务之一（在应用自己的
+   代码变多之前）：照 `alm guide file-size` 在项目自己的测试里搭好文件大小检查（超过项目行数上限的
+   文件只准变小）；之后每个任务都随测试一起跑它。
 5. **先就绪，再排顺序。** 对每个任务运行 `alm ready <id>`，目标任务也一样。然后对每个需要先等别的
    任务的任务运行 `alm block <id> --by <task-id>`：每个验收检查被它所在迭代的其他任务阻塞，每个迭代
    最先做的任务被上一个迭代的检查阻塞，目标任务被最后一个检查阻塞。
@@ -1533,7 +1555,7 @@ const GOAL_ZH_CN: &str = "# 目标运行：根据描述构建一个应用 (goal 
 只有到了额度关口才提前停下，并写好交接；再次收到这段提示时，从 `alm next` 继续。
 ";
 
-const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal prompt v4)
+const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal prompt v5)
 
 エージェントへ：これはゴールのプロンプトです。ある人が、欲しいアプリを説明しました（その人の言葉は
 このプロンプトと一緒に渡されます）。あなたはそれをエリア、イテレーション、タスクに計画し、タスクを
@@ -1571,7 +1593,7 @@ const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal 
    `alm add task --area <id> --title \"Goal: <the app, in one line>\" --branch <the branch you
    are on>`。その説明（`alm describe <id> --from <file.md>`）に仕様を書きます。アプリが何をし、
    誰のためのものか、そして完成したアプリが満たすべき受け入れ基準。基準はどれも、人が試せることに
-   します。最後にこの一行を書きます：「Goal run (goal prompt v4)：この人は <date> にゴールを出して、
+   します。最後にこの一行を書きます：「Goal run (goal prompt v5)：この人は <date> にゴールを出して、
    この計画を前もって承認しました。エリア、イテレーション、準備完了のタスクはエージェントが作ります。
    外部への影響があることは、引き続き承認者を待ちます。」タイトルの `Goal:` は、あとのすべての
    セッションにゴールのタスクを示す印です。消さずに残します。
@@ -1583,7 +1605,10 @@ const GOAL_JA: &str = "# ゴール実行：説明からアプリを作る (goal 
    are on>`（`alm guide tasks` のとおり、一つのタスクに一つの見て分かる結果、だいたい一つの
    セッションと一つのコミット）、続けて `alm plan <id> <iteration>`。各イテレーションの最後の
    タスクは、アプリのエリアに置く、そのリリースの受け入れ確認です。仕様のうちその部分に照らして
-   リリースを試し、その人が試すための手順を書きます。
+   リリースを試し、その人が試すための手順を書きます。v0.1 の最初のタスクの一つとして（アプリ自身の
+   コードが増える前に）、`alm guide file-size` のとおりプロジェクト自身のテストにファイルサイズの
+   確認を組み込みます（プロジェクトの行数の上限を超えるファイルは小さくなることしか許されません）。
+   以後のタスクはどれもテストと一緒にそれを走らせます。
 5. **準備完了にしてから、順番を付けます。** すべてのタスクに `alm ready <id>`、ゴールのタスクにも。
    それから、先にほかのタスクが要るタスクごとに `alm block <id> --by <task-id>`。各受け入れ確認は
    同じイテレーションのほかのタスクで、各イテレーションの最初のタスクは前のイテレーションの確認で、
@@ -1867,171 +1892,6 @@ pub fn added_task_steps(
     }
 }
 
-/// What `alm claim` prints after its Git commands (Task-A03-tide388, approver 2026-10-22), in the
-/// task language (`en`, `zh-CN`, `ja`; English otherwise): before planning the task, look at the
-/// size of the source files the plan will change, and put a refactoring of only the part to be
-/// changed into the plan when one is too big. alm reminds; it measures nothing and stops nothing.
-pub fn claimed_task_steps(language: &str) -> String {
-    match language {
-        "zh-CN" => "做计划之前（alm 提醒，你来检查）：看一下计划要改的源文件有多大。超过约 1000 行（测试文件不算；项目说明 `project-notes.md` 可以定别的行数）就看一看：要改的那部分是否和不相干的东西缠在一起。是的话，把重构写进这次的计划：只把本任务要改的那部分拆出来（例如移到自己的模块），不重构整个文件，文件随一个个任务逐步变小。默认在本任务里做：重构单独一个提交，放在功能提交之前，提交后测试通过、行为不变。重构比功能本身还大，或要动本任务范围外的文件时，先另开一个任务做重构，再用 `alm block <本任务> --by <新任务>` 连上。
-".to_string(),
-        "ja" => "計画を立てる前に（alm は知らせるだけ、確かめるのはあなた）：計画で変える元のファイルの大きさを見ます。約 1000 行を超えるもの（テストのファイルは数えません。`project-notes.md` で別の行数を決めてもかまいません）は一度見て、変える部分が関係のないものと絡み合っていないか判断します。絡み合っていれば、リファクタリングを今回の計画に入れます。このタスクで変える部分だけを切り出し（たとえば専用のモジュールへ移す）、ファイル全体は書き直しません。ファイルはタスクごとに少しずつ小さくなります。ふつうはこのタスクの中で行います：リファクタリングを機能のコミットより前の独立したコミットにし、その後もテストが通り、動きが変わらないこと。リファクタリングが機能そのものより大きいとき、またはこのタスクの範囲外のファイルに及ぶときは、先にリファクタリングのタスクを別に追加し、`alm block <このタスク> --by <新しいタスク>` でつなぎます。
-".to_string(),
-        _ => "Before you plan this task (alm reminds; you check): look at the size of the source files your plan will change. One over about 1000 lines (tests do not count; the project notes, `project-notes.md`, may name another limit) needs a look: is the part you will change tangled with unrelated things? If so, put a refactoring into this plan: only the part this task changes (for example, move it into a module of its own), never the whole file, so files get smaller task by task. By default it is done in this task, as a commit of its own before the feature commit, with the tests passing and the behaviour unchanged after it. When the refactoring is bigger than the feature itself, or reaches files outside this task, add a task for it first and link them with `alm block <this task> --by <new task>`.
-".to_string(),
-    }
-}
-
-/// `alm guide github-release` (Task-A03-planet530): the procedure an agent follows when the
-/// approver writes `alm guide github release` in the conversation: publish a new GitHub release
-/// with release notes, check it, and (only with the word `install`) install it on this computer
-/// (Task-A03-hen326). The same text for every project:
-/// it names no repository, address or file; the project's facts come from the project notes'
-/// `## Releases` section.
-const GITHUB_RELEASE_EN: &str = "# GitHub release: publish a new release, and install it on this computer when asked
-
-The approver writes `alm guide github release` (or `alm guide github-release`) in the
-conversation; you ran it, and this is what to do. One outcome: **a new release on GitHub, with
-notes that say what changed** (and, when the command says `install`, installed on this computer).
-The command in the conversation is the approval for this release, and with `install` for
-installing it here too. Anything it does not cover (another version jump than its words say,
-publishing somewhere new, installing without `install`) still goes to the approver.
-
-Words after the command, which you read from the approver's line (alm does not act on them):
-- `minor` or `major`: raise that part of the version instead of the patch.
-- `install`: after step 6, also download and install the release on this computer (step 7).
-  Without it, skip step 7: the release is published and checked, nothing is downloaded or
-  installed here.
-The words combine, for example `alm guide github release minor install`.
-Any other word: ask the approver what it means before you tag.
-
-This text names no repository, address or file: every fact of the project comes from the
-taskbag's `project-notes.md`, its `## Releases` section (step 0). Where the project's rules
-(AGENTS.md) say something else, they win.
-
-## 0. Read the project's release facts
-
-Read the `## Releases` section of the project notes. It is a table with these keys:
-
-| Key | What it says |
-|---|---|
-| `REMOTE` | the GitHub repository |
-| `BASE_BRANCH` | the branch releases are cut from |
-| `VERSION_FILES` | every file that holds the version, how it is written there, and what derives from it (a lockfile) |
-| `TAG_FORMAT` | how a tag is spelled |
-| `BUMP` | which part of the version goes up by default |
-| `RELEASE_WORKFLOW` | what builds and publishes on a tag push, how long it takes, how to run it again for an existing tag |
-| `NOTES_DIR` | where release-notes pages live, the file name pattern, and the shape of a page |
-| `NOTES_LANGUAGES` | every language a page must exist in |
-| `NOTES_INDEX` | the index pages that list releases and gain a line |
-| `NOTES_URL` | the published address of a release's page, per language |
-| `NOTES_PUBLISH` | what publishes the pages, how long it takes, and how to build them locally |
-| `GH_NOTES` | who writes the GitHub release's own notes, and whether they link to the pages |
-| `INSTALL_ASSET` | the asset to install on this computer, and its checksum file (used only with `install`) |
-| `INSTALL_COMMAND` | how it is installed, and whether a person must approve (a password, a dialog) (only with `install`) |
-| `VERIFY_INSTALLED` | how to read the installed version afterwards (only with `install`) |
-| `APPROVAL_RECORD` | where this release's approval and evidence are written |
-
-When the section is missing, or a key in it: derive what the repository settles (the last tag
-and its shape, the workflow under `.github/workflows` that runs on a tag, the files whose version
-equals the last tag's, the folder holding the last release's notes page, the assets of the last
-GitHub release for this computer), write the section into the project notes, and show it to the
-approver before tagging. Ask only for what nothing in the repository settles. Next time the
-section is the source.
-
-## 1. Preflight: stop on any failure and say which
-
-- You are on `BASE_BRANCH`, the working tree is clean, pulled, and nothing is ahead of the remote.
-- The last release (`gh release list --limit 1`) and the last tag agree.
-- No run of `RELEASE_WORKFLOW` is still going (`gh run list --workflow <file> --limit 1`).
-- There are commits since the last tag. None: say so and stop, there is nothing to release.
-- `gh auth status` passes; with `install`, so does every tool `INSTALL_COMMAND` needs.
-
-## 2. Collect what changed
-
-- `git log <last tag>..HEAD --no-merges` lists the commits; a version bump is not a change.
-- When a commit names a task, read it (`alm show <id>`), so the notes say what a person using the
-  product notices, not what the code did.
-- Sort the changes under **New**, **Fixed** and **Also** (or the headings the last release's page
-  uses): one bullet per outcome, a bold lead-in, plain words, present tense; no commit hashes and
-  no task IDs in the text. A change nobody using the product can notice (refactoring, tests, agent
-  rules) goes under Also in one line, or is left out; say in your handoff what you left out.
-- Write the notes in each of `NOTES_LANGUAGES`, translating meaning, not words; product and
-  command names stay as they are.
-
-## 3. Choose the version
-
-`BUMP` (or the command's `minor` / `major`) applied to the last tag's version. Say the version you
-chose before you write anything: until the tag exists, everything is easy to undo.
-
-## 4. Write the notes
-
-- One page per language in `NOTES_LANGUAGES`, in the same shape as the last release's page (front
-  matter, headings, the download line, the date).
-- A line for the new release at the top of every page in `NOTES_INDEX`.
-- Build the pages locally (`NOTES_PUBLISH` says how), so a broken page is found before it is
-  published.
-- When `GH_NOTES` links to the pages, every language's page exists before the tag: a missing page
-  is a dead link on the GitHub release.
-
-## 5. Bump, commit, tag
-
-- Change every file in `VERSION_FILES` to the new version; update what derives from them (a
-  lockfile) with the project's own tool, never by hand.
-- One commit holds the notes and the bump, in the project's commit style with the attribution line
-  its rules ask for. Push `BASE_BRANCH` and confirm it landed.
-- Tag in `TAG_FORMAT`, annotated (`git tag -a <tag> -m <tag>`), and push the tag. The tag push is
-  the outside effect; everything before it is local.
-
-## 6. Wait and check
-
-- Wait for the release run and for the notes' publish in the background
-  (`gh run watch <run id> --exit-status`); do not poll by hand.
-- A failed run: read its log, fix the cause on `BASE_BRANCH`, and run it again the way
-  `RELEASE_WORKFLOW` says (often `workflow_dispatch` with the tag). Never delete a tag or a release
-  and tag again; say what happened instead.
-- Check, and keep the evidence: `gh release view <tag>` lists every expected asset and checksum
-  file; the release's own notes point to the pages (`GH_NOTES`); `NOTES_URL` for the new version
-  answers 200 in every language, with the version in the page's title.
-
-## 7. Download and install (only with `install`)
-
-Without `install` in the command, skip this step and go on with step 8.
-
-- Download into a new, empty folder outside the project:
-  `gh release download <tag> --pattern <INSTALL_ASSET> --pattern <its checksum file>`.
-- Check the checksum first; a mismatch stops the install, and you report it.
-- Install with `INSTALL_COMMAND`. When it asks for a password or an approval in a dialog, open it
-  for the approver and say what to click; never type a password.
-- `VERIFY_INSTALLED`: the installed version equals the released one. Report what it shows.
-
-## 8. Record and report
-
-- Write the approval (the approver's command line, and when) and the evidence where
-  `APPROVAL_RECORD` says, and in your handoff.
-- Report in plain words first: the version, the notes' headings and how many items each has, the
-  links to the release and to the notes, and the version installed (without `install`: that it
-  was not installed here). Then the evidence: the run IDs, the asset list, and with `install` the
-  checksum result. Last, what was not done or not checked.
-
-## What you never do here
-
-- Release from a working tree with changes, from another branch than `BASE_BRANCH`, or while a
-  release run is going.
-- Guess a value the repository does not settle: ask the approver.
-- Force-push, delete a tag or a release, or tag again.
-- Type a password or approve an installer's dialog.
-";
-
-/// `alm guide github-release` in `language`, or `None` when it is not written in that language
-/// (the agent then follows a faithful translation of the English text). Only English so far.
-pub fn github_release(language: &str) -> Option<&'static str> {
-    match written_in(language)? {
-        "en" => Some(GITHUB_RELEASE_EN),
-        _ => None,
-    }
-}
-
 /// The topic `words` name, joined by hyphens (`github release` is `github-release`), and the words
 /// after it, which the guide defines and the agent reads (`alm guide github release minor`). The
 /// longest run of leading words that names a topic wins; `None` when no leading words name one.
@@ -2052,13 +1912,14 @@ pub fn localized(topic: &str, language: &str) -> Option<&'static str> {
         "run-modes" => run_modes(language),
         "agent-files" => agent_files(language),
         "goal" => goal(language),
-        "github-release" => github_release(language),
+        "github-release" => crate::github_release::github_release(language),
+        "file-size" => crate::file_size::file_size_guide(language),
         _ => None,
     }
 }
 
 /// Which of [`RUN_MODES_LANGUAGES`] a task language is written in, if any.
-fn written_in(language: &str) -> Option<&'static str> {
+pub(crate) fn written_in(language: &str) -> Option<&'static str> {
     let l = language.trim().to_lowercase().replace('_', "-");
     let is = |code: &str| l == code || l.starts_with(&format!("{code}-"));
     if is("en") {
@@ -2101,9 +1962,10 @@ pub fn guide(topic: Option<&str>) -> Option<String> {
         "run-modes" => Some(RUN_MODES_EN),
         "agent-files" => Some(AGENT_FILES_EN),
         "goal" => Some(GOAL_EN),
-        "github-release" => Some(GITHUB_RELEASE_EN),
+        "github-release" => Some(crate::github_release::GITHUB_RELEASE_EN),
         "move-cards" => Some(MOVE_CARDS),
         "codex-rules" => Some(CODEX_RULES),
+        "file-size" => Some(crate::file_size::FILE_SIZE_GUIDE_EN),
         _ => None,
     };
     let full = |t: &str| {
@@ -2137,6 +1999,7 @@ pub fn guide(topic: Option<&str>) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::github_release::{GITHUB_RELEASE_EN, github_release};
 
     #[test]
     fn every_topic_is_there_and_the_brief_names_them() {
@@ -2145,9 +2008,10 @@ mod tests {
                 guide(Some(topic)).is_some_and(|t| t.starts_with("# ")),
                 "{topic}"
             );
-            // `codex-rules` is named by `workflow` and `agent-files` instead, so the brief (and
-            // every project's AGENTS.md section) stays as it is (Task-A03-pier032).
-            if topic != "codex-rules" {
+            // `codex-rules` is named by `workflow` and `agent-files` instead, and `file-size` by
+            // `workflow`, `goal` and `alm claim`, so the brief (and every project's AGENTS.md
+            // section) stays as it is (Task-A03-pier032, Task-A03-dapper008).
+            if topic != "codex-rules" && topic != "file-size" {
                 assert!(
                     crate::agent_section().contains(&format!("alm guide {topic}")),
                     "{topic}"
@@ -2546,59 +2410,34 @@ mod tests {
         assert!(brief.contains("when it prints a guide, follow that guide"));
     }
 
-    /// Task-A03-tide388: the size reminder, in every language the app speaks and in the workflow
-    /// guide; only a reminder.
+    /// Task-A03-tide388 and Task-A03-dapper008: the workflow's size rule says the outcome, reads
+    /// the project's limit, asks for the `file-size:` record and points to the guide.
     #[test]
-    fn the_file_size_reminder_is_written_in_every_language_and_in_the_workflow() {
-        for (language, words) in [
-            (
-                "en",
-                [
-                    "1000 lines",
-                    "only the part this task changes",
-                    "a commit of its own before the feature commit",
-                    "`alm block <this task> --by <new task>`",
-                    "project-notes.md",
-                ],
-            ),
-            (
-                "zh-CN",
-                [
-                    "1000 行",
-                    "只把本任务要改的那部分拆出来",
-                    "放在功能提交之前",
-                    "`alm block <本任务> --by <新任务>`",
-                    "project-notes.md",
-                ],
-            ),
-            (
-                "ja",
-                [
-                    "1000 行",
-                    "このタスクで変える部分だけ",
-                    "機能のコミットより前",
-                    "`alm block <このタスク> --by <新しいタスク>`",
-                    "project-notes.md",
-                ],
-            ),
-        ] {
-            let text = claimed_task_steps(language);
-            for w in words {
-                assert!(text.contains(w), "{language}: {w}");
-            }
-        }
-        assert_eq!(claimed_task_steps("fr"), claimed_task_steps("en"));
-        let workflow = guide(Some("workflow")).unwrap();
+    fn the_workflow_tells_the_file_size_rule_and_the_record() {
+        let workflow = guide(Some("workflow"))
+            .unwrap()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
         for w in [
             "**Before you plan: the size of the files you will change**",
-            "about 1000 lines",
+            "`alm file-size-settings`",
+            "1000 lines by default",
+            "must not be longer after any task than before it",
+            "`alm guide file-size`",
+            "\"file-size: <file>:",
+            "searching the taskbag for `file-size:`",
             "never the whole file",
             "alm only reminds",
         ] {
             assert!(workflow.contains(w), "{w}");
         }
+        assert!(!workflow.contains("the project notes may name another limit"));
+        // No hard ban on adding code (approver 2026-11-16).
+        assert!(!workflow.contains("no new code"));
         // AGENTS.md's section is not changed (approver, 2026-10-22).
         assert!(!crate::agent_section().contains("1000 lines"));
+        assert!(!crate::agent_section().contains("file-size"));
     }
 
     /// A topic written as separate words is the same topic; the words after it are the guide's.
@@ -2667,7 +2506,7 @@ mod tests {
                 "`alm add area \"<the app's name>\"`",
                 "--title \"Goal: <the app, in one line>\"",
                 "`alm describe <id> --from <file.md>`",
-                "Goal run (goal prompt v4)",
+                "Goal run (goal prompt v5)",
                 "`alm add area \"<name>\"`",
                 "`alm add iteration \"<name>\" --release v0.1`",
                 "`alm plan <id> <iteration>`",

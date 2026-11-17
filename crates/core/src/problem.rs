@@ -236,6 +236,9 @@ problems! {
     NotHeld { id, state } => "not_held", "Task {id} is {state} and held by no working session, so it gets no heartbeat. Only the session holding an in-progress task beats (`alm claim` it first).";
     /// `alm heartbeat-settings` with a length that is not whole minutes (Task-A01-zero387).
     HeartbeatMinutesInvalid { field, value } => "heartbeat_minutes_invalid", "\"{value}\" is not a length of whole minutes for {field}. Write it like 10m, 30m, 1h or 45 (minutes); at least 1 minute.";
+    /// `alm file-size-settings --limit` with something that is not a whole number of lines, at
+    /// least 1 (Task-A03-dapper008).
+    FileSizeLimitInvalid { value } => "file_size_limit_invalid", "\"{value}\" is not a line limit. Write a whole number of lines, at least 1, such as 1000.";
     /// `alm beat --busy` with a length not written as one (Task-A01-nurse164).
     BusyInvalid { value } => "busy_invalid", "\"{value}\" is not a length of time. Write it like 45m, 2h or 1h30m (0m ends a busy window).";
     /// The one-time number of a change (`--request-id`, Task-A01-58) was used before for a

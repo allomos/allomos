@@ -11,6 +11,7 @@ mod audit;
 mod codex_rules;
 mod for_you;
 mod former_worktree;
+mod file_size_settings;
 mod heartbeat_settings;
 mod lan;
 mod lan_commands;
@@ -241,6 +242,8 @@ pub fn run() {
             project_settings::set_handoff_rules,
             heartbeat_settings::heartbeat_settings,
             heartbeat_settings::set_heartbeat_settings,
+            file_size_settings::file_size_settings,
+            file_size_settings::set_file_size_settings,
             risk_settings::risk_settings,
             risk_settings::set_risk_settings,
             audit_settings,

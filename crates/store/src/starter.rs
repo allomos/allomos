@@ -27,6 +27,7 @@ pub fn create_starter(root: &Path, name: &str) -> io::Result<PathBuf> {
         audit: None,
         heartbeat: None,
         risk: None,
+        file_size: None,
     };
     write_json(&root.join(PROJECT_FILE), &project)?;
     let areas = [("A01", "Getting started", 1), ("A02", "First feature", 2)];
@@ -173,6 +174,7 @@ pub fn init_with_labels(
         audit: None,
         heartbeat: None,
         risk: None,
+        file_size: None,
     };
     // Checked like any project file, so `init` never writes one that `load` refuses.
     let text = json_text(&project);

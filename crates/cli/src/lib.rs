@@ -631,6 +631,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         Command::Quota { .. }
         | Command::HandoffRules { .. }
         | Command::HeartbeatSettings { .. }
+        | Command::FileSizeSettings { .. }
         | Command::AuditSettings { .. }
         | Command::TaskLanguage { .. }
         | Command::Labels { .. } => settings::execute(cli, cwd),

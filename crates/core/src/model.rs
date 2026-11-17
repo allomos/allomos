@@ -122,6 +122,10 @@ pub struct Project {
     /// counts as high risk and its two limits. Missing: no rules of its own, both limits off.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub risk: Option<crate::risk::Settings>,
+    /// The line limit for source files (Task-A03-dapper008): files over it may only get shorter.
+    /// Missing: 1000 lines. `alm` keeps and shows it; it measures no file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_size: Option<crate::file_size::Settings>,
     /// Fields this Allomos does not know, kept as they are and written back (Task-A01-piano403).
     #[serde(flatten)]
     pub extra: Extra,
