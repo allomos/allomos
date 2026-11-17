@@ -7,6 +7,7 @@ sidebar:
 
 リリースごとに、新しくなったことと直したことを書いたページがここにあります。新しいものほどサイドバーの上にあります。
 
+- [0.1.71](/allomos/ja/release-notes/v0-1-71/)
 - [0.1.70](/allomos/ja/release-notes/v0-1-70/)
 - [0.1.69](/allomos/ja/release-notes/v0-1-69/)
 - [0.1.68](/allomos/ja/release-notes/v0-1-68/)
