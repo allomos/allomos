@@ -34,9 +34,12 @@ npm --prefix apps/web run typecheck
 npm --prefix apps/web run build
 npm --prefix apps/web run check:i18n
 npm --prefix apps/web test
+node --test scripts/tests/publish-agent-models.test.mjs
 ```
 
 All must pass. Report anything not run as NOT RUN.
+
+**The list of supported agents, models and reasoning efforts** (task `A03-coral174`): its source is `data/agent-models.json` (format `version` 1: each agent's `id`, `name`, `models` as `value`/`label`, `efforts`; Claude models are family aliases such as `opus`, Codex models carry their version and are changed here when Codex moves on; set `updated` to the day you change it). After changing it, run `node scripts/publish-agent-models.mjs`: it checks the source (format, no duplicates, at least one of each), writes `site/agents/models.json`, changes nothing when nothing changed, and prints the next steps. That file goes online at `https://www.allomos.com/agents/models.json` only when it reaches `main`, which publishes `site/`: each such push is a deployment and needs the approver's approval.
 
 ## Writing code
 
