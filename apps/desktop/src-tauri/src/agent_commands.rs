@@ -174,7 +174,7 @@ pub(crate) async fn connect_agents(
         let Some(agent) = found.iter().find(|a| a.id == id) else {
             continue;
         };
-        agents::ask(agent, &project, &request)?;
+        agents::ask(agent, &project, &taskbag, &request)?;
         opened.push(id);
     }
     Ok(opened)
@@ -285,7 +285,7 @@ pub(crate) async fn build_app(
         quiet,
         discuss,
     );
-    agents::ask(chosen, &project, &request)
+    agents::ask(chosen, &project, &taskbag, &request)
 }
 
 /// **Build a new app…** with Manual: the same request, as an agent opened through a link gets it
@@ -409,7 +409,7 @@ pub(crate) async fn move_tasks_in(
         return Err(Problem::AgentNotFound { agent });
     };
     let request = tasks_in_plan(&taskbag, &language, translate.as_deref(), name.as_deref())?;
-    agents::ask(chosen, &project, &request)
+    agents::ask(chosen, &project, &taskbag, &request)
 }
 
 /// **Update the taskbag…** with Manual: the same request, as an agent opened through a link gets
@@ -491,7 +491,7 @@ pub(crate) async fn translate_taskbag(
         return Err(Problem::AgentNotFound { agent });
     };
     let request = translate_plan(&taskbag, &language, target.trim(), name.as_deref());
-    agents::ask(chosen, &project, &request)
+    agents::ask(chosen, &project, &taskbag, &request)
 }
 
 /// **Translate the taskbag…** with Manual: the same request, for the person to copy.
@@ -546,7 +546,7 @@ pub(crate) async fn proceed_with_agent(
     let Some(chosen) = found.iter().find(|a| a.id == agent) else {
         return Err(Problem::AgentNotFound { agent });
     };
-    agents::ask(chosen, &project, &request)
+    agents::ask(chosen, &project, &taskbag, &request)
 }
 
 /// **Work on it…** with Manual: `request` as the person copies it (with this Allomos's own `alm`, as
