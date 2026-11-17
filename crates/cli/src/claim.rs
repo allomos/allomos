@@ -89,10 +89,16 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             // Before planning: the size of the files to change, in the task language
             // (Task-A03-tide388). alm reminds; the agent checks.
             let system: Vec<String> = sys_locale::get_locales().collect();
-            let language = taskbag_of(&root, load(&root))
-                .map(|(bag, _)| task_language(&bag.project, &system).language)
-                .unwrap_or_else(|_| "en".to_string());
-            let reminder = allomos_store::claimed_task_steps(&language);
+            // The project's line limit too (Task-A03-dapper008).
+            let (language, limit) = taskbag_of(&root, load(&root))
+                .map(|(bag, _)| {
+                    (
+                        task_language(&bag.project, &system).language,
+                        allomos_core::file_size::limit(&bag.project),
+                    )
+                })
+                .unwrap_or_else(|_| ("en".to_string(), allomos_core::file_size::DEFAULT_LIMIT));
+            let reminder = allomos_store::claimed_task_steps(&language, limit);
             done.fields["before_planning"] = json!(reminder);
             done.after = reminder;
             done.warnings = claimed.changed.warnings;

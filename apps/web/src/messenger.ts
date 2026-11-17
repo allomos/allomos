@@ -9,6 +9,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import type { FolderInfo as ProjectFolderInfo } from "./folderFlow";
 import type { HeartbeatSettings } from "./heartbeatSettingsFlow";
+import type { FileSizeSettings } from "./FileSizeSettings";
 import type { RiskSettings } from "./riskFlow";
 import type { CodexRules } from "./codexRulesFlow";
 import type { LadderStep } from "./ladderFlow";
@@ -237,6 +238,10 @@ export interface Messenger {
   heartbeatSettings(root: string): Promise<HeartbeatSettings>;
   /** Changes them (whole minutes), or puts both back to their defaults (`clear`); resolves to the settings as saved. Rejects with a Problem. */
   setHeartbeatSettings(root: string, change: { interval?: string; lostAfter?: string; pushWork?: boolean; clear?: boolean }): Promise<HeartbeatSettings>;
+  /** Project settings → File size (Task-A03-dapper008): the line limit for source files, as `alm file-size-settings`. */
+  fileSizeSettings(root: string): Promise<FileSizeSettings>;
+  /** Changes it (a whole number of lines), or puts it back to the default (`clear`); resolves to the settings as saved. Rejects with a Problem. */
+  setFileSizeSettings(root: string, change: { limit?: string; clear?: boolean }): Promise<FileSizeSettings>;
   /** Project settings → Risk management (decision 0027 § 6, Task-A01-beetle749): the fixed rules for high risk, the project's own rules and its two limits. */
   riskSettings(root: string): Promise<RiskSettings>;
   /** Changes them: `rules` replaces the project's own rules, each limit given is turned on or off; resolves to the settings as saved. Rejects with a Problem. */
@@ -632,6 +637,9 @@ export const desktopMessenger: Messenger = {
       pushWork: c.pushWork ?? null,
       clear: c.clear ?? false,
     }),
+  fileSizeSettings: (root) => invoke<FileSizeSettings>("file_size_settings", { root }),
+  setFileSizeSettings: (root, c) =>
+    invoke<FileSizeSettings>("set_file_size_settings", { root, limit: c.limit ?? null, clear: c.clear ?? false }),
   riskSettings: (root) => invoke<RiskSettings>("risk_settings", { root }),
   setRiskSettings: (root, c) =>
     invoke<RiskSettings>("set_risk_settings", {

@@ -1610,6 +1610,7 @@ mod tests {
                 audit: None,
                 heartbeat: None,
                 risk: None,
+                file_size: None,
             },
             areas: vec![],
             iterations: vec![],

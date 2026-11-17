@@ -78,6 +78,7 @@ impl Command {
             | Command::Translate { .. }
             | Command::HandoffRules { .. }
             | Command::HeartbeatSettings { .. }
+            | Command::FileSizeSettings { .. }
             | Command::AuditSettings { .. }
             | Command::Cards { .. }
             | Command::Upgrade { .. }
@@ -120,6 +121,9 @@ impl Command {
         } = self
         {
             return interval.is_some() || lost_after.is_some() || push_work.is_some() || *clear;
+        }
+        if let Command::FileSizeSettings { limit, clear } = self {
+            return limit.is_some() || *clear;
         }
         if let Command::AuditSettings {
             identity,
@@ -262,6 +266,7 @@ impl Command {
             Command::Translate { .. } => "translate",
             Command::HandoffRules { .. } => "handoff-rules",
             Command::HeartbeatSettings { .. } => "heartbeat-settings",
+            Command::FileSizeSettings { .. } => "file-size-settings",
             Command::AuditSettings { .. } => "audit-settings",
             Command::Handoff { .. } => "handoff",
         }

@@ -159,6 +159,9 @@
   ],
   "field_missing": [],
   "field_unknown": [],
+  "file_size_limit_invalid": [
+    "value"
+  ],
   "folder_choice_missing": [
     "folders"
   ],

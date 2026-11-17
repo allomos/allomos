@@ -17,6 +17,7 @@ pub mod duties;
 pub mod effect;
 pub mod event;
 pub mod exception;
+pub mod file_size;
 pub mod folders;
 pub mod handover;
 pub mod heartbeat;

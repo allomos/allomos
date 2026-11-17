@@ -752,6 +752,19 @@ pub(crate) enum Command {
         #[arg(long)]
         clear: bool,
     },
+    /// The project's line limit for source files (Task-A03-dapper008): a file over it may only get
+    /// shorter, task by task; the project's own tests check that (`alm guide file-size`). 1000 by
+    /// default, tests not counted. alm keeps and shows the number; it measures no file. Without
+    /// options, show it.
+    #[command(name = "file-size-settings")]
+    FileSizeSettings {
+        /// The line limit: a whole number of lines, at least 1.
+        #[arg(long, value_name = "LINES")]
+        limit: Option<String>,
+        /// Back to the default (1000 lines); --limit then still applies.
+        #[arg(long)]
+        clear: bool,
+    },
     /// The project's audit settings (decision 0021 § 6): the identity level, separation of
     /// duties, retention and the legal hold, and the outside witness. Without options, show them. The history only ever holds a pseudonym ID at every level; who is
     /// behind it is kept on this computer (local project) or in the cloud (cloud project).
