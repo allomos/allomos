@@ -446,6 +446,13 @@ fn add_dirs(dirs: &[PathBuf], quote: fn(&str) -> String) -> String {
 /// inspect the repository's actual origin URL.
 const ANTIGRAVITY_PUSH_RULE: &str =
     "command(regex:^git push origin refs/heads/[A-Za-z0-9][A-Za-z0-9._/-]*$)";
+const ANTIGRAVITY_ASK_RULES: &[&str] = &[
+    "command(regex:^git push$)",
+    "command(regex:^git push origin$)",
+    "command(regex:^git push .* (--force|--force-with-lease|--force-if-includes|--delete|-f|-d|-D|--mirror|--prune|--tags|--all|--follow-tags|--set-upstream|-u|--atomic|--no-verify)(=| |$).*)",
+    r"command(regex:^git push .* \+[^ ]+( |$).*)",
+    r"command(regex:^git push .* :[^ ]+( |$).*)",
+];
 
 /// Session-only Antigravity settings for quiet monitoring. Preserve the user's current fine-grained
 /// rules because `--settings` overrides them for this session; if they cannot be read safely, omit
@@ -469,6 +476,15 @@ fn antigravity_quiet_settings(existing: Option<&str>) -> Option<String> {
         .any(|rule| rule.as_str() == Some(ANTIGRAVITY_PUSH_RULE))
     {
         allow.push(serde_json::json!(ANTIGRAVITY_PUSH_RULE));
+    }
+    let ask = permissions
+        .entry("ask")
+        .or_insert_with(|| serde_json::json!([]))
+        .as_array_mut()?;
+    for rule in ANTIGRAVITY_ASK_RULES {
+        if !ask.iter().any(|existing| existing.as_str() == Some(rule)) {
+            ask.push(serde_json::json!(rule));
+        }
     }
     Some(serde_json::json!({"permissions": permissions}).to_string())
 }
@@ -860,9 +876,15 @@ mod tests {
             settings["permissions"]["allow"],
             serde_json::json!(["command(git status)", ANTIGRAVITY_PUSH_RULE])
         );
+        let mut expected_ask = vec![serde_json::json!("command(*)")];
+        expected_ask.extend(
+            ANTIGRAVITY_ASK_RULES
+                .iter()
+                .map(|rule| serde_json::json!(rule)),
+        );
         assert_eq!(
             settings["permissions"]["ask"],
-            serde_json::json!(["command(*)"])
+            serde_json::Value::Array(expected_ask)
         );
         assert_eq!(
             settings["permissions"]["deny"],
@@ -877,6 +899,10 @@ mod tests {
         assert_eq!(
             settings["permissions"]["allow"].as_array().unwrap().len(),
             1
+        );
+        assert_eq!(
+            settings["permissions"]["ask"],
+            serde_json::json!(ANTIGRAVITY_ASK_RULES)
         );
         assert!(antigravity_quiet_settings(Some("not json")).is_none());
     }
