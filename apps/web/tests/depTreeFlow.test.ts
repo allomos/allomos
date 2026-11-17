@@ -33,6 +33,17 @@ test("a fork: the children keep the sort's order, and so do the roots; a task al
   assert.deepEqual(shape(newest), ["0:A01-4", "1:A01-5", "0:A01-6", "0:A01-1", "1:A01-3", "1:A01-2"]);
 });
 
+test("when sorted by creation time, children under the same parent keep that order", () => {
+  const tasks = [task("A01-1"), task("A01-10", ["A01-1"]), task("A01-2", ["A01-1"])];
+  const created = {
+    "A01-1": "2026-10-01T00:00:00Z",
+    "A01-10": "2026-10-03T00:00:00Z",
+    "A01-2": "2026-10-02T00:00:00Z",
+  };
+  const rows = depTreeRows(sortTasks(tasks, { key: "created", dir: "asc" }, {}, created));
+  assert.deepEqual(shape(rows), ["0:A01-1", "1:A01-2", "1:A01-10"]);
+});
+
 test("guide lines: an ancestor with a later sibling runs a line through the lines under it", () => {
   const rows = depTreeRows([task("A01-1"), task("A01-2", ["A01-1"]), task("A01-3", ["A01-2"]), task("A01-4", ["A01-3"]), task("A01-5", ["A01-1"])]);
   assert.deepEqual(shape(rows), ["0:A01-1", "1:A01-2", "2:A01-3", "3:A01-4", "1:A01-5"]);

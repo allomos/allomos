@@ -1036,6 +1036,11 @@ mod tests {
             open_taskbag(root.clone()).last_changed.get("A01-01"),
             Some(&h.events[0].at)
         );
+        // Creation time is the oldest event for the task.
+        assert_eq!(
+            open_taskbag(root.clone()).created.get("A01-01"),
+            Some(&h.events.last().unwrap().at)
+        );
         // Newest first.
         assert_eq!(seen, [("plan", None, "app"), ("add task", None, "app")]);
         // The task pane's "New…" iteration, as `messenger.addIterationAndPlan` sends it: added

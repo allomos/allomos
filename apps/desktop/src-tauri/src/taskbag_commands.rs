@@ -45,6 +45,8 @@ pub(crate) struct Opened {
     /// When each task last changed, by task ID (Task-A01-52), from the history: the Iterations
     /// tab's sort menu orders by it.
     pub(crate) last_changed: std::collections::BTreeMap<String, String>,
+    /// When each task was created, by task ID, from the history: the sort menu orders by it.
+    pub(crate) created: std::collections::BTreeMap<String, String>,
     /// The card files agents reported as still in the project folder (Task-A00-30): the notice
     /// "N tasks keep their card files in the project folder" with **Update the taskbag…**.
     pub(crate) cards_outside: Vec<allomos_core::card::Outside>,
@@ -90,6 +92,7 @@ pub(crate) fn open_taskbag(root: PathBuf) -> Opened {
         links: allomos_store::links::by_task(&root),
         branches: allomos_store::branches(&root),
         last_changed: allomos_store::last_changed(&root),
+        created: allomos_store::created(&root),
         cards_outside,
         old_handoffs: allomos_store::handoff::legacy(&root),
         root,
@@ -135,6 +138,7 @@ pub(crate) fn create_taskbag(
         links: Default::default(),
         branches: Default::default(),
         last_changed: Default::default(),
+        created: Default::default(),
         cards_outside: Vec::new(),
         old_handoffs: Vec::new(),
         versions: Default::default(),
@@ -236,6 +240,7 @@ pub(crate) fn move_taskbag_aside(root: PathBuf) -> Result<Opened, Problem> {
         links: Default::default(),
         branches: Default::default(),
         last_changed: Default::default(),
+        created: Default::default(),
         cards_outside: Vec::new(),
         old_handoffs: Vec::new(),
         versions: Default::default(),
