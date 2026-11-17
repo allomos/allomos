@@ -78,7 +78,8 @@ fn apply(root: &Path, path: &Path, action: &str) -> Result<CodexRules, Problem> 
         }
     };
     let name = allomos_store::saved_owner_name();
-    let actor = crate::app_actor(name.as_deref()).unwrap_or(allomos_store::Actor::APP);
+    let actor =
+        crate::task_commands::app_actor(name.as_deref()).unwrap_or(allomos_store::Actor::APP);
     let lock = allomos_store::Lock::acquire(root, LOCK_WAIT)?;
     let loaded = lock.load();
     let bag = loaded

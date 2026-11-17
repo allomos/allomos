@@ -390,7 +390,7 @@ pub fn route(req: &Request, source: &dyn Source) -> Response {
             // What the desktop window reads when it opens a taskbag, so the companion page shows
             // the same views (Task-A04-02-03).
             "opened" => match shown() {
-                Some(root) => Response::json(200, &crate::open_taskbag(root)),
+                Some(root) => Response::json(200, &crate::taskbag_commands::open_taskbag(root)),
                 None => not_open(),
             },
             // Changes when any of the taskbag's files change: the page reads it again only then.
@@ -847,7 +847,7 @@ mod tests {
                 op: &str,
                 args: serde_json::Value,
             ) -> Result<serde_json::Value, allomos_core::Problem> {
-                crate::companion_change(root, by, op, args)
+                crate::task_commands::companion_change(root, by, op, args)
             }
         }
         let env = |k: &str| std::env::var(k).ok();
