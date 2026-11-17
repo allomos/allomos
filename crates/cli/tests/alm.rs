@@ -8487,6 +8487,65 @@ fn next_lists_lost_tasks_and_busy_windows() {
     assert!(v.get("issues").is_none_or(|i| i == &json!([])), "{v}");
 }
 
+/// The line limit (Task-A03-dapper008): a project setting, 1000 by default and not written until
+/// set; `alm file-size-settings` shows and changes it, refuses what is not a whole number of
+/// lines, and `alm claim`'s reminder names it. alm measures no file.
+#[test]
+fn file_size_settings_keep_the_limit_and_claim_names_it() {
+    let repo = filled();
+    let v = ok(&repo, &["file-size-settings"]);
+    assert_eq!(v["limit_lines"], 1000, "{v}");
+    assert_eq!(v["file_size"], Value::Null, "{v}");
+    let text = String::from_utf8_lossy(&alm(&repo, &["file-size-settings"]).stdout).into_owned();
+    assert!(text.contains("1000 (default)"), "{text}");
+
+    let v = ok(&repo, &["file-size-settings", "--limit", "1500"]);
+    assert_eq!(v["file_size"], json!({ "limit_lines": 1500 }), "{v}");
+    assert!(
+        v["changed_files"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|f| f == "project.json"),
+        "{v}"
+    );
+    for bad in ["0", "abc", "1.5"] {
+        refused(
+            &repo,
+            &["file-size-settings", "--limit", bad],
+            1,
+            "file_size_limit_invalid",
+        );
+    }
+    ok(&repo, &["ready", "A01-01"]);
+    let v = ok(
+        &repo,
+        &["--as", "s1", "claim", "A01-01", "--branch", "main"],
+    );
+    let reminder = v["before_planning"].as_str().unwrap();
+    assert!(reminder.contains("1500"), "{reminder}");
+    assert!(reminder.contains("file-size:"), "{reminder}");
+
+    let v = ok(&repo, &["file-size-settings", "--clear"]);
+    assert_eq!(v["file_size"], Value::Null);
+    assert_eq!(v["limit_lines"], 1000);
+    let project: Value = serde_json::from_str(
+        &fs::read_to_string(repo.join(".allomos/taskbag/project.json")).unwrap(),
+    )
+    .unwrap();
+    assert!(project.get("file_size").is_none());
+    let (_, v) = fj(&repo, &["list"]);
+    assert!(v.get("issues").is_none_or(|i| i == &json!([])), "{v}");
+    // The guide is a topic of its own, in the task language too.
+    let v = ok(&repo, &["guide", "file-size", "--language", "ja"]);
+    let guide = v["guide"].as_str().unwrap();
+    assert!(guide.starts_with("# ファイルサイズの確認"), "{guide}");
+    assert!(
+        guide.contains("alm ai-decided <id> \"file-size: "),
+        "{guide}"
+    );
+}
+
 /// Takeover (decision 0022 § 6 and § 7, Task-A01-sign613): a plain `alm claim` takes over a lost
 /// task, records the former holder in the claim's event, keeps the working branch and prints the
 /// commands to continue on it and where the former holder worked; a task that is not lost is
