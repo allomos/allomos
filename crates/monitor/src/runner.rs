@@ -392,6 +392,13 @@ impl Loop {
                 .iter()
                 .find(|(id, _)| *id == base)
                 .map(|(_, p)| p.display().to_string());
+            // Antigravity adds the taskbag and its other project folders to its workspace
+            // (Task-A03-latch882).
+            let dirs = if base == "antigravity_cli" {
+                terminal::workspace_dirs(&self.record.taskbag, &self.record.project)
+            } else {
+                Vec::new()
+            };
             let started = match (found, accounts::config_of(&agent, &accounts)) {
                 (Some(found), Ok(config)) => terminal::start_session(
                     &base,
@@ -402,6 +409,7 @@ impl Loop {
                     self.alm_dir.as_deref(),
                     config.as_ref().map(|(var, dir)| (*var, dir.as_path())),
                     self.record.run.quiet,
+                    &dirs,
                 ),
                 (None, _) => Err(terminal::ask_failed(&agent, "not found on this computer")),
                 (_, Err(why)) => Err(terminal::ask_failed(&agent, why)),

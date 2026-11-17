@@ -13,7 +13,7 @@ pub use allomos_monitor::terminal::{
 };
 use allomos_monitor::terminal::{
     ask_failed, find_tool, home, name, powershell_script, session_command, terminal_script,
-    tool_dirs,
+    tool_dirs, workspace_dirs,
 };
 
 /// One agent the person can ask.
@@ -305,8 +305,9 @@ pub fn copy_text(text: &str) -> Result<(), Problem> {
 
 /// Open one agent in `project` with `request`: through its link, or in a new terminal window
 /// with the request on the clipboard. Either way the agent is pointed at the app's own `alm`
-/// (Task-A03-16).
-pub fn ask(agent: &Agent, project: &Path, request: &str) -> Result<(), Problem> {
+/// (Task-A03-16). Antigravity in a terminal also adds the taskbag at `taskbag` and its other
+/// project folders to its workspace (Task-A03-latch882).
+pub fn ask(agent: &Agent, project: &Path, taskbag: &Path, request: &str) -> Result<(), Problem> {
     let id = agent.id.as_str();
     if !cfg!(any(target_os = "macos", windows)) {
         return Err(ask_failed(id, "not available on this system yet"));
@@ -319,6 +320,11 @@ pub fn ask(agent: &Agent, project: &Path, request: &str) -> Result<(), Problem> 
         }
     }
     let alm_dir = own_alm.as_deref().and_then(Path::parent);
+    let dirs = if id == "antigravity_cli" {
+        workspace_dirs(taskbag, project)
+    } else {
+        Vec::new()
+    };
     let program = match id {
         "claude_cli" => "claude".to_string(),
         "codex_cli" => "codex".to_string(),
@@ -331,13 +337,14 @@ pub fn ask(agent: &Agent, project: &Path, request: &str) -> Result<(), Problem> 
     let program = if id == "antigravity_cli" && !cfg!(windows) {
         let file = std::env::temp_dir().join(format!("allomos-request-{}.md", std::process::id()));
         std::fs::write(&file, request).map_err(|e| ask_failed(id, e))?;
-        session_command(id, &file, None).ok_or_else(|| ask_failed(id, "no way to open it"))?
+        session_command(id, &file, None, &dirs)
+            .ok_or_else(|| ask_failed(id, "no way to open it"))?
     } else {
         copy_to_clipboard(request).map_err(|e| ask_failed(id, e))?;
         program
     };
     if cfg!(windows) {
-        let script = powershell_script(project, &agent.found, alm_dir);
+        let script = powershell_script(project, &agent.found, alm_dir, &dirs);
         return new_console("powershell.exe")
             .args(["-NoExit", "-NoLogo", "-Command", &script])
             .spawn()

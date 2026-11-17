@@ -354,11 +354,21 @@ pub fn terminal_script(project: &Path, program: &str, alm_dir: Option<&Path>) ->
 
 /// What a new PowerShell window runs (Windows): the same, with `$env:PATH`. The tool is started
 /// by its full path: a new window does not always get the same `PATH`.
-pub fn powershell_script(project: &Path, found: &str, alm_dir: Option<&Path>) -> String {
+/// `dirs`: folders an Antigravity session adds to its workspace ([`workspace_dirs`]; empty for the
+/// other agents).
+pub fn powershell_script(
+    project: &Path,
+    found: &str,
+    alm_dir: Option<&Path>,
+    dirs: &[PathBuf],
+) -> String {
+    let args = add_dirs(dirs, powershell_quote);
     let start = format!(
-        "Set-Location -LiteralPath {}; & {}",
+        "Set-Location -LiteralPath {}; & {}{}{}",
         powershell_quote(&project.display().to_string()),
-        powershell_quote(found)
+        powershell_quote(found),
+        if args.is_empty() { "" } else { " " },
+        args.trim_end()
     );
     match alm_dir {
         Some(dir) => format!(
@@ -388,6 +398,46 @@ fn codex_quiet_policy() -> String {
     format!("{CODEX_QUIET_POLICY}{app_access}")
 }
 
+/// The folders an Antigravity (`agy`) session started in `project` adds to its workspace with
+/// `--add-dir` (Task-A03-latch882): the taskbag's folder, then each of the taskbag's project
+/// folders (`project_folders`) other than `project` itself, as absolute paths. agy's auto mode lets
+/// the session use files in its workspace without asking, so it no longer stops at "Allow access
+/// to this file?" for the taskbag's `project-notes.md` or another project folder (approver,
+/// 2026-11-17: every project folder of the taskbag, for sessions Allomos starts only; the person's
+/// agy settings are untouched). A folder missing on this computer is left out, and so is a folder
+/// that cannot be listed: the session then starts as it did before.
+pub fn workspace_dirs(taskbag: &Path, project: &Path) -> Vec<PathBuf> {
+    let whole = |p: &Path| allomos_store::tidy(&std::path::absolute(p).unwrap_or(p.to_path_buf()));
+    let project = whole(project);
+    let mut dirs = vec![whole(taskbag)];
+    if let Ok(folders) = allomos_store::folders::list(taskbag) {
+        dirs.extend(
+            folders
+                .into_iter()
+                .filter(|f| f.exists)
+                .map(|f| whole(&f.full)),
+        );
+    }
+    let mut out: Vec<PathBuf> = Vec::new();
+    for dir in dirs {
+        if dir != project && !out.contains(&dir) {
+            out.push(dir);
+        }
+    }
+    out
+}
+
+/// `--add-dir '<dir>' ` for each of `dirs`, quoted with `quote` (the shell's or PowerShell's).
+fn add_dirs(dirs: &[PathBuf], quote: fn(&str) -> String) -> String {
+    let mut out = String::new();
+    for dir in dirs {
+        out.push_str("--add-dir ");
+        out.push_str(&quote(&dir.display().to_string()));
+        out.push(' ');
+    }
+    out
+}
+
 /// The command line that starts a terminal agent with the request read from `file` (and the file
 /// removed once read), for Monitor ready tasks (Task-A03-moth285): `claude --session-id <id>`
 /// takes the session ID Allomos made, so the app knows the session before it claims; Codex picks
@@ -398,9 +448,15 @@ fn codex_quiet_policy() -> String {
 /// folder without a person approving each edit (Task-A03-plaza436). Only quiet monitored sessions
 /// set its approval policy to `never` and allow network access in the sandbox (Task-A03-trail745).
 /// On macOS they also allow the Allomos app in this process only, so Computer Use does not ask for
-/// app access. User settings are untouched.
-pub fn session_command(id: &str, file: &Path, session_id: Option<&str>) -> Option<String> {
-    session_command_with_quiet(id, file, session_id, false)
+/// app access. User settings are untouched. Antigravity adds `dirs` to its workspace
+/// ([`workspace_dirs`], Task-A03-latch882); the other agents ignore them.
+pub fn session_command(
+    id: &str,
+    file: &Path,
+    session_id: Option<&str>,
+    dirs: &[PathBuf],
+) -> Option<String> {
+    session_command_with_quiet(id, file, session_id, false, dirs)
 }
 
 fn session_command_with_quiet(
@@ -408,6 +464,7 @@ fn session_command_with_quiet(
     file: &Path,
     session_id: Option<&str>,
     quiet: bool,
+    dirs: &[PathBuf],
 ) -> Option<String> {
     let file = shell_quote(&file.display().to_string());
     let request = format!("\"$(cat {file}; rm -f {file})\"");
@@ -424,7 +481,7 @@ fn session_command_with_quiet(
                 String::new()
             }
         )),
-        ("antigravity_cli", _) => Some(format!("agy -i {request}")),
+        ("antigravity_cli", _) => Some(format!("agy {}-i {request}", add_dirs(dirs, shell_quote))),
         _ => None,
     }
 }
@@ -438,8 +495,11 @@ pub fn powershell_session(
     session_id: Option<&str>,
     alm_dir: Option<&Path>,
     config: Option<(&str, &Path)>,
+    dirs: &[PathBuf],
 ) -> String {
-    powershell_session_with_quiet(id, project, found, file, session_id, alm_dir, config, false)
+    powershell_session_with_quiet(
+        id, project, found, file, session_id, alm_dir, config, false, dirs,
+    )
 }
 
 fn powershell_session_with_quiet(
@@ -451,6 +511,7 @@ fn powershell_session_with_quiet(
     alm_dir: Option<&Path>,
     config: Option<(&str, &Path)>,
     quiet: bool,
+    dirs: &[PathBuf],
 ) -> String {
     let file = powershell_quote(&file.display().to_string());
     let session = match (id, session_id) {
@@ -463,7 +524,7 @@ fn powershell_session_with_quiet(
                 String::new()
             }
         ),
-        ("antigravity_cli", _) => "-i ".to_string(),
+        ("antigravity_cli", _) => format!("{}-i ", add_dirs(dirs, powershell_quote)),
         _ => String::new(),
     };
     let start = format!(
@@ -510,7 +571,8 @@ pub fn plain_session_id(id: &str) -> bool {
 /// Return. It never edits the user's Codex configuration; a quiet monitored Codex session gets
 /// only the per-process approval and network settings approved for this task.
 /// `id` is the agent (`claude_cli`, `codex_cli`, `antigravity_cli`), `found` its command's path;
-/// `alm_dir` the folder of the `alm` the session should use, put first in its `PATH`.
+/// `alm_dir` the folder of the `alm` the session should use, put first in its `PATH`; `dirs` the
+/// folders an Antigravity session adds to its workspace ([`workspace_dirs`]).
 pub fn start_session(
     id: &str,
     found: &str,
@@ -520,6 +582,7 @@ pub fn start_session(
     alm_dir: Option<&Path>,
     config: Option<(&str, &Path)>,
     quiet: bool,
+    dirs: &[PathBuf],
 ) -> Result<Option<crate::session_tab::SessionTab>, Problem> {
     if !cfg!(any(target_os = "macos", windows)) {
         return Err(ask_failed(id, "not available on this system yet"));
@@ -532,7 +595,7 @@ pub fn start_session(
         .map(|d| d.as_nanos())
         .unwrap_or_default();
     let file = std::env::temp_dir().join(format!("allomos-request-{stamp}.txt"));
-    let Some(program) = session_command_with_quiet(id, &file, session_id, quiet) else {
+    let Some(program) = session_command_with_quiet(id, &file, session_id, quiet, dirs) else {
         return Err(ask_failed(id, "no way to start it"));
     };
     // An extra account's folder variable goes in front of the command, for that command only.
@@ -540,7 +603,7 @@ pub fn start_session(
     std::fs::write(&file, request).map_err(|e| ask_failed(id, e))?;
     if cfg!(windows) {
         let script = powershell_session_with_quiet(
-            id, project, found, &file, session_id, alm_dir, config, quiet,
+            id, project, found, &file, session_id, alm_dir, config, quiet, dirs,
         );
         return new_console("powershell.exe")
             .args(["-NoExit", "-NoLogo", "-Command", &script])
@@ -659,19 +722,19 @@ mod tests {
     fn monitored_sessions_start_with_the_request_sent() {
         let file = Path::new("/tmp/allomos-request-1.txt");
         assert_eq!(
-            session_command("claude_cli", file, Some("0b1c-2d")).as_deref(),
+            session_command("claude_cli", file, Some("0b1c-2d"), &[]).as_deref(),
             Some(
                 "claude --session-id '0b1c-2d' \"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\""
             )
         );
         assert_eq!(
-            session_command("codex_cli", file, Some("ignored")).as_deref(),
+            session_command("codex_cli", file, Some("ignored"), &[]).as_deref(),
             Some(
                 "codex --sandbox workspace-write \"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\""
             )
         );
         assert_eq!(
-            session_command("antigravity_cli", file, Some("ignored")).as_deref(),
+            session_command("antigravity_cli", file, Some("ignored"), &[]).as_deref(),
             Some(
                 "agy -i \"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\""
             )
@@ -684,7 +747,8 @@ mod tests {
                 Path::new(r"C:\t\r.txt"),
                 None,
                 None,
-                None
+                None,
+                &[]
             ),
             r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\agy\bin\agy.exe' -i $request"
         );
@@ -696,11 +760,12 @@ mod tests {
                 Path::new(r"C:\t\r.txt"),
                 Some("ignored"),
                 None,
-                None
+                None,
+                &[]
             ),
             r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\npm\codex.cmd' --sandbox workspace-write $request"
         );
-        assert_eq!(session_command("claude_app", file, None), None);
+        assert_eq!(session_command("claude_app", file, None, &[]), None);
         assert!(plain_session_id("8f0e5a52-1c2d-4e3f-9a0b-1c2d3e4f5a6b"));
         assert!(!plain_session_id("x; rm -rf ~"));
         assert!(!plain_session_id(""));
@@ -713,11 +778,123 @@ mod tests {
                 Path::new(r"C:\t\r.txt"),
                 Some("ab-12"),
                 None,
-                None
+                None,
+                &[]
             ),
             format!(
                 r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-12' $request"
             )
+        );
+    }
+
+    /// Task-A03-latch882: an Antigravity session adds the taskbag and the taskbag's other project
+    /// folders to its workspace, one `--add-dir` each, quoted (spaces too); the other agents
+    /// take none.
+    #[test]
+    fn antigravity_adds_the_taskbag_and_its_project_folders_to_its_workspace() {
+        let file = Path::new("/tmp/allomos-request-1.txt");
+        let request = "\"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\"";
+        let one = [PathBuf::from("/w/my tb/.allomos/taskbag")];
+        assert_eq!(
+            session_command_with_quiet("antigravity_cli", file, None, true, &one).as_deref(),
+            Some(format!("agy --add-dir '/w/my tb/.allomos/taskbag' -i {request}").as_str())
+        );
+        let several = [
+            PathBuf::from("/w/tb/.allomos/taskbag"),
+            PathBuf::from("/w/site"),
+            PathBuf::from("/w/O'Neil app"),
+        ];
+        assert_eq!(
+            session_command("antigravity_cli", file, None, &several).as_deref(),
+            Some(
+                format!(
+                    "agy --add-dir '/w/tb/.allomos/taskbag' --add-dir '/w/site' --add-dir '/w/O'\\''Neil app' -i {request}"
+                )
+                .as_str()
+            )
+        );
+        assert_eq!(
+            session_command("codex_cli", file, None, &several).as_deref(),
+            Some(format!("codex --sandbox workspace-write {request}").as_str())
+        );
+        let windows_one = [PathBuf::from(r"C:\my tb\.allomos\taskbag")];
+        let windows_several = [
+            PathBuf::from(r"C:\tb\.allomos\taskbag"),
+            PathBuf::from(r"C:\site"),
+        ];
+        let start = r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\agy\bin\agy.exe'";
+        for (dirs, args) in [
+            (&windows_one[..], r"--add-dir 'C:\my tb\.allomos\taskbag' "),
+            (
+                &windows_several[..],
+                r"--add-dir 'C:\tb\.allomos\taskbag' --add-dir 'C:\site' ",
+            ),
+        ] {
+            assert_eq!(
+                powershell_session_with_quiet(
+                    "antigravity_cli",
+                    Path::new(r"C:\p"),
+                    r"C:\agy\bin\agy.exe",
+                    Path::new(r"C:\t\r.txt"),
+                    None,
+                    None,
+                    None,
+                    true,
+                    dirs
+                ),
+                format!("{start} {args}-i $request")
+            );
+        }
+        // Opened from the app on Windows: the request is pasted, the folders are still added.
+        assert_eq!(
+            powershell_script(
+                Path::new(r"C:\p"),
+                r"C:\agy\bin\agy.exe",
+                None,
+                &windows_several
+            ),
+            r"Set-Location -LiteralPath 'C:\p'; & 'C:\agy\bin\agy.exe' --add-dir 'C:\tb\.allomos\taskbag' --add-dir 'C:\site'"
+        );
+    }
+
+    /// Task-A03-latch882: the folders come from the taskbag: the taskbag itself, then every
+    /// project folder but the one the session starts in, absolute; a missing folder is left out.
+    #[cfg(unix)]
+    #[test]
+    fn workspace_dirs_are_the_taskbag_and_its_other_project_folders() {
+        let dir = TempDir::new("workspace");
+        let w = dir.path();
+        let taskbag = w.join("tb/.allomos/taskbag");
+        std::fs::create_dir_all(&taskbag).unwrap();
+        for f in ["app", "my site", "docs"] {
+            std::fs::create_dir_all(w.join(f)).unwrap();
+        }
+        let write = |folders: &str| {
+            std::fs::write(
+                taskbag.join("project.json"),
+                format!(
+                    r#"{{"format":"allomos/9","id":"allomos-test-1","name":"P","labels":[],"project_folders":[{folders}]}}"#
+                ),
+            )
+            .unwrap();
+        };
+        // One project folder: only the taskbag is added.
+        write(r#"{"name":"app","path":"../app"}"#);
+        let listed = allomos_store::folders::list(&taskbag);
+        assert!(listed.is_ok(), "{listed:?}");
+        assert_eq!(workspace_dirs(&taskbag, &w.join("app")), [taskbag.clone()]);
+        // Several: the taskbag, then the others, in their order; a missing one is left out.
+        write(
+            r#"{"name":"app","path":"../app"},{"name":"site","path":"../my site"},{"name":"gone","path":"../gone"},{"name":"docs","path":"../docs"}"#,
+        );
+        assert_eq!(
+            workspace_dirs(&taskbag, &w.join("app")),
+            [taskbag.clone(), w.join("my site"), w.join("docs")]
+        );
+        // Started in another of them: that one is the workspace already.
+        assert_eq!(
+            workspace_dirs(&taskbag, &w.join("my site")),
+            [taskbag.clone(), w.join("app"), w.join("docs")]
         );
     }
 
@@ -731,21 +908,21 @@ mod tests {
             ""
         };
         assert_eq!(
-            session_command_with_quiet("codex_cli", file, None, true).as_deref(),
+            session_command_with_quiet("codex_cli", file, None, true, &[]).as_deref(),
             Some(format!(
                 "codex --sandbox workspace-write --ask-for-approval never --config sandbox_workspace_write.network_access=true {app_access}{request}"
             ).as_str())
         );
         assert_eq!(
-            session_command("codex_cli", file, None).as_deref(),
+            session_command("codex_cli", file, None, &[]).as_deref(),
             Some(format!("codex --sandbox workspace-write {request}").as_str())
         );
         assert_eq!(
-            session_command_with_quiet("claude_cli", file, Some("ab-12"), true).as_deref(),
+            session_command_with_quiet("claude_cli", file, Some("ab-12"), true, &[]).as_deref(),
             Some(format!("claude --session-id 'ab-12' {request}").as_str())
         );
         assert_eq!(
-            session_command_with_quiet("antigravity_cli", file, None, true).as_deref(),
+            session_command_with_quiet("antigravity_cli", file, None, true, &[]).as_deref(),
             Some(format!("agy -i {request}").as_str())
         );
 
@@ -758,7 +935,8 @@ mod tests {
                 None,
                 None,
                 None,
-                true
+                true,
+                &[]
             ),
             format!(
                 "Set-Location -LiteralPath 'C:\\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\\t\\r.txt'; Remove-Item -LiteralPath 'C:\\t\\r.txt'; & 'C:\\npm\\codex.cmd' --sandbox workspace-write --ask-for-approval never --config sandbox_workspace_write.network_access=true {app_access}$request"
@@ -782,7 +960,8 @@ mod tests {
                 Path::new(r"C:\t\r.txt"),
                 None,
                 None,
-                Some(("CODEX_HOME", Path::new(r"C:\acct")))
+                Some(("CODEX_HOME", Path::new(r"C:\acct"))),
+                &[]
             )
             .starts_with(r"${env:CODEX_HOME} = 'C:\acct'; Set-Location -LiteralPath 'C:\p';"),
             true
@@ -807,14 +986,15 @@ mod tests {
             powershell_script(
                 Path::new(r"C:\p"),
                 found,
-                Some(Path::new(r"C:\Apps\Allomos"))
+                Some(Path::new(r"C:\Apps\Allomos")),
+                &[]
             ),
             format!(
                 r"$env:PATH = 'C:\Apps\Allomos;' + $env:PATH; Set-Location -LiteralPath 'C:\p'; & '{found}'"
             )
         );
         assert_eq!(
-            powershell_script(Path::new(r"C:\p"), found, None),
+            powershell_script(Path::new(r"C:\p"), found, None, &[]),
             format!(r"Set-Location -LiteralPath 'C:\p'; & '{found}'")
         );
     }
