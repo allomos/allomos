@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "./i18n";
+import { AnchoredPopover } from "./AnchoredPopover";
 import { difficultyOf, difficultyText, levelItems, levelMenuEdit, levelText } from "./difficultyFlow";
 import { WhoForm } from "./WhoForm";
 import { isProblem, type Edit, type Task } from "./types";
@@ -35,6 +36,7 @@ export function DifficultyMenu({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const box = useRef<HTMLSpanElement>(null);
+  const popover = useRef<HTMLDivElement>(null);
 
   const close = () => {
     setOpen(false);
@@ -45,7 +47,8 @@ export function DifficultyMenu({
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (!box.current?.contains(e.target as Node)) close();
+      const target = e.target as Node;
+      if (!box.current?.contains(target) && !popover.current?.contains(target)) close();
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
@@ -117,7 +120,12 @@ export function DifficultyMenu({
         {text}
       </button>
       {open && (
-        <div className="sort-popover state-popover difficulty-popover" role="menu" aria-label={t("difficulty_menu.label")}>
+        <AnchoredPopover
+          anchorRef={box}
+          popoverRef={popover}
+          className="sort-popover state-popover difficulty-popover"
+          label={t("difficulty_menu.label")}
+        >
           {pending ? (
             <WhoForm
               name={name}
@@ -149,7 +157,7 @@ export function DifficultyMenu({
               {error && <p className="banner error small state-why">{error}</p>}
             </>
           )}
-        </div>
+        </AnchoredPopover>
       )}
     </span>
   );

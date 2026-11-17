@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useI18n, useTaskT } from "./i18n";
+import { AnchoredPopover } from "./AnchoredPopover";
 import { stateItems, stateMenuEdit, type StateWhy } from "./editFlow";
 import { isPlainEnter } from "./enterKey";
 import { WhoForm } from "./WhoForm";
@@ -39,6 +40,7 @@ export function StateMenu({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const box = useRef<HTMLSpanElement>(null);
+  const popover = useRef<HTMLDivElement>(null);
 
   const close = () => {
     setOpen(false);
@@ -50,7 +52,8 @@ export function StateMenu({
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (!box.current?.contains(e.target as Node)) close();
+      const target = e.target as Node;
+      if (!box.current?.contains(target) && !popover.current?.contains(target)) close();
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
@@ -140,7 +143,12 @@ export function StateMenu({
         {stateText}
       </button>
       {open && (
-        <div className="sort-popover state-popover" role="menu" aria-label={t("state_menu.label")}>
+        <AnchoredPopover
+          anchorRef={box}
+          popoverRef={popover}
+          className="sort-popover state-popover"
+          label={t("state_menu.label")}
+        >
           {pending ? (
             <WhoForm
               name={name}
@@ -204,7 +212,7 @@ export function StateMenu({
               {error && <p className="banner error small state-why">{error}</p>}
             </>
           )}
-        </div>
+        </AnchoredPopover>
       )}
     </span>
   );
