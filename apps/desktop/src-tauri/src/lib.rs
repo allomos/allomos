@@ -12,6 +12,7 @@ mod for_you;
 mod former_worktree;
 mod heartbeat_settings;
 mod lan;
+mod lan_commands;
 mod monitor_loop;
 mod monitor_menu;
 mod monitor_pause;
@@ -24,6 +25,7 @@ mod tab_drag;
 mod task_change;
 mod taskbag_watch;
 mod update;
+mod update_commands;
 mod window_list;
 mod windows;
 
@@ -1440,317 +1442,10 @@ fn set_handoff_rules(
     handoff_settings_of(&root)
 }
 
-/// "Allow devices on your network to view" (Task-A04-02-01): the server while it runs, and the
-/// paired devices (Task-A04-02-02).
-struct Lan {
-    server: Mutex<Option<lan::Server>>,
-    pairing: pairing::Pairing,
-}
-
-impl Lan {
-    fn new() -> Lan {
-        Lan {
-            server: Mutex::new(None),
-            pairing: pairing::Pairing::load(allomos_store::settings_dir().as_deref()),
-        }
-    }
-}
-
-/// Tells the "Devices on your network" dialog that a request came or changed.
-const PAIRING_EVENT: &str = "lan:pairing";
-
-/// Record a pairing (`pair`) or a removal (`unpair`) in the history of every taskbag a window shows
-/// (approver, 2026-10-25, A04-02 decision 5): a project event whose `device` field (new, so older
-/// Allomos versions read past it) names the device. A taskbag that cannot be written to now is
-/// left out.
-fn record_pairing(app: &AppHandle, command: &str, device: &str) {
-    for root in lan::Source::open_taskbags(&AppSource(app.clone())) {
-        let Ok(lock) = allomos_store::Lock::acquire(&root, std::time::Duration::from_secs(5))
-        else {
-            continue;
-        };
-        let Some(bag) = lock.load().taskbag else {
-            continue;
-        };
-        let name = serde_json::Value::String(device.to_string());
-        let (from, to) = if command == "pair" {
-            (None, Some(name.clone()))
-        } else {
-            (Some(name.clone()), None)
-        };
-        let mut event = allomos_store::Actor::APP.event(
-            command,
-            allomos_core::event::Kind::Project,
-            Some(&bag.project.id),
-            vec![allomos_core::event::Change {
-                field: "device".into(),
-                from,
-                to,
-                extra: Default::default(),
-            }],
-        );
-        event.extra.insert("device".into(), name);
-        let _ = lock.record(&event, |_| Ok(()));
-    }
-}
-
-/// What the web interface's server reads from the app: its built files, and the taskbags the
-/// windows show.
-struct AppSource(AppHandle);
-
-impl lan::Source for AppSource {
-    fn asset(&self, path: &str) -> Option<(Vec<u8>, String)> {
-        let asset = self.0.asset_resolver().get(path.to_string())?;
-        Some((asset.bytes().to_vec(), asset.mime_type().to_string()))
-    }
-    fn open_taskbags(&self) -> Vec<PathBuf> {
-        self.0.state::<Windows>().open_taskbags()
-    }
-    fn pairing(&self) -> &pairing::Pairing {
-        &self.0.state::<Lan>().inner().pairing
-    }
-    fn pairing_changed(&self) {
-        let _ = self.0.emit(PAIRING_EVENT, ());
-    }
-    fn paired(&self, device: &pairing::Device) {
-        record_pairing(&self.0, "pair", &device.name);
-    }
-    fn change(
-        &self,
-        root: &Path,
-        by: &str,
-        op: &str,
-        args: serde_json::Value,
-    ) -> Result<serde_json::Value, Problem> {
-        companion_change(root, by, op, args)
-    }
-}
-
-/// What the "Devices on your network" dialog shows.
-#[derive(Serialize)]
-struct LanStatus {
-    on: bool,
-    /// The port in use, and the address and its QR code (SVG) while on; the address is `None`
-    /// when this computer has no network address.
-    port: Option<u16>,
-    url: Option<String>,
-    qr_svg: Option<String>,
-    /// The certificate's SHA-256 fingerprint, to compare with what the browser shows.
-    fingerprint: Option<String>,
-    default_port: u16,
-    /// Why it could not start, in plain words, when it could not.
-    error: Option<String>,
-}
-
-fn lan_status_of(lan: &Lan, error: Option<String>) -> LanStatus {
-    let server = lan.server.lock().unwrap_or_else(|e| e.into_inner());
-    let port = server.as_ref().map(|s| s.port);
-    let url = port.and_then(|p| lan::local_address().map(|ip| lan::address(ip, p)));
-    let fingerprint = server
-        .as_ref()
-        .and_then(|_| allomos_store::settings_dir())
-        .and_then(|d| lan::identity(&d).ok())
-        .map(|id| id.fingerprint);
-    LanStatus {
-        on: port.is_some(),
-        port,
-        qr_svg: url.as_deref().and_then(lan::qr_svg),
-        url,
-        fingerprint,
-        default_port: lan::DEFAULT_PORT,
-        error,
-    }
-}
-
-/// Start the server (it was off), or say why it cannot.
-fn start_lan(app: &AppHandle, lan: &Lan) -> Result<(), String> {
-    let mut server = lan.server.lock().unwrap_or_else(|e| e.into_inner());
-    if server.is_some() {
-        return Ok(());
-    }
-    let dir =
-        allomos_store::settings_dir().ok_or("This computer has no settings folder for Allomos.")?;
-    let id = lan::identity(&dir).map_err(|e| format!("The certificate could not be made: {e}"))?;
-    let source: std::sync::Arc<dyn lan::Source> = std::sync::Arc::new(AppSource(app.clone()));
-    let started = lan::start(lan::DEFAULT_PORT, &id, source)
-        .map_err(|e| format!("No port could be opened: {e}"))?;
-    *server = Some(started);
-    Ok(())
-}
-
-#[tauri::command]
-fn lan_status(lan: tauri::State<Lan>) -> LanStatus {
-    lan_status_of(&lan, None)
-}
-
-/// Turn "Allow devices on your network to view" on or off, and remember it. Off stops listening.
-#[tauri::command]
-fn set_lan_viewing(app: AppHandle, lan: tauri::State<Lan>, on: bool) -> LanStatus {
-    let _ = allomos_store::save_lan_viewing(on);
-    let error = if on {
-        start_lan(&app, &lan).err()
-    } else {
-        if let Some(server) = lan.server.lock().unwrap_or_else(|e| e.into_inner()).take() {
-            server.stop();
-        }
-        None
-    };
-    lan_status_of(&lan, error)
-}
-
-/// The requests waiting for an answer and the paired devices (Task-A04-02-02).
-#[tauri::command]
-fn lan_pairing(lan: tauri::State<Lan>) -> pairing::View {
-    lan.pairing.view()
-}
-
-/// Approve (a code is shown) or refuse a device's request to pair.
-#[tauri::command]
-fn answer_pairing(lan: tauri::State<Lan>, id: String, approve: bool) -> pairing::View {
-    lan.pairing.answer(&id, approve);
-    lan.pairing.view()
-}
-
-/// Remove a paired device: its access ends at once, and the removal is recorded.
-#[tauri::command]
-fn remove_paired_device(app: AppHandle, lan: tauri::State<Lan>, id: String) -> pairing::View {
-    if let Some(device) = lan.pairing.remove(&id) {
-        record_pairing(&app, "unpair", &device.name);
-    }
-    lan.pairing.view()
-}
-
 /// One task's history, newest first, and when the taskbag started recording (Task-A01-17).
 #[tauri::command(async)]
 fn task_history(root: PathBuf, id: String) -> allomos_store::events::History {
     allomos_store::events::history(&root, &id)
-}
-
-/// Where a newer Allomos is downloaded (owner, 2026-10-12: the GitHub releases page, even
-/// while it is private). A fixed address: the window cannot ask to open any other.
-const DOWNLOAD_URL: &str = "https://github.com/allomos/allomos/releases";
-
-/// Open the download page in the web browser, for a taskbag that needs a newer Allomos.
-#[tauri::command]
-fn open_download_page() -> Result<(), Problem> {
-    opener()
-        .arg(DOWNLOAD_URL)
-        .spawn()
-        .map(drop)
-        .map_err(|e| Problem::OpenFailed {
-            path: DOWNLOAD_URL.to_string(),
-            detail: e.to_string(),
-        })
-}
-
-/// Whether a newer Allomos is on GitHub (Task-A07-16). `asked` when the person chose
-/// **Check for Updates…**: GitHub is asked now, and a skipped version is offered again.
-/// Otherwise GitHub is asked only when the last answer is a day old.
-///
-/// When a newer version is known, its installer is downloaded and checked in the background
-/// (Task-A07-17); when the download has ended, kept or not, every window hears `update:ready`
-/// and asks again. While it downloads, the menu's **Download Allomos <version>…** waits
-/// (A07-glove300); once it has failed, that item opens the release page.
-///
-/// With **Check for updates automatically** off (Task-A07-meter647), GitHub is asked only from
-/// the menu. With **Download updates automatically** off (Task-A07-trunk220), a check does not
-/// download in the background; the menu's **Check for Updates…** still does, because the person asked.
-#[tauri::command]
-async fn update_status(app: AppHandle, asked: bool) -> update::UpdateStatus {
-    // What the check remembers before it runs: put back if the person cancels its download
-    // (Task-A07-fact210).
-    let before = allomos_store::update_memory();
-    let mut status = update::check(asked, allomos_store::auto_check());
-    if update::should_download(
-        asked,
-        allomos_store::auto_download(),
-        status.available.as_deref(),
-        status.ready.as_deref(),
-    ) {
-        if let Some(version) = status.available.clone() {
-            if update::prepare_in_background(version.clone(), before, move || {
-                let _ = app.emit(UPDATE_READY_EVENT, ());
-            }) {
-                status.preparing = Some(version);
-            }
-        }
-    }
-    status
-}
-
-/// How much of the newer Allomos's installer is downloaded, in percent, while it downloads
-/// (Task-A07-fact210): the banner and the menu item show it. `None` when it is not known.
-#[tauri::command]
-fn update_progress() -> Option<u8> {
-    update::download_percent()
-}
-
-/// **Cancel** on the update notice while the installer downloads (Task-A07-fact210): the download
-/// stops, the check that found it is undone, and every window looks again. `false` when nothing
-/// was downloading.
-#[tauri::command]
-fn cancel_update_download() -> bool {
-    update::cancel_download()
-}
-
-/// **Settings… › General › Check for updates automatically** on or off (Task-A07-meter647). Every
-/// window looks at updates again at once (the `update:ready` event), so the change shows without
-/// waiting for the hourly look: turned off, a notice goes away; turned on, a day-old check runs now.
-#[tauri::command]
-fn set_auto_check(app: AppHandle, on: bool) -> Result<(), Problem> {
-    allomos_store::save_auto_check(on).map_err(|e| Problem::WriteFailed {
-        path: "settings.json".into(),
-        detail: e.to_string(),
-    })?;
-    let _ = app.emit(UPDATE_READY_EVENT, ());
-    Ok(())
-}
-
-/// **Settings… › General › Download updates automatically** on or off (Task-A07-trunk220). The
-/// window looks again at once (the `update:ready` event): turned on, a newer version the last
-/// check found is downloaded now.
-#[tauri::command]
-fn set_auto_download(app: AppHandle, on: bool) -> Result<(), Problem> {
-    allomos_store::save_auto_download(on).map_err(|e| Problem::WriteFailed {
-        path: "settings.json".into(),
-        detail: e.to_string(),
-    })?;
-    let _ = app.emit(UPDATE_READY_EVENT, ());
-    Ok(())
-}
-
-/// **Restart to Update to Allomos <version>** (Task-A07-17): run the checked installer and
-/// quit; the new version starts by itself. If the person cancels macOS's password prompt,
-/// nothing changes. A failure is told to every window, and this version keeps running.
-fn restart_to_update(app: AppHandle) {
-    tauri::async_runtime::spawn_blocking(move || {
-        // Task-A03-bowl641: while monitoring runs, say first that it keeps running; Cancel changes nothing.
-        if let Some(sessions) = monitor_pause::running_sessions() {
-            if !monitor_pause::confirm_blocking(&app, monitor_pause::Action::Restart, sessions) {
-                return;
-            }
-        }
-        match update::restart_to_update() {
-            Ok(update::Restart::Quit) => app.exit(0),
-            Ok(update::Restart::Cancelled) => {}
-            Err(detail) => {
-                let _ = app.emit(UPDATE_FAILED_EVENT, Problem::UpdateFailed { detail });
-            }
-        }
-    });
-}
-
-/// **Restart to Update** on the update notice: the same as the menu item, so the two never offer
-/// different steps.
-#[tauri::command]
-fn restart_to_update_now(app: AppHandle) {
-    restart_to_update(app);
-}
-
-/// "Skip this version" on the update notice.
-#[tauri::command]
-fn skip_update(version: String) {
-    let _ = allomos_store::skip_update(&version);
 }
 
 /// The taskbag's format compared with this Allomos's, whether or not an agent is connected: the
@@ -2113,8 +1808,6 @@ const ABOUT_ID: &str = "about";
 /// The About window's label: not a project window, so menu commands never go to it.
 const ABOUT_WINDOW: &str = "about";
 const CHECK_UPDATES_EVENT: &str = "menu:check_updates";
-const UPDATE_READY_EVENT: &str = "update:ready";
-const UPDATE_FAILED_EVENT: &str = "update:failed";
 
 /// What the update menu item does when chosen (Task-A07-16, Task-A07-17).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -2527,7 +2220,7 @@ pub fn run() {
         .manage(tab_drag::Drag::default())
         .manage(taskbag_watch::Following::default())
         .manage(monitor_loop::MonitorLoop::default())
-        .manage(Lan::new())
+        .manage(lan_commands::Lan::new())
         .manage(for_you::ForYou::default())
         // The first window starts hidden (tauri.conf.json) and opens sized to its screen.
         .setup(|app| {
@@ -2545,7 +2238,7 @@ pub fn run() {
             // Remembered on (Task-A04-02-01): listen again from the start.
             if allomos_store::lan_viewing() {
                 let handle = app.handle().clone();
-                let _ = start_lan(&handle, &handle.state::<Lan>());
+                let _ = lan_commands::start_lan(&handle, &handle.state::<lan_commands::Lan>());
             }
             Ok(())
         })
@@ -2607,9 +2300,9 @@ pub fn run() {
                 match action {
                     UpdateAction::Check => send(CHECK_UPDATES_EVENT, None),
                     UpdateAction::Download => {
-                        let _ = open_download_page();
+                        let _ = update_commands::open_download_page();
                     }
-                    UpdateAction::Restart => restart_to_update(app.clone()),
+                    UpdateAction::Restart => update_commands::restart_to_update(app.clone()),
                 }
             } else if id == CLEAR_RECENT_ID {
                 send(CLEAR_RECENT_EVENT, None);
@@ -2655,8 +2348,8 @@ pub fn run() {
             for_you::for_you_project,
             for_you::set_for_you_title,
             for_you::human_queue,
-            set_auto_check,
-            set_auto_download,
+            update_commands::set_auto_check,
+            update_commands::set_auto_download,
             inspect_folder,
             open_taskbag,
             taskbag_stamp,
@@ -2665,12 +2358,12 @@ pub fn run() {
             version_check,
             move_taskbag_aside,
             taskbag_format,
-            open_download_page,
-            update_status,
-            update_progress,
-            cancel_update_download,
-            skip_update,
-            restart_to_update_now,
+            update_commands::open_download_page,
+            update_commands::update_status,
+            update_commands::update_progress,
+            update_commands::cancel_update_download,
+            update_commands::skip_update,
+            update_commands::restart_to_update_now,
             set_update_item,
             handoff_settings,
             set_handoff_rules,
@@ -2691,8 +2384,8 @@ pub fn run() {
             this_computer,
             export_public_key,
             replace_key,
-            lan_status,
-            set_lan_viewing,
+            lan_commands::lan_status,
+            lan_commands::set_lan_viewing,
             rename_project,
             project_folders,
             bind_folder,
@@ -2702,9 +2395,9 @@ pub fn run() {
             show_folder_in_file_manager,
             set_task_language,
             change_ladder,
-            lan_pairing,
-            answer_pairing,
-            remove_paired_device,
+            lan_commands::lan_pairing,
+            lan_commands::answer_pairing,
+            lan_commands::remove_paired_device,
             create_taskbag,
             task_history,
             show_in_file_manager,
