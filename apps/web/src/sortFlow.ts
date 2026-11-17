@@ -76,3 +76,19 @@ export function sortTasks(
   const sign = sort.dir === "asc" ? 1 : -1;
   return [...tasks].sort((a, b) => sign * primary(a, b) || byId(a, b));
 }
+
+/** Keep the remembered order for tasks already in a group, while appending any new tasks in their
+ * current sorted order. This lets the list keep its place while a local edit changes `changed`. */
+export function keepTaskOrder(tasks: Task[], remembered: string[] | undefined): Task[] {
+  if (!remembered) return tasks;
+  const rank = new Map(remembered.map((id, i) => [id, i]));
+  const current = new Map(tasks.map((task, i) => [task.id, i]));
+  return [...tasks].sort((a, b) => {
+    const x = rank.get(a.id);
+    const y = rank.get(b.id);
+    if (x !== undefined && y !== undefined) return x - y;
+    if (x !== undefined) return -1;
+    if (y !== undefined) return 1;
+    return (current.get(a.id) ?? 0) - (current.get(b.id) ?? 0);
+  });
+}

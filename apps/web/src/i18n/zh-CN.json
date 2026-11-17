@@ -1021,6 +1021,7 @@
   "sort.by_name": "名称",
   "sort.by_changed": "修改时间",
   "sort.by_created": "创建时间",
+  "sort.reorder": "顺序已变 · 重排",
   "sort.id_asc": "A → Z",
   "sort.id_desc": "Z → A",
   "sort.name_asc": "A → Z",

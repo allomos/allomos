@@ -1021,6 +1021,7 @@
   "sort.by_name": "Name",
   "sort.by_changed": "Modified",
   "sort.by_created": "Created",
+  "sort.reorder": "Order changed · Reorder",
   "sort.id_asc": "A → Z",
   "sort.id_desc": "Z → A",
   "sort.name_asc": "A → Z",

@@ -12,12 +12,17 @@ export function SortMenu({
   onChange,
   tree,
   onTree,
+  stale,
+  onReorder,
 }: {
   sort: Sort;
   onChange: (s: Sort) => void;
   /** Whether the dependency tree is on. */
   tree: boolean;
   onTree: (on: boolean) => void;
+  /** A local edit changed the modified-time order; the person can apply it when ready. */
+  stale: boolean;
+  onReorder: () => void;
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -55,6 +60,11 @@ export function SortMenu({
         </svg>
         {t("sort.summary", { key: t(`sort.by_${sort.key}`), dir: dirText(sort.dir) })}
       </button>
+      {stale && (
+        <button type="button" className="link small sort-reorder" onClick={onReorder}>
+          {t("sort.reorder")}
+        </button>
+      )}
       {tree && (
         <span className="sort-tag" title={t("sort.dep_tree_title")}>
           {t("sort.dep_tree")}

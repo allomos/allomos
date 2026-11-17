@@ -1021,6 +1021,7 @@
   "sort.by_name": "名前",
   "sort.by_changed": "更新日時",
   "sort.by_created": "作成日時",
+  "sort.reorder": "順序が変わりました · 並べ替え",
   "sort.id_asc": "A → Z",
   "sort.id_desc": "Z → A",
   "sort.name_asc": "A → Z",

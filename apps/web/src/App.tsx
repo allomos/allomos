@@ -48,7 +48,7 @@ import {
   type StateFilter,
 } from "./stopFlow";
 import { useFold } from "./useFold";
-import { parseSort, sortTasks, type Sort } from "./sortFlow";
+import { keepTaskOrder, parseSort, sortTasks, type Sort } from "./sortFlow";
 import { depTreeRows, parseDepTree, type TreeRow } from "./depTreeFlow";
 import { SortMenu } from "./SortMenu";
 import { FilterMenu } from "./FilterMenu";
@@ -1371,6 +1371,8 @@ type Group = {
   place?: number;
 };
 
+type FrozenTaskOrder = { root: string; refreshed: Refreshed | null; groups: Record<string, string[]> };
+
 function TaskbagView({
   opened,
   messenger,
@@ -1408,9 +1410,24 @@ function TaskbagView({
   const { t, rich } = useI18n();
   const taskT = useTaskT();
   const { taskbag: box, issues, active_iteration: activeIteration } = opened.loaded;
+  const [frozenOrder, setFrozenOrder] = useState<FrozenTaskOrder | null>(null);
+  const frozenOrderRef = useRef<FrozenTaskOrder | null>(null);
+  const deferredEdits = useRef({ generation: 0, pending: 0, applied: 0 });
+  const clearFrozenOrder = () => {
+    const edits = deferredEdits.current;
+    edits.generation += 1;
+    edits.pending = 0;
+    edits.applied = 0;
+    frozenOrderRef.current = null;
+    setFrozenOrder(null);
+  };
+  useEffect(() => clearFrozenOrder(), [opened.root, refreshed]);
+  const currentFrozenOrder =
+    frozenOrder?.root === opened.root && frozenOrder.refreshed === refreshed ? frozenOrder : null;
   const shownIssues = hideOlder ? issues.filter((i) => i.problem.code !== "taskbag_to_move_in") : issues;
   const [groupBy, setGroupBy] = useState<GroupBy>(readGroupBy);
   const choose = (g: GroupBy) => {
+    clearFrozenOrder();
     setGroupBy(g);
     try {
       localStorage.setItem(GROUP_BY_KEY, g);
@@ -1491,6 +1508,7 @@ function TaskbagView({
   // A chosen folder that is no longer bound, or fewer than two folders, reads as all folders.
   const folderFilter = readFolderFilter(storedFolder, folders);
   const chooseFolder = (value: string) => {
+    clearFrozenOrder();
     setStoredFolder(value);
     try {
       localStorage.setItem(folderKey, value);
@@ -1511,6 +1529,7 @@ function TaskbagView({
   const stateFilter = tableFilter(storedFilter, box?.project, box?.tasks);
   const ladder = stateFilter.labels;
   const chooseFilter = (f: StateFilter) => {
+    clearFrozenOrder();
     setStoredFilter(f);
     try {
       localStorage.setItem(LIST_FILTER_KEY, storeFilter(f));
@@ -1528,6 +1547,7 @@ function TaskbagView({
     }
   });
   const chooseSort = (s: Sort) => {
+    clearFrozenOrder();
     setSort(s);
     try {
       localStorage.setItem(SORT_KEY, JSON.stringify(s));
@@ -1535,7 +1555,8 @@ function TaskbagView({
       /* storage unavailable: the choice lasts until the window closes */
     }
   };
-  const inOrder = (tasks: Task[]) => sortTasks(tasks, sort, opened.last_changed, opened.created);
+  const inOrder = (tasks: Task[], group: string) =>
+    keepTaskOrder(sortTasks(tasks, sort, opened.last_changed, opened.created), currentFrozenOrder?.groups[group]);
   // The dependency tree (Task-A01-alpine458), remembered like the sort; one choice for both tabs.
   // The tasks whose children are folded away are remembered per project.
   const [depTree, setDepTree] = useState(() => {
@@ -1587,7 +1608,7 @@ function TaskbagView({
         name: it.name,
         sub: iterationSub(it, t),
         empty: t("iteration.no_tasks"),
-        tasks: inOrder(box.tasks.filter((task) => task.iteration === it.id)),
+        tasks: inOrder(box.tasks.filter((task) => task.iteration === it.id), `i-${it.id}`),
         newTask: { area: null, iteration: it.id },
         edit: { kind: "iteration", id: it.id },
         iterationState: it.id === activeIteration ? "active" : it.state === "closed" ? "closed" : undefined,
@@ -1595,7 +1616,7 @@ function TaskbagView({
       });
     }
     // Tasks with no iteration, or one that does not exist (reported above), come last.
-    const unplanned = inOrder(box.tasks.filter((task) => !iterations.some((i) => i.id === task.iteration)));
+    const unplanned = inOrder(box.tasks.filter((task) => !iterations.some((i) => i.id === task.iteration)), "unplanned");
     if (unplanned.length > 0)
       groups.push({ key: "unplanned", id: "", name: t("box.unplanned"), empty: "", tasks: unplanned, newTask: { area: null, iteration: null } });
   } else if (box) {
@@ -1605,12 +1626,12 @@ function TaskbagView({
         id: area.id,
         name: area.name,
         empty: t("area.no_tasks"),
-        tasks: inOrder(box.tasks.filter((task) => task.area === area.id)),
+        tasks: inOrder(box.tasks.filter((task) => task.area === area.id), `a-${area.id}`),
         newTask: { area: area.id, iteration: null },
         edit: { kind: "area", id: area.id },
       });
     }
-    const lost = inOrder(box.tasks.filter((task) => !box.areas.find((a) => a.id === task.area)));
+    const lost = inOrder(box.tasks.filter((task) => !box.areas.find((a) => a.id === task.area)), "lost");
     if (lost.length > 0) groups.push({ key: "lost", id: "?", name: t("box.unknown_area"), empty: "", tasks: lost });
   }
   // With a state filter, each group lists only the tasks in that state (its count stays whole)
@@ -1768,9 +1789,49 @@ function TaskbagView({
       <WhoLine name={ownerName} onSave={saveOwnerName} />
     </div>
   );
+  const beginDeferredSortEdit = (edit: Edit): number | null => {
+    if (sort.key !== "changed" || (edit.field !== "state" && edit.field !== "difficulty")) return null;
+    let snapshot = frozenOrderRef.current;
+    if (snapshot?.root !== opened.root || snapshot.refreshed !== refreshed) {
+      const progress = deferredEdits.current;
+      progress.generation += 1;
+      progress.pending = 0;
+      progress.applied = 0;
+      snapshot = {
+        root: opened.root,
+        refreshed,
+        groups: Object.fromEntries(groups.map((group) => [group.key, group.tasks.map((task) => task.id)])),
+      };
+      frozenOrderRef.current = snapshot;
+      setFrozenOrder(snapshot);
+    }
+    deferredEdits.current.pending += 1;
+    return deferredEdits.current.generation;
+  };
+  const finishDeferredSortEdit = (generation: number | null, applied: boolean) => {
+    if (generation === null || deferredEdits.current.generation !== generation) return;
+    const progress = deferredEdits.current;
+    progress.pending = Math.max(0, progress.pending - 1);
+    if (applied) {
+      progress.applied += 1;
+    } else if (progress.pending === 0 && progress.applied === 0) {
+      frozenOrderRef.current = null;
+      setFrozenOrder(null);
+    }
+  };
   // One task changed: shown in place (Task-A01-parade485). The changes below it reach further
   // (an iteration, approvals, AI decisions) and read the whole taskbag again, as before.
-  const editTask = (id: string, edit: Edit) => onChangeTask(() => messenger.editTask(opened.root, id, edit));
+  const editTask = async (id: string, edit: Edit, fromListRow = false) => {
+    if (!fromListRow && sort.key === "changed" && currentFrozenOrder) clearFrozenOrder();
+    const generation = fromListRow ? beginDeferredSortEdit(edit) : null;
+    try {
+      await onChangeTask(() => messenger.editTask(opened.root, id, edit));
+      finishDeferredSortEdit(generation, true);
+    } catch (error) {
+      finishDeferredSortEdit(generation, false);
+      throw error;
+    }
+  };
   // The task pane's "New…" iteration (Task-A01-39): added, then the task planned in it.
   const planInNewIteration = async (id: string, iteration: NewIteration) => {
     await messenger.addIterationAndPlan(opened.root, id, iteration);
@@ -1944,7 +2005,14 @@ function TaskbagView({
                   </select>
                 </label>
               )}
-              <SortMenu sort={sort} onChange={chooseSort} tree={depTree} onTree={chooseDepTree} />
+              <SortMenu
+                sort={sort}
+                onChange={chooseSort}
+                tree={depTree}
+                onTree={chooseDepTree}
+                stale={Boolean(currentFrozenOrder && sort.key === "changed")}
+                onReorder={clearFrozenOrder}
+              />
               <SearchBox ref={searchRef} value={query} onChange={setQuery} />
               {/* Task-A01-26: for the list shown now. */}
               <span className="fold-all">
@@ -2004,7 +2072,7 @@ function TaskbagView({
                   onOpenSession={canOpenSessions ? (id) => messenger.openAgentSession(opened.root, id) : undefined}
                   onProceed={canOpenSessions ? setProceeding : undefined}
                   onError={onError}
-                  stateMenu={{ ownerName, onSaveName: saveOwnerName, onEdit: editTask }}
+                  stateMenu={{ ownerName, onSaveName: saveOwnerName, onEdit: (id, edit) => editTask(id, edit, true) }}
                   selectedId={selectedId}
                   onSelect={selectTask}
                   terms={terms}

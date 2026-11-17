@@ -843,6 +843,7 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .sort-button { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 4px 10px; border-radius: 6px; }
 .sort-button svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .sort-button.on { border-color: var(--accent); color: var(--accent-ink); }
+.sort-reorder { white-space: nowrap; }
 .sort-popover {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; min-width: 190px;
   background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 4px 0;

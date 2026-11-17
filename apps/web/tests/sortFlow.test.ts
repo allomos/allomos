@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_SORT, parseSort, sortTasks, type Sort } from "../src/sortFlow.ts";
+import { DEFAULT_SORT, keepTaskOrder, parseSort, sortTasks, type Sort } from "../src/sortFlow.ts";
 import type { Task } from "../src/types.ts";
 
 const task = (id: string, title: string) => ({ id, title }) as Task;
@@ -42,6 +42,17 @@ test("sorting leaves the given list as it was", () => {
   const before = ids(tasks);
   sortTasks(tasks, { key: "name", dir: "desc" });
   assert.deepEqual(ids(tasks), before);
+});
+
+test("a remembered order keeps edited tasks in place after their changed time moves", () => {
+  const latest = [task("A01-3", "third"), task("A01-1", "first"), task("A01-2", "second")];
+  assert.deepEqual(ids(keepTaskOrder(latest, ["A01-1", "A01-2", "A01-3"])), ["A01-1", "A01-2", "A01-3"]);
+});
+
+test("a remembered order still filters tasks and puts new tasks after the frozen rows", () => {
+  const latest = [task("A01-2", "second"), task("A01-4", "new"), task("A01-1", "first")];
+  assert.deepEqual(ids(keepTaskOrder(latest, ["A01-1", "A01-2", "A01-3"])), ["A01-1", "A01-2", "A01-4"]);
+  assert.deepEqual(ids(keepTaskOrder(latest.filter((t) => t.id !== "A01-2"), ["A01-1", "A01-2", "A01-3"])), ["A01-1", "A01-4"]);
 });
 
 test("a remembered sort survives a round trip; anything unreadable is the default", () => {
