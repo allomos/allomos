@@ -1535,7 +1535,7 @@ function TaskbagView({
       /* storage unavailable: the choice lasts until the window closes */
     }
   };
-  const inOrder = (tasks: Task[]) => sortTasks(tasks, sort, opened.last_changed);
+  const inOrder = (tasks: Task[]) => sortTasks(tasks, sort, opened.last_changed, opened.created);
   // The dependency tree (Task-A01-alpine458), remembered like the sort; one choice for both tabs.
   // The tasks whose children are folded away are remembered per project.
   const [depTree, setDepTree] = useState(() => {

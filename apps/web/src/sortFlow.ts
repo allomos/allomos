@@ -1,17 +1,17 @@
 // Sorting the tasks inside each iteration and area (Task-A01-52, Task-A01-plum588): by ID (the
-// taskbag's own order), by name or by last change, ascending or descending. Kept apart from React
-// so it can be tested with Node alone (`npm --prefix apps/web test`). Only type imports here: Node
-// strips them.
+// taskbag's own order), by name, by last change or by creation time, ascending or descending.
+// Kept apart from React so it can be tested with Node alone (`npm --prefix apps/web test`). Only
+// type imports here: Node strips them.
 import type { Task } from "./types";
 
-export type SortKey = "id" | "name" | "changed";
+export type SortKey = "id" | "name" | "changed" | "created";
 export type SortDir = "asc" | "desc";
 export interface Sort {
   key: SortKey;
   dir: SortDir;
 }
 
-export const SORT_KEYS: SortKey[] = ["id", "name", "changed"];
+export const SORT_KEYS: SortKey[] = ["id", "name", "changed", "created"];
 /** The sort when the person has not chosen one: the most recently changed tasks first
  * (Task-A01-city762). Before, it was the taskbag's own order (ID, ascending). */
 export const DEFAULT_SORT: Sort = { key: "changed", dir: "desc" };
@@ -38,14 +38,20 @@ export function numbered(id: string): boolean {
   return /^[^-]+-[\d-]+$/.test(id);
 }
 
-/** `tasks` in `sort`'s order, as a new list. `changed` holds each task's last change (UTC,
- * `2026-10-13T14:02:05Z`, so text order is time order); a task with none counts as oldest. Ties
- * fall back to the ID order, ascending, so the order never jumps between reloads.
+/** `tasks` in `sort`'s order, as a new list. `changed` holds each task's last change and `created`
+ * its first event (UTC, `2026-10-13T14:02:05Z`, so text order is time order); a task with no time
+ * counts as oldest. Ties fall back to the ID order, ascending, so the order never jumps between
+ * reloads.
  *
  * The ID order is the taskbag's own order, as `tasks` come (Task-A01-54): numbered IDs
  * (`A01-53`) by number, then word IDs (`A01-tiger042`) in the order they were made, which
  * Allomos works out from the history. Sorting word IDs alphabetically would scatter new tasks. */
-export function sortTasks(tasks: Task[], sort: Sort, changed: Record<string, string> = {}): Task[] {
+export function sortTasks(
+  tasks: Task[],
+  sort: Sort,
+  changed: Record<string, string> = {},
+  created: Record<string, string> = {},
+): Task[] {
   const at = new Map(tasks.map((t, i) => [t.id, i]));
   const byId = (a: Task, b: Task) => {
     const [x, y] = [numbered(a.id), numbered(b.id)];
@@ -58,6 +64,11 @@ export function sortTasks(tasks: Task[], sort: Sort, changed: Record<string, str
     if (sort.key === "changed") {
       const x = changed[a.id] ?? "";
       const y = changed[b.id] ?? "";
+      return x < y ? -1 : x > y ? 1 : 0;
+    }
+    if (sort.key === "created") {
+      const x = created[a.id] ?? "";
+      const y = created[b.id] ?? "";
       return x < y ? -1 : x > y ? 1 : 0;
     }
     return byId(a, b);

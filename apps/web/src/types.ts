@@ -345,6 +345,8 @@ export interface Opened {
   branches?: Record<string, Branches>;
   /** When each task last changed (UTC), by task ID, from the history (Task-A01-52). */
   last_changed?: Record<string, string>;
+  /** When each task was created (UTC), by task ID, from its first history event (Task-A01-dynamo075). */
+  created?: Record<string, string>;
   /** Card files agents reported as still in the project folder (Task-A00-30). */
   cards_outside?: CardOutside[];
   /** An older taskbag's handoff files in `handoffs/` (Task-A03-polar770): the taskbag needs updating. */

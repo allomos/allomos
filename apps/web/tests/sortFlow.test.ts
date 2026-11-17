@@ -32,6 +32,12 @@ test("by last change: oldest or newest first; a task never changed counts as old
   assert.deepEqual(ids(sortTasks(tasks, { key: "changed", dir: "desc" }, changed)), ["A02-01", "A01-03", "A01-10", "A01-2"]);
 });
 
+test("by creation time: oldest or newest first; a task with no creation time counts as oldest; ties by ID", () => {
+  const created = { "A01-10": "2026-10-16T09:00:00Z", "A02-01": "2026-10-17T08:00:00Z", "A01-03": "2026-10-16T09:00:00Z" };
+  assert.deepEqual(ids(sortTasks(tasks, { key: "created", dir: "asc" }, {}, created)), ["A01-2", "A01-03", "A01-10", "A02-01"]);
+  assert.deepEqual(ids(sortTasks(tasks, { key: "created", dir: "desc" }, {}, created)), ["A02-01", "A01-03", "A01-10", "A01-2"]);
+});
+
 test("sorting leaves the given list as it was", () => {
   const before = ids(tasks);
   sortTasks(tasks, { key: "name", dir: "desc" });
@@ -40,6 +46,7 @@ test("sorting leaves the given list as it was", () => {
 
 test("a remembered sort survives a round trip; anything unreadable is the default", () => {
   assert.deepEqual(parseSort(JSON.stringify({ key: "changed", dir: "desc" })), { key: "changed", dir: "desc" });
+  assert.deepEqual(parseSort(JSON.stringify({ key: "created", dir: "asc" })), { key: "created", dir: "asc" });
   assert.deepEqual(parseSort(null), DEFAULT_SORT);
   assert.deepEqual(parseSort("nope"), DEFAULT_SORT);
   assert.deepEqual(parseSort('{"key":"size","dir":"asc"}'), DEFAULT_SORT);
