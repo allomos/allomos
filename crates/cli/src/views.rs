@@ -1,19 +1,20 @@
-//! `alm list`, `alm show`, `alm history` and `alm next`: what the taskbag holds, read without changing it.
+//! `alm list`, `alm show`, `alm history` and `alm next`: what the taskbag holds, read without
+//! changing it.
 
 use std::path::Path;
 
 use allomos_core::decision::Decision;
-use allomos_core::ops::{self};
-use allomos_core::{Problem, State, Task};
+use allomos_core::event;
+use allomos_core::ops;
+use allomos_core::{Problem, State, Task, Taskbag};
 use allomos_store::handoff;
-use allomos_store::{events, load, taskbag_of};
+use allomos_store::{events, load, plain_path, taskbag_of};
 use serde_json::{Value, json};
 
 use crate::{
-    CHOOSING_RULE, Cli, Command, Done, READ_BLOCKERS_FIRST, approve, blocked_text, classify,
-    decision_lines, effects, event_lines, exceptions, finished_blockers_text, folders, heartbeat,
-    indent, iteration_heading, links, locate, next_cards_line, next_handoffs_line, notes_lines,
-    rules_line, stop_lines, task_json_in, task_line, task_line_in, traces_text,
+    Cli, Command, Done, approve, blocked_text, classify, decision_lines, effects, exceptions,
+    finished_blockers_text, folders, heartbeat, indent, iteration_heading, links, locate,
+    rules_line, stop_lines, task_json_in, task_line, traces_text,
 };
 
 /// Runs the commands this module holds; `execute` in `lib.rs` sends only those here.
@@ -509,5 +510,134 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             Ok(done)
         }
         _ => unreachable!("lib.rs sends only this module's commands here"),
+    }
+}
+
+/// What `alm next` tells the agent when there are tasks to take (Task-A03-14, owner 2026-10-13).
+pub(crate) const CHOOSING_RULE: &str = "Take the task the person named, if any. Otherwise take one from the active iteration (the one marked active, or else the first planned one) whose next dependency is met (the list shows its tasks first); with none there, from the earliest iteration, and read its handoff first (`alm show <id>`). Get the latest changes first, then claim it with `alm claim <id> --as <your session name> --branch <the branch you are on>` and save and share the claim right away with your version control tool (it prints the Git commands as the example): until your claim is shared, other sessions do not see it. When you claim, pass what the Allomos app needs to reopen your session: `--session-agent <your agent's id>`, `--session-id <your session's ID>`, and whatever else your agent needs to reopen it. In the Claude desktop app you must also pass `--session-kind desktop --app-session-id <its local_… ID>`: without them the Allomos app resumes your session in a terminal instead of opening it in the Claude app (in a terminal, pass `--session-kind terminal`).";
+
+/// What whoever starts a task with finished blockers does first (decision 0026, detail h).
+pub(crate) const READ_BLOCKERS_FIRST: &str = "before starting, read their AI decisions and handoffs (`alm show <id>`), and change this task's plan if they changed what it needs";
+
+/// When to write a handoff, for the agent that asked.
+/// The project notes for `alm next`: where they are, the day they last changed, then their
+/// Running and Pitfalls sections as written (Task-A03-20).
+pub(crate) fn notes_lines(n: &handoff::ProjectNotes) -> String {
+    if !n.found {
+        return format!(
+            "Project notes: this taskbag has no {} yet ({}).\n",
+            n.file,
+            plain_path(&n.path).display()
+        );
+    }
+    let mut text = format!(
+        "Project notes ({}, last changed {}):\n",
+        plain_path(&n.path).display(),
+        n.changed.as_deref().unwrap_or("unknown")
+    );
+    for (name, section) in [("Running", &n.running), ("Pitfalls", &n.pitfalls)] {
+        match section.as_deref() {
+            None => text.push_str(&format!("{name}: no such section.\n")),
+            Some("") => text.push_str(&format!("{name}: (empty)\n")),
+            Some(body) => {
+                text.push_str(&format!("{name}:\n"));
+                for line in body.lines() {
+                    if line.is_empty() {
+                        text.push('\n');
+                    } else {
+                        text.push_str(&format!("  {line}\n"));
+                    }
+                }
+            }
+        }
+    }
+    // Where the code and the taskbag are kept online, for an agent working from a copy elsewhere
+    // (Task-A03-30). alm reads no remote; the agent fills the section from its own Git remotes.
+    match n.repositories.as_deref() {
+        None => text.push_str(&format!(
+            "Repositories: no such section. Add `## Repositories` to {} with where the code and this taskbag are kept online (each folder's remote repository, the address only; in Git: its remote), so an agent working from a copy elsewhere, in the cloud for example, finds both.\n",
+            n.file
+        )),
+        Some([]) => text.push_str("Repositories: none named.\n"),
+        Some(items) => {
+            text.push_str("Repositories:\n");
+            for item in items {
+                text.push_str(&format!("  - {item}\n"));
+            }
+        }
+    }
+    text
+}
+
+/// An event for people: when, who (and through which writer), the command, then one line per
+/// changed field. Long or multi-line values are shortened to their first 80 characters.
+pub(crate) fn event_lines(e: &event::Event) -> String {
+    let value = |v: &Option<Value>| match v {
+        None => "—".to_string(),
+        Some(Value::String(s)) => {
+            let first = s.lines().next().unwrap_or_default();
+            let short: String = first.chars().take(80).collect();
+            if short.len() < s.trim_end().len() {
+                format!("{short}…")
+            } else {
+                short
+            }
+        }
+        Some(other) => other.to_string(),
+    };
+    let mut out = format!(
+        "{}  {} ({})  {}\n",
+        e.at,
+        e.by.as_deref().unwrap_or("someone"),
+        e.via,
+        e.command
+    );
+    for c in &e.changes {
+        out.push_str(&format!(
+            "  {}: {} → {}\n",
+            c.field,
+            value(&c.from),
+            value(&c.to)
+        ));
+    }
+    out
+}
+
+/// A task's line where the taskbag is at hand: the state says "· blocked" when a blocker has not
+/// finished (decision 0026: the state and being blocked are shown together).
+pub(crate) fn task_line_in(bag: &Taskbag, t: &Task) -> String {
+    if !ops::is_blocked(bag, t) {
+        return task_line(t);
+    }
+    task_line(t).replacen(
+        &format!("{}  {}  ", t.id, t.state.as_str()),
+        &format!("{}  {} · blocked  ", t.id, t.state.as_str()),
+        1,
+    )
+}
+
+/// `alm next`'s line about card files (Task-A00-30): the ones still outside the taskbag (linked
+/// or reported). None are: no line at all (Task-A03-34, approver 2026-10-20), so `alm next`
+/// prints only what is useful.
+/// What `alm next` says when an older taskbag still keeps handoff files (Task-A03-polar770):
+/// nothing when there are none.
+pub(crate) fn next_handoffs_line(files: &[String]) -> String {
+    if files.is_empty() {
+        return String::new();
+    }
+    format!(
+        "This taskbag needs updating: its `handoffs/` folder still holds {} old handoff file(s) ({}). A handoff is now written into the task (`alm handoff <id>`). Tell the person: they choose Update the taskbag… in the Allomos app (or you run `alm move-in` and follow the request it prints), which moves what is still useful into the tasks and removes the files after their Go ahead.\n",
+        files.len(),
+        files.join(", ")
+    )
+}
+
+pub(crate) fn next_cards_line(outside: usize) -> String {
+    if outside > 0 {
+        format!(
+            "Card files: {outside} task(s) keep their card files in the project folder (`alm cards`): propose moving them in beside their tasks, following `alm guide move-cards`.\n"
+        )
+    } else {
+        String::new()
     }
 }

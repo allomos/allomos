@@ -1,16 +1,16 @@
-//! The project's settings: `alm quota`, `alm handoff-rules`, `alm heartbeat-settings`, `alm audit-settings`, `alm task-language` and `alm labels`.
+//! The project's settings: `alm quota`, `alm handoff-rules`, `alm heartbeat-settings`, `alm
+//! audit-settings`, `alm task-language` and `alm labels`.
 
 use std::path::Path;
 
 use allomos_core::event::Kind;
-use allomos_core::ops::{self};
+use allomos_core::ops;
 use allomos_core::{Problem, Taskbag};
 use allomos_store::{Actor, Lock, load, task_language, taskbag_of};
 use serde_json::json;
 
 use crate::{
-    Cli, Command, Done, LabelsWhat, heartbeat, identity_lines, language_line, locate, lock_wait,
-    retention_lines, rules_line, save_project, separation_lines, witness_lines,
+    Cli, Command, Done, LabelsWhat, heartbeat, locate, lock_wait, rules_line, save_project,
 };
 
 /// Runs the commands this module holds; `execute` in `lib.rs` sends only those here.
@@ -338,4 +338,108 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         }
         _ => unreachable!("lib.rs sends only this module's commands here"),
     }
+}
+
+/// The identity settings in plain words (`alm audit-settings`).
+pub(crate) fn identity_lines(id: &allomos_core::audit::Identity) -> String {
+    let level = match id.level {
+        allomos_core::audit::ACCOUNT => "Allomos account",
+        allomos_core::audit::SSO => "Company sign-in (SSO)",
+        _ => "Pseudonym",
+    };
+    let mut text = format!("Identity: {level}");
+    if let Some(w) = &id.written {
+        text.push_str(&format!(
+            " (project.json says \"{w}\", which this Allomos does not know)"
+        ));
+    }
+    text.push_str(&format!(
+        ".\nSign in again to approve or check: {}.\n",
+        if id.reauthenticate { "on" } else { "off" }
+    ));
+    text.push_str(
+        "The history only ever holds a pseudonym ID; who is behind each one is kept on this computer (local project) or in the cloud (cloud project), never in the taskbag.\n",
+    );
+    if !id.sign_in_available {
+        text.push_str(
+            "Allomos account and Company sign-in (SSO) need a cloud project; this project is local-only.\n",
+        );
+    }
+    text
+}
+
+/// Separation of duties in plain words (`alm audit-settings`, Task-A01-grotto036).
+pub(crate) fn separation_lines(on: bool) -> String {
+    if on {
+        "Separation of duties: on. The same person or agent may not both do and check (or do and approve) a task; alm refuses it and says why. A project with one person cannot finish its checks while this is on.\n".into()
+    } else {
+        "Separation of duties: off. Anyone may check or approve a task, including who did it.\n"
+            .into()
+    }
+}
+
+/// The outside witness in plain words (`alm audit-settings`, Task-A01-wood982).
+pub(crate) fn witness_lines(w: Option<&allomos_core::witness::Witness>) -> String {
+    match w {
+        None => "Outside witness: off. Checkpoints are signed on this computer only; no fingerprint leaves it.\n".into(),
+        Some(w) => format!(
+            "Outside witness: on. Each checkpoint's fingerprint (a hash, never the content) is sent to {}; the receipt is kept in the checkpoint.\n{}",
+            w.services().join(" and "),
+            match w.when() {
+                allomos_core::witness::When::Daily => "How often: daily. The app while it is open, and any alm command that changes the taskbag, make a checkpoint when the last one is a day old.\n",
+                allomos_core::witness::When::Approvals => "How often: at each approval and human check (alm approve, alm checked and the app's same).\n",
+                allomos_core::witness::When::Asked => "How often: only when asked (alm checkpoint, Make a checkpoint now, and upgrading).\n",
+            }
+        ),
+    }
+}
+
+/// Retention and the legal hold in plain words (`alm audit-settings`, Task-A01-stem986).
+pub(crate) fn retention_lines(
+    kept: &allomos_core::retention::Retention,
+    past: Option<&allomos_store::redact::PastRetention>,
+) -> String {
+    let mut text = match kept.years {
+        None => "Keep the history: forever.\n".to_string(),
+        Some(y) => format!(
+            "Keep the history: {y} year{}.\n",
+            if y == 1 { "" } else { "s" }
+        ),
+    };
+    if let Some(p) = past {
+        if p.events == 0 {
+            text.push_str(&format!(
+                "No event is older than the retention period (before {}).\n",
+                p.cutoff
+            ));
+        } else {
+            text.push_str(&format!(
+                "Fact: {} event{} older than the retention period (before {}; the oldest from {}). Allomos removes nothing on its own; what to do with them is the project's decision.\n",
+                p.events,
+                if p.events == 1 { " is" } else { "s are" },
+                p.cutoff,
+                p.oldest.as_deref().unwrap_or("?")
+            ));
+        }
+    }
+    text.push_str("China's Cybersecurity Law (Art. 23) asks for network logs to be kept at least six months.\n");
+    text.push_str(if kept.legal_hold {
+        "Legal hold: on. Nothing in the history may be removed or redacted while it is on.\n"
+    } else {
+        "Legal hold: off. Personal details written by mistake can be removed with alm redact.\n"
+    });
+    text
+}
+
+/// One line saying which language to write tasks in, and why.
+pub(crate) fn language_line(l: &allomos_store::TaskLanguage) -> String {
+    let why = match l.source {
+        "taskbag" => "set in this taskbag".to_string(),
+        "app" => "follows the Allomos app's language".to_string(),
+        _ => "follows this computer's language; the Allomos app has not saved one yet".to_string(),
+    };
+    format!(
+        "Write new and changed tasks in: {} ({why}). Keep IDs, commands, code and file names as they are.",
+        l.language
+    )
 }

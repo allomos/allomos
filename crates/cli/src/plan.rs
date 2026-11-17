@@ -1,8 +1,9 @@
-//! `alm add`, `alm rename`, `alm change`, `alm move` and `alm delete`: areas, iterations, labels and tasks being added, renamed, moved and removed.
+//! `alm add`, `alm rename`, `alm change`, `alm move` and `alm delete`: areas, iterations, labels
+//! and tasks being added, renamed, moved and removed.
 
 use std::path::Path;
 
-use allomos_core::ops::{self};
+use allomos_core::ops;
 use allomos_core::{Iteration, IterationState, Problem};
 use allomos_store::{Actor, load, task_language, taskbag_of};
 use serde_json::{Value, json};

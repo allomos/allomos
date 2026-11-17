@@ -1,16 +1,18 @@
-//! The commands that change or read one task: its traces, labels, session, waits and blockers, finishing and checks, AI decisions, approvals, effects, exceptions, links, title, description, cards, heartbeats, folders and state.
+//! The commands that change or read one task: its traces, labels, session, waits and blockers,
+//! finishing and checks, AI decisions, approvals, effects, exceptions, links, title, description,
+//! cards, heartbeats, folders and state.
 
 use std::path::Path;
 
-use allomos_core::ops::{self};
+use allomos_core::ops;
 use allomos_core::{Problem, State};
 use allomos_store::{Actor, Lock, load, plain_path, read_text, taskbag_of};
 use serde_json::json;
 
 use crate::{
-    CardsWhat, Cli, Command, Done, approve, cards_text, change, classify, decision_text, effects,
-    exceptions, folders, for_codex, heartbeat, human, links, locate, lock_wait, non_blank, quoted,
-    redact, save_project, stop_lines, task_json, task_json_in, task_line, traces_text, trail,
+    CardsWhat, Cli, Command, Done, approve, change, classify, decision_text, effects, exceptions,
+    folders, for_codex, heartbeat, human, links, locate, lock_wait, non_blank, quoted, redact,
+    save_project, stop_lines, task_json, task_json_in, task_line, traces_text, trail,
 };
 
 /// Runs the commands this module holds; `execute` in `lib.rs` sends only those here.
@@ -602,4 +604,34 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         }
         _ => unreachable!("lib.rs sends only this module's commands here"),
     }
+}
+
+/// What `alm cards` says: the card files agents reported as still in the project folder, and what
+/// to do about them (Task-A00-30).
+pub(crate) fn cards_text(outside: &[allomos_core::card::Outside]) -> String {
+    if outside.is_empty() {
+        return "No task's Card: link points outside the taskbag, and no card files are reported as \
+kept in the project folder. If you find others, report them with `alm cards found <id>=<path>` \
+(`alm guide move-cards`).\n"
+            .to_string();
+    }
+    let mut text = format!(
+        "{} task(s) keep their card files in the project folder:\n",
+        outside.len()
+    );
+    for o in outside {
+        let how = match o.source {
+            allomos_core::card::Source::Link => "its Card: link".to_string(),
+            allomos_core::card::Source::Report => format!(
+                "reported by {}, {}",
+                o.by.as_deref().unwrap_or("?"),
+                o.at.as_deref().unwrap_or("?")
+            ),
+        };
+        text.push_str(&format!("  {}  {}  ({how})\n", o.task, o.path));
+    }
+    text.push_str(
+        "Propose moving them in beside their tasks, and do it only after the person's Go ahead: `alm guide move-cards`.\n",
+    );
+    text
 }

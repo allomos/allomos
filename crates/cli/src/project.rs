@@ -1,8 +1,9 @@
-//! `alm init`, `alm confirm`, `alm progress`, `alm brief`, `alm handoff`, `alm move-in`, `alm translate` and `alm guide`: the taskbag as a whole, its handoffs and its guides.
+//! `alm init`, `alm confirm`, `alm progress`, `alm brief`, `alm handoff`, `alm move-in`, `alm
+//! translate` and `alm guide`: the taskbag as a whole, its handoffs and its guides.
 
 use std::path::Path;
 
-use allomos_core::ops::{self};
+use allomos_core::ops;
 use allomos_core::{FORMAT, Problem};
 use allomos_store::handoff;
 use allomos_store::{
