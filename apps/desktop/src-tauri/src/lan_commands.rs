@@ -8,8 +8,9 @@ use allomos_core::Problem;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
+use crate::task_commands::companion_change;
 use crate::windows::Windows;
-use crate::{companion_change, lan, pairing};
+use crate::{lan, pairing};
 
 /// "Allow devices on your network to view" (Task-A04-02-01): the server while it runs, and the
 /// paired devices (Task-A04-02-02).

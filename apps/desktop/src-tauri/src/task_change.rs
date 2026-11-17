@@ -116,9 +116,9 @@ mod tests {
         let wait = std::time::Duration::from_secs(5);
         let app = allomos_store::Actor::APP;
         allomos_store::add_area(&root, app, wait, None, "A").unwrap();
-        let iteration: crate::NewIteration =
+        let iteration: crate::task_commands::NewIteration =
             serde_json::from_value(json!({ "name": "One" })).unwrap();
-        let iteration = crate::add_iteration_as(&root, Some("Will"), iteration)
+        let iteration = crate::task_commands::add_iteration_as(&root, Some("Will"), iteration)
             .unwrap()
             .id;
         let mut ids = Vec::new();
@@ -218,7 +218,7 @@ mod tests {
             let before = read(&root);
             let stamp_before = crate::taskbag_stamp(root.clone());
             let parsed: allomos_core::ops::Edit = serde_json::from_value(edit.clone()).unwrap();
-            let change = crate::change_task_as(&root, Some("Will"), id, &parsed)
+            let change = crate::task_commands::change_task_as(&root, Some("Will"), id, &parsed)
                 .unwrap_or_else(|p| panic!("{edit}: {}", p.code()));
             let change = serde_json::to_value(change).unwrap();
             let after = read(&root);

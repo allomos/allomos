@@ -847,7 +847,7 @@ mod tests {
                 op: &str,
                 args: serde_json::Value,
             ) -> Result<serde_json::Value, allomos_core::Problem> {
-                crate::companion_change(root, by, op, args)
+                crate::task_commands::companion_change(root, by, op, args)
             }
         }
         let env = |k: &str| std::env::var(k).ok();
