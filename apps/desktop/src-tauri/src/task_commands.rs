@@ -493,7 +493,7 @@ pub(crate) fn delete_iteration(root: PathBuf, id: String) -> Result<(), Problem>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{open_taskbag, task_history, taskbag_stamp};
+    use crate::taskbag_commands::{open_taskbag, task_history, taskbag_stamp};
     use allomos_store::init;
 
     /// Task-A04-02-04: a companion page's change goes through the window's own functions, given

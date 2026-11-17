@@ -11,7 +11,7 @@ use allomos_core::ops::Edit;
 use allomos_core::{Problem, Task};
 use serde::Serialize;
 
-/// A task as an edit left it, with the parts of [`crate::Opened`] that follow one task.
+/// A task as an edit left it, with the parts of [`crate::taskbag_commands::Opened`] that follow one task.
 #[derive(Debug, Serialize)]
 pub(crate) struct TaskChange {
     pub(crate) task: Task,
@@ -70,7 +70,7 @@ mod tests {
 
     /// The taskbag as the window reads it whole, as JSON.
     fn read(root: &Path) -> Value {
-        serde_json::to_value(crate::open_taskbag(root.to_path_buf())).unwrap()
+        serde_json::to_value(crate::taskbag_commands::open_taskbag(root.to_path_buf())).unwrap()
     }
 
     fn task_of<'a>(opened: &'a Value, id: &str) -> &'a Value {
@@ -216,7 +216,7 @@ mod tests {
         let mut cards_linked = 0;
         for (id, edit, whole) in edits {
             let before = read(&root);
-            let stamp_before = crate::taskbag_stamp(root.clone());
+            let stamp_before = crate::taskbag_commands::taskbag_stamp(root.clone());
             let parsed: allomos_core::ops::Edit = serde_json::from_value(edit.clone()).unwrap();
             let change = crate::task_commands::change_task_as(&root, Some("Will"), id, &parsed)
                 .unwrap_or_else(|p| panic!("{edit}: {}", p.code()));
@@ -227,7 +227,7 @@ mod tests {
             assert_eq!(change["stamp_before"], stamp_before, "{edit}");
             assert_eq!(
                 change["stamp_after"],
-                crate::taskbag_stamp(root.clone()),
+                crate::taskbag_commands::taskbag_stamp(root.clone()),
                 "{edit}"
             );
             // The task, its version and when it last changed, as the whole read has them.

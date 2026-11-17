@@ -637,7 +637,7 @@ pub(crate) fn write_agent_files(project: PathBuf) -> Result<Vec<String>, Problem
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{create_taskbag, move_taskbag_aside, version_check};
+    use crate::taskbag_commands::{create_taskbag, move_taskbag_aside, version_check};
 
     /// Task-A03-galley051: Work on it…'s request names the taskbag as the agent in the project folder
     /// passes it, beside the project or inside it.
