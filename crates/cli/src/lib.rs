@@ -1350,6 +1350,7 @@ mod approve;
 mod command;
 mod command_args;
 mod command_meta;
+use command_meta::id_and_name;
 mod classify;
 mod effects;
 mod exceptions;
@@ -1363,7 +1364,9 @@ mod redact;
 mod takeover;
 mod trail;
 pub(crate) use command::Command;
-pub(crate) use command_args::{Add, CardsWhat, ChangeWhat, Delete, FolderWhat, LabelsWhat, MoveWhat, Rename};
+pub(crate) use command_args::{
+    Add, CardsWhat, ChangeWhat, Delete, FolderWhat, LabelsWhat, MoveWhat, Rename,
+};
 
 /// A task's traces in one line (Task-A01-fennel617): "R77, 0021", or "none".
 fn traces_text(traces: &[String]) -> String {

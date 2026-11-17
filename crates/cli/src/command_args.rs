@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::Subcommand;
 
-use crate::{difficulty_level, difficulty_range};
+use crate::difficulty_level;
 
 #[derive(Subcommand)]
 pub(crate) enum CardsWhat {
@@ -182,4 +182,3 @@ pub(crate) enum Delete {
     /// included: plan them elsewhere first.
     Iteration { id: String },
 }
-

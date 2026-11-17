@@ -1,7 +1,10 @@
 use crate::{Add, CardsWhat, ChangeWhat, Command, Delete, FolderWhat, MoveWhat, Rename};
 
 /// `alm add area|iteration [<id>] <name>`: the ID given, if any, and the name.
-fn id_and_name<'a>(first: &'a str, name: &'a Option<String>) -> (Option<&'a str>, &'a str) {
+pub(crate) fn id_and_name<'a>(
+    first: &'a str,
+    name: &'a Option<String>,
+) -> (Option<&'a str>, &'a str) {
     match name {
         Some(name) => (Some(first), name),
         None => (None, first),
@@ -264,4 +267,3 @@ impl Command {
         }
     }
 }
-

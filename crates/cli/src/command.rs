@@ -3,7 +3,10 @@ use std::path::PathBuf;
 use allomos_core::State;
 use clap::Subcommand;
 
-use crate::{command_args::{Add, CardsWhat, ChangeWhat, Delete, FolderWhat, LabelsWhat, MoveWhat, Rename}, difficulty_level, difficulty_range};
+use crate::command_args::{
+    Add, CardsWhat, ChangeWhat, Delete, FolderWhat, LabelsWhat, MoveWhat, Rename,
+};
+use crate::{difficulty_level, difficulty_range, monitor};
 
 #[derive(Subcommand)]
 pub(crate) enum Command {
@@ -821,4 +824,3 @@ pub(crate) enum Command {
         evidence: Option<String>,
     },
 }
-
