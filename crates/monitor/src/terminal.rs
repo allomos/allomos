@@ -440,6 +440,73 @@ fn add_dirs(dirs: &[PathBuf], quote: fn(&str) -> String) -> String {
     out
 }
 
+/// Only quiet, monitor-started Antigravity sessions may auto-allow an ordinary push to an
+/// explicitly named origin branch. The fully qualified source keeps tags out; anchoring the
+/// regex rejects options, extra arguments, and compound shell commands. Command matching cannot
+/// inspect the repository's actual origin URL.
+const ANTIGRAVITY_PUSH_RULE: &str =
+    "command(regex:^git push origin refs/heads/[A-Za-z0-9][A-Za-z0-9._/-]*$)";
+const ANTIGRAVITY_ASK_RULES: &[&str] = &[
+    "command(regex:^git push$)",
+    "command(regex:^git push origin$)",
+    "command(regex:^git push .* (--force|--force-with-lease|--force-if-includes|--delete|-f|-d|-D|--mirror|--prune|--tags|--all|--follow-tags|--set-upstream|-u|--atomic|--no-verify)(=| |$).*)",
+    r"command(regex:^git push .* \+[^ ]+( |$).*)",
+    r"command(regex:^git push .* :[^ ]+( |$).*)",
+];
+
+/// Session-only Antigravity settings for quiet monitoring. Preserve the user's current fine-grained
+/// rules because `--settings` overrides them for this session; if they cannot be read safely, omit
+/// the override so the CLI keeps its usual permission behavior.
+fn antigravity_quiet_settings(existing: Option<&str>) -> Option<String> {
+    let mut settings = match existing {
+        Some(text) => serde_json::from_str::<serde_json::Value>(text).ok()?,
+        None => serde_json::json!({}),
+    };
+    let root = settings.as_object_mut()?;
+    let permissions = root
+        .entry("permissions")
+        .or_insert_with(|| serde_json::json!({}))
+        .as_object_mut()?;
+    let allow = permissions
+        .entry("allow")
+        .or_insert_with(|| serde_json::json!([]))
+        .as_array_mut()?;
+    if !allow
+        .iter()
+        .any(|rule| rule.as_str() == Some(ANTIGRAVITY_PUSH_RULE))
+    {
+        allow.push(serde_json::json!(ANTIGRAVITY_PUSH_RULE));
+    }
+    let ask = permissions
+        .entry("ask")
+        .or_insert_with(|| serde_json::json!([]))
+        .as_array_mut()?;
+    for rule in ANTIGRAVITY_ASK_RULES {
+        if !ask.iter().any(|existing| existing.as_str() == Some(rule)) {
+            ask.push(serde_json::json!(rule));
+        }
+    }
+    Some(serde_json::json!({"permissions": permissions}).to_string())
+}
+
+fn antigravity_quiet_settings_arg(quote: fn(&str) -> String) -> String {
+    antigravity_quiet_settings_from_read(std::fs::read_to_string(
+        home().join(".gemini/antigravity-cli/settings.json"),
+    ))
+    .map(|settings| format!("--settings {} ", quote(&settings)))
+    .unwrap_or_default()
+}
+
+fn antigravity_quiet_settings_from_read(existing: std::io::Result<String>) -> Option<String> {
+    match existing {
+        Ok(settings) => antigravity_quiet_settings(Some(&settings)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            antigravity_quiet_settings(None)
+        }
+        Err(_) => None,
+    }
+}
+
 /// The command line that starts a terminal agent with the request read from `file` (and the file
 /// removed once read), for Monitor ready tasks (Task-A03-moth285): `claude --session-id <id>`
 /// takes the session ID Allomos made, so the app knows the session before it claims; Codex picks
@@ -486,7 +553,15 @@ fn session_command_with_quiet(
                 String::new()
             }
         )),
-        ("antigravity_cli", _) => Some(format!("agy {}-i {request}", add_dirs(dirs, shell_quote))),
+        ("antigravity_cli", _) => Some(format!(
+            "agy {}{}-i {request}",
+            add_dirs(dirs, shell_quote),
+            if quiet {
+                antigravity_quiet_settings_arg(shell_quote)
+            } else {
+                String::new()
+            }
+        )),
         _ => None,
     }
 }
@@ -530,7 +605,15 @@ fn powershell_session_with_quiet(
                 String::new()
             }
         ),
-        ("antigravity_cli", _) => format!("{}-i ", add_dirs(dirs, powershell_quote)),
+        ("antigravity_cli", _) => format!(
+            "{}{}-i ",
+            add_dirs(dirs, powershell_quote),
+            if quiet {
+                antigravity_quiet_settings_arg(powershell_quote)
+            } else {
+                String::new()
+            }
+        ),
         _ => String::new(),
     };
     let start = format!(
@@ -794,6 +877,60 @@ mod tests {
         );
     }
 
+    #[test]
+    fn antigravity_quiet_settings_preserve_existing_permission_rules() {
+        let global = r#"{"permissions":{"allow":["command(git status)"],"ask":["command(*)"],"deny":["command(rm -rf)"]}}"#;
+        let settings: serde_json::Value =
+            serde_json::from_str(&antigravity_quiet_settings(Some(global)).unwrap()).unwrap();
+        assert_eq!(
+            settings["permissions"]["allow"],
+            serde_json::json!(["command(git status)", ANTIGRAVITY_PUSH_RULE])
+        );
+        let mut expected_ask = vec![serde_json::json!("command(*)")];
+        expected_ask.extend(
+            ANTIGRAVITY_ASK_RULES
+                .iter()
+                .map(|rule| serde_json::json!(rule)),
+        );
+        assert_eq!(
+            settings["permissions"]["ask"],
+            serde_json::Value::Array(expected_ask)
+        );
+        assert_eq!(
+            settings["permissions"]["deny"],
+            serde_json::json!(["command(rm -rf)"])
+        );
+
+        let already_allowed =
+            format!(r#"{{"permissions":{{"allow":["{ANTIGRAVITY_PUSH_RULE}"]}}}}"#);
+        let settings: serde_json::Value =
+            serde_json::from_str(&antigravity_quiet_settings(Some(&already_allowed)).unwrap())
+                .unwrap();
+        assert_eq!(
+            settings["permissions"]["allow"].as_array().unwrap().len(),
+            1
+        );
+        assert_eq!(
+            settings["permissions"]["ask"],
+            serde_json::json!(ANTIGRAVITY_ASK_RULES)
+        );
+        assert!(antigravity_quiet_settings(Some("not json")).is_none());
+        assert!(
+            antigravity_quiet_settings_from_read(Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "not readable",
+            )))
+            .is_none()
+        );
+        assert!(
+            antigravity_quiet_settings_from_read(Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "not present",
+            )))
+            .is_some()
+        );
+    }
+
     /// Task-A03-latch882: an Antigravity session adds the taskbag and the taskbag's other project
     /// folders to its workspace, one `--add-dir` each, quoted (spaces too); Claude takes none.
     #[test]
@@ -801,10 +938,11 @@ mod tests {
         let file = Path::new("/tmp/allomos-request-1.txt");
         let request = "\"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\"";
         let one = [PathBuf::from("/w/my tb/.allomos/taskbag")];
-        assert_eq!(
-            session_command_with_quiet("antigravity_cli", file, None, true, &one).as_deref(),
-            Some(format!("agy --add-dir '/w/my tb/.allomos/taskbag' -i {request}").as_str())
-        );
+        let quiet = session_command_with_quiet("antigravity_cli", file, None, true, &one)
+            .expect("quiet Antigravity command");
+        assert!(quiet.starts_with("agy --add-dir '/w/my tb/.allomos/taskbag' --settings '"));
+        assert!(quiet.contains(ANTIGRAVITY_PUSH_RULE));
+        assert!(quiet.ends_with(&format!(" -i {request}")));
         let several = [
             PathBuf::from("/w/tb/.allomos/taskbag"),
             PathBuf::from("/w/site"),
@@ -829,6 +967,7 @@ mod tests {
             PathBuf::from(r"C:\site"),
         ];
         let start = r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\agy\bin\agy.exe'";
+        let settings = antigravity_quiet_settings_arg(powershell_quote);
         for (dirs, args) in [
             (&windows_one[..], r"--add-dir 'C:\my tb\.allomos\taskbag' "),
             (
@@ -848,7 +987,7 @@ mod tests {
                     true,
                     dirs
                 ),
-                format!("{start} {args}-i $request")
+                format!("{start} {args}{settings}-i $request")
             );
         }
         // Opened from the app on Windows: the request is pasted, the folders are still added.
@@ -1020,7 +1159,13 @@ mod tests {
         );
         assert_eq!(
             session_command_with_quiet("antigravity_cli", file, None, true, &[]).as_deref(),
-            Some(format!("agy -i {request}").as_str())
+            Some(
+                format!(
+                    "agy {}-i {request}",
+                    antigravity_quiet_settings_arg(shell_quote)
+                )
+                .as_str()
+            )
         );
 
         assert_eq!(

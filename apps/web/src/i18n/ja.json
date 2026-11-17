@@ -1125,7 +1125,7 @@
   "monitor.codex_rules_never": "禁止：",
   "monitor.codex_rules_none": "なし",
   "monitor.codex_rules_failed": "Codex のルールを変えられませんでした：{problem}",
-  "monitor.permissions_antigravity_cli": "タスクごとに新しい Antigravity のセッション（agy）を開くため、1 つのセッションで選んだモード（Shift+Tab）は次のセッションには引き継がれません。始める前に、Antigravity 自身の設定で既定のモードを決めてください（~/.gemini/antigravity-cli/settings.json：\"agentMode\": \"auto\"）。そうしないと、セッションがコマンドを実行する前に許可を求めて止まることがあります。この設定はこのコンピューター上のすべての agy セッションに効きます。「肩代」はこの設定を変えません。自分が開くセッションに限り、タスクバッグのフォルダーとタスクバッグのほかのプロジェクトフォルダーをそのセッションのワークスペースに加えます（--add-dir）。そのため auto モードのセッションは、それらを読み書きするときにファイルへのアクセスを求めません。",
+  "monitor.permissions_antigravity_cli": "タスクごとに新しい Antigravity のセッション（agy）を開くため、1 つのセッションで選んだモード（Shift+Tab）は次のセッションには引き継がれません。Antigravity 自身の設定で既定のモードを auto にしてください（~/.gemini/antigravity-cli/settings.json の \"agentMode\" を \"auto\" に設定）。auto モードではワークスペース内のファイル編集や安全なコマンドは確認なしで進みますが、共有ブランチへの push などリスクが高い操作や元に戻せない操作では確認を求めます。この設定はこのコンピューター上のすべての agy セッションに適用されます。「肩代」はこの全体設定を変更しません。起動するセッションにはタスクバッグとほかのプロジェクトフォルダーをワークスペースに追加し（--add-dir）、auto モードでファイルアクセスの確認なしに読み書きできるようにします。",
   "monitor.later_app": "選べません：ここから Claude アプリを人の操作なしで動かす方法がありません。アプリが開いたセッションは自分で新しいセッションを開けず、「肩代」はアプリの定期タスクも作れません。",
   "monitor.later_codex_app": "選べません：まだ試していません。",
   "monitor.later_manual": "選べません：自分で貼り付ける依頼は、人の操作なしでは進みません。",

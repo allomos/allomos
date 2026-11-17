@@ -42,6 +42,26 @@ fn usage_paragraph(agent: &str, language: &str) -> String {
     format!("{text}\n\n")
 }
 
+/// Keep the user's usual quiet-mode instructions, while teaching only monitored Antigravity
+/// sessions the exact standalone push form accepted by their temporary allow rule.
+fn with_antigravity_push_rule(mode: String, agent: &str, quiet: bool, language: &str) -> String {
+    if !quiet || crate::accounts::base_agent(agent) != "antigravity_cli" {
+        return mode;
+    }
+    let instruction = match lang(language) {
+        "zh-CN" => {
+            "本安静 Antigravity 会话只有单独执行普通推送 `git push origin refs/heads/<branch>`（替换成当前分支名）才会免确认。不要裸用 `git push`，不要加强推、删除、镜像或清理远端分支的参数，也不要把推送和合并、删除工作树或删分支合并成一条命令；其他操作仍遵守 CLI 的权限确认。"
+        }
+        "ja" => {
+            "この静かな Antigravity セッションで確認なしに実行できる通常の push は、単独の `git push origin refs/heads/<branch>`（現在のブランチ名に置き換える）だけです。裸の `git push`、強制 push、削除・mirror・prune のオプションは使わず、push を merge、worktree の削除、ブランチ削除と一つのコマンドにまとめないでください。それ以外の操作は CLI の権限確認に従ってください。"
+        }
+        _ => {
+            "In this quiet Antigravity session, only a standalone ordinary push written as `git push origin refs/heads/<branch>` (replace it with the current branch name) is auto-allowed. Do not use bare `git push`, force, delete, mirror, or prune options, and do not combine the push with a merge, worktree removal, or branch deletion. Keep every other operation under the CLI's normal permission checks."
+        }
+    };
+    format!("{mode}\n\n{instruction}")
+}
+
 /// The request a new session gets for one task. `taskbag` is the taskbag's path as the agent,
 /// working in the project folder, passes it to `--taskbag`; `session_id` the ID Allomos gave
 /// Claude Code (none for the agents that pick their own).
@@ -68,6 +88,7 @@ pub fn monitor_request(
             } else {
                 r#"运行模式：普通模式（开始监测的人选的）。需要人时照常问。"#.to_string()
             };
+            let mode = with_antigravity_push_rule(mode, agent, quiet, language);
             format!(
                 r#"请做这个项目任务袋里的任务 {id}（“{title}”）。「换肩」正在自动监测就绪任务，为这一个任务开了这个会话。每条 alm 命令都加上 {tb}。
 
@@ -97,6 +118,7 @@ pub fn monitor_request(
             } else {
                 r#"実行モード：通常のモード（監視を始めた人が選びました）。人が必要なときはいつもどおり聞いてください。"#.to_string()
             };
+            let mode = with_antigravity_push_rule(mode, agent, quiet, language);
             format!(
                 r#"このプロジェクトのタスクバッグにあるタスク {id}（「{title}」）を進めてください。「肩代」が準備完了のタスクを自動で監視していて、このタスクひとつのためにこのセッションを開きました。alm コマンドはすべて {tb} を付けて実行してください。
 
@@ -126,6 +148,7 @@ pub fn monitor_request(
             } else {
                 r#"Run mode: normal (chosen by the person who started the monitoring). Ask the person as usual when you need them."#.to_string()
             };
+            let mode = with_antigravity_push_rule(mode, agent, quiet, language);
             format!(
                 r#"Work on task {id} ("{title}") in this project's taskbag. Allomos is monitoring ready tasks and opened this session for this one task. Run every alm command with {tb}.
 
@@ -334,10 +357,17 @@ mod tests {
         let ja = monitor_request("A01-1", "x", "tb", "ja", "antigravity_cli", None, true);
         assert!(ja.contains("--session-agent antigravity"));
         assert!(ja.contains("alm wait A01-1 --on"));
+        assert!(ja.contains("git push origin refs/heads/<branch>"));
+        let ja_normal = monitor_request("A01-1", "x", "tb", "ja", "antigravity_cli", None, false);
+        assert!(!ja_normal.contains("git push origin refs/heads/<branch>"));
+        let zh_agy = monitor_request("A01-1", "x", "tb", "zh-CN", "antigravity_cli", None, true);
+        assert!(zh_agy.contains("git push origin refs/heads/<branch>"));
         // Another task language: English.
         assert!(
             monitor_request("A01-1", "x", "tb", "de", "codex_cli", None, true)
                 .starts_with("Work on task")
         );
+        let en_agy = monitor_request("A01-1", "x", "tb", "en", "antigravity_cli", None, true);
+        assert!(en_agy.contains("only a standalone ordinary push"));
     }
 }
