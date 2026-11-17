@@ -23,19 +23,22 @@ import { SettingsDialog } from "./SettingsDialog";
 import { LanDialog } from "./LanDialog";
 import { setKeys, toggleKey, visibleItems } from "./foldFlow";
 import { JUMP_EVENT, JUMP_KEY, jumpIsFor, takeJump, type IterationJump } from "./iterationJumpFlow";
+import { TASK_JUMP_EVENT, TASK_JUMP_KEY, taskJumpIsFor, takeTaskJump, type TaskJump } from "./taskJumpFlow";
 import { groupCount } from "./groupCountFlow";
 import { collapsedWhileSearching, searchGroups, searchTerms, taskMatches } from "./searchFlow";
 import { ListBanners, RefreshLine, SearchBox, isSearchShortcut } from "./Search";
 import { whatChanged, type Refreshed } from "./refreshFlow";
+import { withTaskChange, type TaskChange } from "./taskChangeFlow";
 import {
   allTicked,
   filterGroups,
   hiddenByFilter,
   hiddenText,
+  decorated,
   isAll,
   readFilter,
   storeFilter,
-  stopFact,
+  stopFacts,
   type StopFact,
   tableFilter,
   withBlocked,
@@ -367,6 +370,8 @@ export function App({
   const followBusy = useRef(false);
   /** A notice came while a comparison was going on: compare again after it. */
   const followAgain = useRef(false);
+  /** How many changes to one task this window is writing just now (Task-A01-parade485). */
+  const writing = useRef(0);
   /** Goes up each time a comparison found the taskbag changed. */
   const [taskbagChanges, setTaskbagChanges] = useState(0);
   const [pushed, setPushed] = useState(false);
@@ -375,7 +380,9 @@ export function App({
   }, [root]);
   const follow = useCallback(() => {
     if (!root) return;
-    if (followBusy.current) {
+    // A change this window is writing tells its own fingerprint when it is done: comparing in
+    // the middle of it would take the window's own write for another session's (A01-parade485).
+    if (followBusy.current || writing.current > 0) {
       followAgain.current = true;
       return;
     }
@@ -600,6 +607,33 @@ export function App({
       if (stamp !== null) stampRef.current = stamp;
     },
     [messenger],
+  );
+
+  /** A change to one task made in this window (Task-A01-parade485): the task is replaced in the
+   * list as it is, with no reading of the whole taskbag, unless only reading it again can tell
+   * (`withTaskChange` says when); the fingerprint moves on, so the follow does not take this
+   * window's own write for another session's. */
+  const changeTask = useCallback(
+    async (root: string, write: () => Promise<TaskChange>) => {
+      writing.current += 1;
+      try {
+        const change = await write();
+        const now = openedRef.current;
+        if (now?.root !== root) return;
+        const next = withTaskChange(now, change, stampRef.current, decorated);
+        if (next) {
+          setOpened(next);
+          stampRef.current = change.stamp_after;
+        } else await readAgain(root).catch(() => undefined);
+      } finally {
+        writing.current -= 1;
+        if (writing.current === 0 && followAgain.current) {
+          followAgain.current = false;
+          followRef.current();
+        }
+      }
+    },
+    [readAgain],
   );
 
   // The start page's Open recent… dialog (Task-A01-43): the same list as File → Open Recent, read
@@ -847,15 +881,8 @@ export function App({
             onNotice={(message) => setNotices((list) => [...list, { text: message }])}
             hideOlder={olderShown}
             canOpenSessions={!companion}
-            onReload={async () => {
-              // After a change made in this window: read again, and note the stamp so the follow
-              // does not read it a second time and call it automatic (Task-A01-47).
-              const stamp = await messenger.taskbagStamp(opened.root).catch(() => null);
-              const fresh = await messenger.openTaskbag(opened.root);
-              if (openedRef.current?.root !== fresh.root) return;
-              setOpened(fresh);
-              if (stamp !== null) stampRef.current = stamp;
-            }}
+            onReload={() => readAgain(opened.root)}
+            onChangeTask={(write) => changeTask(opened.root, write)}
             refreshed={refreshed}
             onRefresh={async () => {
               // Refresh now (Task-A01-47): always read again, then say what differs from before.
@@ -1353,6 +1380,7 @@ function TaskbagView({
   hideOlder,
   canOpenSessions,
   onReload,
+  onChangeTask,
   refreshed,
   onRefresh,
 }: {
@@ -1369,6 +1397,9 @@ function TaskbagView({
   canOpenSessions: boolean;
   /** Reads the taskbag again now, after a change made in this window. */
   onReload: () => Promise<void>;
+  /** Makes a change to one task and shows it in place, without reading the whole taskbag again
+   * (Task-A01-parade485). Rejects as `write` does. */
+  onChangeTask: (write: () => Promise<TaskChange>) => Promise<void>;
   /** When the list was last read and how (Task-A01-47). */
   refreshed: Refreshed | null;
   /** Refresh now: reads the taskbag again and reports what changed. */
@@ -1447,7 +1478,8 @@ function TaskbagView({
     return () => {
       live = false;
     };
-  }, [messenger, opened]);
+    // Not after a change to one task shown in place (Task-A01-parade485): the project is the same.
+  }, [messenger, opened.root, box?.project]);
   const folderKey = `${FOLDER_FILTER_KEY}:${opened.root}`;
   const [storedFolder, setStoredFolder] = useState<string | null>(() => {
     try {
@@ -1522,7 +1554,7 @@ function TaskbagView({
     }
   };
   const [treeFolded, setTreeFolded] = useFold(opened.root, "tree");
-  const stop = (task: Task) => stopFact(task, box?.tasks ?? [], t, taskT);
+  const stops = (task: Task) => stopFacts(task, box?.tasks ?? [], t, taskT);
   // The search box (Task-A01-36): the task list's search, emptied when another project opens. Cmd/Ctrl+F focuses it.
   const [query, setQuery] = useState("");
   const terms = searchTerms(query);
@@ -1619,18 +1651,13 @@ function TaskbagView({
         return { ...g, rows, tasks: rows.map((r) => r.task), counted: g.counted ?? g.tasks };
       })
     : found;
-  // A blocker that is not shown in the task's group: "ID · where it is", with the whole story on hover.
-  const outsideMark = (id: string, groupKey: string) => {
+  // A blocker's hover text in Blocked by (Task-A01-border342): its title and the group it is in.
+  const blockerTitle = (id: string) => {
     const blocker = box?.tasks.find((task) => task.id === id);
-    if (!blocker) return { id, text: id, title: t("tree.unknown_title", { id }) };
+    if (!blocker) return t("tree.unknown_title", { id });
     const home = groups.find((g) => g.tasks.includes(blocker));
-    if (!home || home.key === groupKey)
-      return { id, text: t("tree.outside", { id, where: t("tree.not_shown") }), title: t("tree.not_shown_title", { id, title: blocker.title }) };
-    return {
-      id,
-      text: t("tree.outside", { id, where: home.id || home.name }),
-      title: t("tree.outside_title", { id, title: blocker.title, where: [home.id, home.name].filter(Boolean).join(" ") }),
-    };
+    const where = home ? [home.id, home.name].filter(Boolean).join(" ") : "";
+    return where ? t("task.blocker_title", { title: blocker.title, where }) : blocker.title;
   };
   // Tasks in collapsed groups are hidden, so the arrow keys skip them.
   const shown = visibleItems(drawn, folded);
@@ -1638,7 +1665,32 @@ function TaskbagView({
 
   // The task shown in the pane, by ID, so it stays selected when the taskbag reloads.
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  useEffect(() => {
+    const root = opened.root;
+    const take = () => {
+      if (!box) return;
+      const jump = takeTaskJump(root);
+      if (jump && box.tasks.some((task) => task.id === jump.id)) setSelectedId(jump.id);
+    };
+    const onEvent = (event: Event) => {
+      const jump = (event as CustomEvent<TaskJump>).detail;
+      if (!taskJumpIsFor(jump, root)) return;
+      takeTaskJump(root);
+      if (box?.tasks.some((task) => task.id === jump.id)) setSelectedId(jump.id);
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === TASK_JUMP_KEY) take();
+    };
+    take();
+    window.addEventListener(TASK_JUMP_EVENT, onEvent);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(TASK_JUMP_EVENT, onEvent);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [opened.root, box?.tasks]);
   const selected = box?.tasks.find((task) => task.id === selectedId) ?? null;
+  const selectTask = (id: string) => setSelectedId((now) => afterClick(now, id));
   // The selected task's history (Task-A01-17), read again whenever the taskbag reloads. Kept with
   // its task's ID, so another task never shows it and a reload does not blank it while reading.
   const [history, setHistory] = useState<{ id: string; history: TaskHistory | null } | null>(null);
@@ -1716,10 +1768,9 @@ function TaskbagView({
       <WhoLine name={ownerName} onSave={saveOwnerName} />
     </div>
   );
-  const editTask = async (id: string, edit: Edit) => {
-    await messenger.editTask(opened.root, id, edit);
-    await onReload().catch(() => undefined);
-  };
+  // One task changed: shown in place (Task-A01-parade485). The changes below it reach further
+  // (an iteration, approvals, AI decisions) and read the whole taskbag again, as before.
+  const editTask = (id: string, edit: Edit) => onChangeTask(() => messenger.editTask(opened.root, id, edit));
   // The task pane's "New…" iteration (Task-A01-39): added, then the task planned in it.
   const planInNewIteration = async (id: string, iteration: NewIteration) => {
     await messenger.addIterationAndPlan(opened.root, id, iteration);
@@ -1756,7 +1807,8 @@ function TaskbagView({
     return () => {
       live = false;
     };
-  }, [messenger, opened]);
+    // Not after a change to one task shown in place (Task-A01-parade485): no ID was taken.
+  }, [messenger, opened.root, box?.areas, box?.iterations, box?.tasks.length]);
   const add = async (request: AddRequest) => {
     let shown: string | null = null;
     if (request.kind === "task") {
@@ -1856,6 +1908,7 @@ function TaskbagView({
         onOpen={() => setMonitorFrom(from)}
         onEdit={(run) => setEditingRun(run.id)}
         onOpenSession={(id) => messenger.openAgentSession(opened.root, id)}
+        onOpenTask={(id) => setSelectedId((now) => afterClick(now, id))}
         onError={onError}
         onNeedYou={() => chooseFilter(presetFilter("needs_you", ladder))}
       />
@@ -1940,19 +1993,20 @@ function TaskbagView({
                     g.rows &&
                     ((id) => {
                       const row = g.rows!.find((r) => r.task.id === id);
-                      return row && { row, onFold: () => setTreeFolded((keys) => toggleKey(keys, id)), outside: row.outside.map((o) => outsideMark(o, g.key)) };
+                      return row && { row, onFold: () => setTreeFolded((keys) => toggleKey(keys, id)), };
                     })
                   }
                   counted={g.counted}
                   hidden={!searching && !isAll(stateFilter) ? hiddenByFilter(stateFilter, g.counted ?? []) : undefined}
                   onShowAll={() => chooseFilter(allTicked(ladder))}
-                  stop={stop}
+                  stops={stops}
+                  blockerTitle={blockerTitle}
                   onOpenSession={canOpenSessions ? (id) => messenger.openAgentSession(opened.root, id) : undefined}
                   onProceed={canOpenSessions ? setProceeding : undefined}
                   onError={onError}
                   stateMenu={{ ownerName, onSaveName: saveOwnerName, onEdit: editTask }}
                   selectedId={selectedId}
-                  onSelect={(id) => setSelectedId((now) => afterClick(now, id))}
+                  onSelect={selectTask}
                   terms={terms}
                   modified={opened.last_changed}
                   lostAfter={lostAfter}
@@ -1999,6 +2053,7 @@ function TaskbagView({
                 area={box.areas.find((a) => a.id === selected.area)}
                 iteration={iterations.find((i) => i.id === selected.iteration)}
                 onClose={() => setSelectedId(null)}
+                onOpenTask={selectTask}
                 onLink={openLink}
                 history={history?.id === selected.id ? history.history : null}
                 labels={ladder}
@@ -2166,7 +2221,8 @@ function TaskGroup({
   counted,
   hidden,
   onShowAll,
-  stop,
+  stops,
+  blockerTitle,
   selectedId,
   onSelect,
   terms,
@@ -2204,7 +2260,8 @@ function TaskGroup({
   /** Turns the state filter off. */
   onShowAll?: () => void;
   /** Why a stopped task is stopped: its Waiting on or Blocked by fact (Task-A01-cactus586). */
-  stop?: (task: Task) => StopFact | null;
+  stops?: (task: Task) => StopFact[];
+  blockerTitle?: (id: string) => string;
   /** When each task last changed (UTC), by task ID (Task-A01-52), one of each row's facts. */
   modified?: Record<string, string>;
   /** The project's lost limit, in minutes (Task-A01-kernel761). */
@@ -2294,7 +2351,8 @@ function TaskGroup({
               selected={task.id === selectedId}
               onSelect={onSelect}
               terms={terms}
-              stop={stop?.(task) ?? null}
+              stops={stops?.(task) ?? []}
+              blockerTitle={blockerTitle}
               modified={modified?.[task.id]}
               lostAfter={lostAfter}
               onOpenSession={onOpenSession}

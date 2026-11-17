@@ -210,8 +210,13 @@ Exit codes: 0 done, 1 refused by a rule, 2 wrong usage, 3 taskbag busy or not wr
 
 `alm` never runs or reads your version control tool. After a change it prints \"Save this change
 in your version control tool and share it\", the files that change wrote, and, \"For Git:\", the
-exact `git add`, `git commit` and `git push` commands for them (`--json`: `changed_files` and
-`git_commands`); save and share them yourself and leave other changes as they are. `alm claim`
+exact `git add`, `git commit` and `git push` commands for them (`--json`: `changed_files`,
+`git_commands` and `git_folder`, the folder they run in); save and share them yourself and leave
+other changes as they are: run the commands as printed, never `git add -A`, `git add .` or
+`git commit -a` in the taskbag, which also take changes others have not shared yet. When the
+agent is Codex for certain (the task was claimed with `--session-agent codex`), the commands
+come without `git -C <folder>`, under \"For Git, in <folder> …\": run each on its own, with
+that folder as its working folder. `alm claim`
 asks you to share at once, before you start the work. Changes the person made in the Allomos app
 and not shared yet come with their own files and commands, to save as the person's. `alm init`
 prints none: save the new taskbag yourself.
@@ -360,7 +365,9 @@ Work a task:
   its history; done tasks too. An emergency's approval is due by `--due` (three days after it is
   marked, by default). `alm human` lists, under To approve afterwards, every emergency without an
   approval recorded after it was marked (`alm approve`), and which are past due; `alm show` lists
-  a task's. Without options it shows what is recorded.
+  a task's. Without options it shows what is recorded. Before you finish a task, record its
+  risk with `--risk` and `--touches`, and one sentence of why with `--why` (decision 0027; the
+  rules: `alm guide workflow`, Risk rules).
 - `alm audit-settings`: the project's identity level (pseudonym by default; events only ever
   hold a pseudonym ID). `--identity pseudonym|account|sso`, `--reauthenticate on|off` and
   `--reason \"<why>\"` change it; account and sso need a cloud project.
@@ -590,6 +597,10 @@ and the network is closed, so a Codex session with nobody there to approve (an u
 such as one Monitor ready tasks… starts) cannot pull, commit or push. Allomos's rules for Codex
 let Codex run Git and `alm` without asking; every other command stays in Codex's sandbox.
 
+- **Sessions Monitor ready tasks… starts** use the `workspace-write` sandbox
+  (`codex --sandbox workspace-write`), whatever your own Codex settings say, so they can change
+  files in the project folder without asking; Codex sessions you start yourself keep your
+  settings.
 - **Once per computer, not once per project.** The file below goes in Codex's rules folder as
   `~/.codex/rules/allomos.rules` (`$CODEX_HOME/rules/allomos.rules` when `CODEX_HOME` is set).
   In the Allomos app, the option in Monitor ready tasks… adds it, updates it and removes it.
@@ -600,7 +611,13 @@ let Codex run Git and `alm` without asking; every other command stays in Codex's
 - **How Codex matches a rule:** a command that starts with the rule's words, run on its own.
   Run each Git and `alm` command on its own (no `&&`, `;` or pipes): a command joined with others
   runs in the sandbox. `git -C <folder> …` does not match: run `git …` in that folder instead.
-  The commands `alm` prints are examples; write them in this form.
+- **What `alm` prints for Codex:** on a task claimed with `--session-agent codex`, the Git
+  commands `alm` prints are ready to run as they are: plain `git add`, `git commit` and
+  `git push`, under a line that names the folder (`For Git, in <folder> …`). Run each one on its
+  own, with that folder as its working folder. Pass `--session-agent codex` when you claim:
+  that is how `alm` knows (a session name starting with `codex` tells it too). Where `alm`
+  still prints `git -C <folder> …` (it could not tell the agent is Codex), write the command in
+  the plain form yourself.
 - **Which `alm`:** the rules name no path for `alm`, so they cover the one in the installed
   Allomos app and a development build alike. Use the `alm` the person or the request names, and
   when a command or field is unknown, check `alm --version` (or `which alm`) first.
@@ -644,7 +661,10 @@ const WORKFLOW: &str = "# How to work the tasks
    `alm` tells you when a task was taken over from you. Send a heartbeat at least every 10
    minutes (the project's interval; `alm heartbeat-settings` shows it): `alm beat --as <your
    session name>` beats every task you hold in one change; save and share it as `alm` prints,
-   since a heartbeat counts only once shared. Under half the interval after the last one it
+   since a heartbeat counts only once shared. Save only the files it lists, with the commands as
+   printed: never `git add -A`, `git add .` or `git commit -a` in the taskbag, which also take
+   changes others have not shared yet (the person's changes in the Allomos app, other sessions'
+   changes), often without the events that record them. Under half the interval after the last one it
    writes nothing, so running it often costs nothing. Any change you make to your task (`label`,
    `note`, `handoff`, …) beats along with it; reading never does. Before a long step that runs
    no `alm` command for longer than the interval (a long build, a long test run, waiting for a
@@ -708,7 +728,9 @@ const WORKFLOW: &str = "# How to work the tasks
    repository to get around it: the other sessions would go on reading the stale one. Run each
    Git and `alm` command on its own (no `&&`, `;` or pipes): a command joined with others runs
    in the sandbox. Unattended Codex does not use `git -C <folder>`: it runs `git …` in that
-   folder. **Which `alm`:** use the one the person or the request names; when a command or
+   folder. On a task claimed with `--session-agent codex`, `alm` prints its Git commands in
+   that form already, under a line naming the folder (`For Git, in <folder> …`): run each as
+   it is, with that folder as its working folder. **Which `alm`:** use the one the person or the request names; when a command or
    field is unknown, check `alm --version` (or `which alm`) first.
    When you claim, pass what the Allomos app needs to reopen your session: `--session-agent
    <your agent's id>`, `--session-id <your session's ID>`, and whatever else your agent needs to
@@ -774,7 +796,13 @@ const WORKFLOW: &str = "# How to work the tasks
    then why, then names in the code. The order is how you write; the data format is the same.
 6. Stopping before it is done (for example your session ends): `alm release <id> --note \"<what
    the next one needs>\"`.
-7. Finished: once the task has a \"by human\" label (a person has checked it: the human check),
+7. Before you finish a task, record its risk yourself, with one sentence of why (decision
+   0027): `alm classify <id> --risk low|medium|high --touches production|others-data|none --why
+   \"<one sentence: which rules apply, and what in the work makes them apply>\"`. The rules are
+   under **Risk rules** below; when several apply, the highest one counts, and the rules the
+   project added count too. You judge: alm records what you say and checks nothing, and the
+   approver may change it when reviewing.
+   Finished: once the task has a \"by human\" label (a person has checked it: the human check),
    `alm done <id>`. When the work is finished and only a
    person's hands-on check is left, finish it without that label, in quiet and normal mode alike (step 8):
    `alm done <id> --without-human-check \"<why>\" --steps <file.md>`; say so in your handoff.
@@ -2044,6 +2072,24 @@ fn written_in(language: &str) -> Option<&'static str> {
     }
 }
 
+/// Around the risk rules at the end of `alm guide workflow` (decision 0027, Task-A00-nectar077).
+const RISK_RULES_HEAD: &str = "
+Risk rules (step 7; decision 0027). The risk says what the approver reviews first, and how
+closely, once the work is done; it changes nothing in what needs the approver before the work.
+- Record it before `alm done`, with `--why`: one sentence naming the rules that apply (H3, M2…)
+  and what in the work makes them apply. Say what the work touches with `--touches`:
+  `production`, `others-data` (other people's data), or `none`.
+- When several rules apply, the highest one counts:
+";
+
+const RISK_RULES_TAIL: &str = "\
+- Rules the project added (its settings, Risk management; kept in the taskbag's `project.json`,
+  under `risk`, `rules`) are sentences written for you, one rule each: read them and apply them
+  the same way. A project can add rules; it cannot take H1–H7 away.
+- A task done before with no risk recorded can still get one: `alm classify` works on done
+  tasks too.
+";
+
 /// One topic of the guide, or all of them when `topic` is `None`. `None` for an unknown topic.
 pub fn guide(topic: Option<&str>) -> Option<String> {
     let text = |t: &str| match t {
@@ -2067,6 +2113,11 @@ pub fn guide(topic: Option<&str>) -> Option<String> {
                 "{x}\nThe file (version {}):\n\n```\n{}```\n",
                 crate::codex_rules::VERSION,
                 crate::codex_rules::text()
+            ),
+            // The risk rules, the same text as in the AGENTS.md section (Task-A00-nectar077).
+            "workflow" => format!(
+                "{x}{RISK_RULES_HEAD}{}{RISK_RULES_TAIL}",
+                crate::classify::RISK_RULES
             ),
             _ => x.to_string(),
         })
@@ -2267,6 +2318,24 @@ mod tests {
     /// (AGENTS.md) and `alm guide workflow` both tell every agent, with commands only, to pass
     /// `--as`, beat every 10 minutes and share it, declare long steps with `--busy`, find and take
     /// over lost tasks, and stop when a task was taken over from it.
+    /// A heartbeat is saved with only its own files (Task-A01-flour637): the workflow and the
+    /// commands guide name the Git commands that would take along what others have not shared.
+    #[test]
+    fn guides_say_to_save_only_the_listed_files() {
+        let flat = |t: &str| t.split_whitespace().collect::<Vec<_>>().join(" ");
+        for topic in ["workflow", "commands"] {
+            let text = flat(guide(Some(topic)).unwrap().as_str());
+            assert!(
+                text.contains("never `git add -A`, `git add .` or `git commit -a` in the taskbag"),
+                "{topic}: {text}"
+            );
+            assert!(
+                text.contains("changes others have not shared yet"),
+                "{topic}"
+            );
+        }
+    }
+
     #[test]
     fn brief_and_workflow_carry_the_heartbeat_rules() {
         let flat = |t: &str| t.split_whitespace().collect::<Vec<_>>().join(" ");
@@ -2869,5 +2938,33 @@ mod tests {
             assert!(check > prompt.find("## 3.").unwrap(), "{language}");
             assert!(check < prompt.find("## 4.").unwrap(), "{language}");
         }
+    }
+
+    /// The risk rules are in `alm guide workflow` and in the AGENTS.md section, the same text in
+    /// both (decision 0027, Task-A00-nectar077).
+    #[test]
+    fn the_workflow_guide_and_the_section_tell_the_risk_rules() {
+        let workflow = guide(Some("workflow")).unwrap();
+        let section = crate::agent_section();
+        for text in [&workflow, &section] {
+            assert!(text.contains(crate::classify::RISK_RULES), "{text}");
+            for words in [
+                "alm classify <id> --risk low|medium|high --touches",
+                "--why",
+                "the highest one counts",
+                "H1 an outside effect",
+                "H7 making `alm` do one more check",
+                "M4 the principle",
+                "Low: everything else",
+                "Risk management",
+            ] {
+                assert!(text.contains(words), "{words}");
+            }
+        }
+        assert!(
+            guide(Some("commands"))
+                .unwrap()
+                .contains("one sentence of why with `--why`")
+        );
     }
 }

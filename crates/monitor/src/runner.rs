@@ -11,7 +11,8 @@ use std::time::{Duration, Instant};
 
 use allomos_core::{Problem, Task, Taskbag};
 
-use crate::flow::{Closing, Run, Stuck, tab_to_close, waiting_alert};
+use crate::flow::{Closing, PauseWhy, Run, Stuck, Working, tab_to_close, waiting_alert};
+use crate::quota::{self, UsedUp};
 use crate::registry::{self, Held, Record, Request};
 use crate::unreadable::{Failures, Step};
 use crate::{accounts, notify, request, session_tab, terminal};
@@ -235,14 +236,142 @@ impl Loop {
         true
     }
 
+    /// Whether `agent`'s quota is used up (A03-otter944): a terminal Claude Code is asked
+    /// (`claude -p /usage`, answered without the model); when it cannot be, and for the other
+    /// agents, the agents' last `alm quota` reports say.
+    fn used_up(&self, agent: &str, accounts: &[accounts::Account]) -> Option<UsedUp> {
+        let base = accounts::base_agent(agent);
+        if base == "claude_cli" {
+            let asked = self
+                .found
+                .iter()
+                .find(|(id, _)| id == base)
+                .zip(accounts::config_of(agent, accounts).ok())
+                .and_then(|((_, program), config)| {
+                    quota::ask_usage(
+                        program,
+                        config.as_ref().map(|(var, dir)| (*var, dir.as_path())),
+                    )
+                });
+            if let Some(read) = asked.as_deref().and_then(quota::from_usage) {
+                return read;
+            }
+        }
+        quota::from_reports(agent, &allomos_store::quota_reports(), &quota::now_local())
+    }
+
+    /// `agent` gets no session until its quota comes back; the person is told once.
+    fn pause_for_quota(&mut self, agent: &str, task: Option<&str>, used: UsedUp, now: i64) {
+        let told = self
+            .record
+            .run
+            .paused
+            .get(agent)
+            .is_some_and(|p| p.why == PauseWhy::Quota);
+        self.record
+            .run
+            .pause(agent, PauseWhy::Quota, used.resets.clone(), now);
+        if !told {
+            let line = request::quota_used_up(
+                &self.record.language,
+                terminal::name(agent),
+                task,
+                used.resets.as_deref(),
+            );
+            log(&line);
+            notify::show(
+                &self.dir,
+                &self.id,
+                request::notify_title(&self.record.language),
+                &line,
+            );
+        }
+    }
+
+    /// The sessions that did not start (A03-otter944): each one's tab says why when it can be
+    /// read ("You've hit your 5-hour limit · resets 7:10pm"); its task is given out again.
+    fn not_started(&mut self, gone: Vec<Working>, now: i64) {
+        for w in gone {
+            let used = w
+                .tab
+                .as_ref()
+                .and_then(session_tab::text_of)
+                .and_then(|text| quota::from_session_text(&text));
+            log(&format!(
+                "{} did not start ({}): it never claimed its task{}",
+                w.id,
+                w.agent,
+                if used.is_some() {
+                    "; its quota is used up"
+                } else {
+                    ""
+                }
+            ));
+            match used {
+                Some(used) => {
+                    self.pause_for_quota(&w.agent, Some(&w.id), used.clone(), now);
+                    self.record
+                        .run
+                        .did_not_start(&w, PauseWhy::Quota, used.resets, now);
+                }
+                None => {
+                    let line = request::not_started(
+                        &self.record.language,
+                        terminal::name(&w.agent),
+                        &w.id,
+                    );
+                    notify::show(
+                        &self.dir,
+                        &self.id,
+                        request::notify_title(&self.record.language),
+                        &line,
+                    );
+                    self.record
+                        .run
+                        .did_not_start(&w, PauseWhy::NoClaim, None, now);
+                }
+            }
+        }
+    }
+
+    /// The paused agents whose time has come: an agent out of quota has it read again (and gets
+    /// sessions again when there is some); one paused after a session that did not start, for
+    /// no reason read, gets sessions again.
+    fn look_at_pauses(&mut self, now: i64) {
+        let due = self.record.run.pauses_due(now);
+        if due.is_empty() {
+            return;
+        }
+        let accounts = accounts::load();
+        for (agent, why) in due {
+            match (why, self.used_up(&agent, &accounts)) {
+                (PauseWhy::Quota, Some(used)) => {
+                    self.record.run.pause(&agent, why, used.resets, now);
+                }
+                _ => {
+                    log(&format!("{agent} gets sessions again"));
+                    self.record.run.resume(&agent);
+                }
+            }
+        }
+    }
+
     /// Start one session per share; an agent that cannot be started is taken off the run.
     fn start_sessions(&mut self, shares: Vec<(String, Task)>) {
         // The accounts as they are now: an account added or removed in the app counts from here
         // (Task-A03-oven548).
         let accounts = accounts::load();
         for (agent, task) in shares {
-            // An agent taken off by an earlier failure gets no more sessions this check.
-            if !self.record.run.agents.contains(&agent) {
+            // An agent taken off by an earlier failure gets no more sessions this check, nor one
+            // paused at this check.
+            if !self.record.run.agents.contains(&agent)
+                || self.record.run.paused.contains_key(&agent)
+            {
+                continue;
+            }
+            // Its quota used up: no session; the task stays ready (A03-otter944).
+            if let Some(used) = self.used_up(&agent, &accounts) {
+                self.pause_for_quota(&agent, Some(&task.id), used, now_ms());
                 continue;
             }
             // The agent's command and its settings (`claude_cli:<account>` runs `claude`, in the
@@ -272,6 +401,7 @@ impl Loop {
                     session_id.as_deref(),
                     self.alm_dir.as_deref(),
                     config.as_ref().map(|(var, dir)| (*var, dir.as_path())),
+                    self.record.run.quiet,
                 ),
                 (None, _) => Err(terminal::ask_failed(&agent, "not found on this computer")),
                 (_, Err(why)) => Err(terminal::ask_failed(&agent, why)),
@@ -319,6 +449,10 @@ impl Loop {
     fn pass(&mut self, bag: &Taskbag) -> (bool, bool) {
         let now = now_ms();
         let before = self.record.run.clone();
+        // Sessions that never claimed their task did not start (A03-otter944).
+        let gone = self.record.run.unclaimed(&bag.tasks, now);
+        let gone_any = !gone.is_empty();
+        self.not_started(gone, now);
         let finished = self.record.run.follow(&bag.tasks, now);
         for cur in &finished {
             log(&format!("{} finished ({})", cur.id, cur.agent));
@@ -349,7 +483,12 @@ impl Loop {
         if run.stopping {
             return (*run != before, run.working.is_empty());
         }
-        let due = !finished.is_empty() || now >= run.next_check();
+        // A slot freed by a finished, a let-go (A03-cart761) or a not-started task (A03-otter944)
+        // is filled at once.
+        let freed = !finished.is_empty() || gone_any || run.let_go != before.let_go;
+        let due = freed || now >= run.next_check();
+        self.look_at_pauses(now);
+        let run = &self.record.run;
         if !run.free_agents().is_empty() && due {
             let run = &self.record.run;
             let shares = run.share(bag, now / 1000);

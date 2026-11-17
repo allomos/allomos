@@ -502,6 +502,11 @@ button.primary.danger { background: var(--err); border-color: var(--err); color:
 .row-stop { display: grid; gap: 1px; justify-items: start; font-size: 13px; }
 .row-stop-name { color: var(--muted); font-size: 12px; }
 .row-stop-text { overflow-wrap: anywhere; white-space: pre-line; }
+/* Task-A01-border342: Blocked by names every blocker; one not finished in the blocked colour, a finished one in the done colour. */
+.row-blocker.open { color: var(--s-blocked); }
+.row-blocker.finished { color: var(--s-done); }
+.row-blocker-link { border: 0; border-radius: 0; background: transparent; padding: 0; font: inherit; text-align: inherit; }
+.row-blocker-link:hover { text-decoration: underline; }
 .row-stop-text.clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
 /* Task-A01-cell542: every state its own colour, wherever a state is shown; Task-A01-yard163: brighter,
    and the state word itself (.state-word) on a light tint of its colour (.tint). The filter
@@ -858,6 +863,9 @@ mark { background: rgb(240 166 58 / 0.35); color: inherit; border-radius: 2px; p
 .state-menu { position: relative; display: inline-block; }
 button.state-menu-button { font: inherit; color: inherit; border: none; cursor: pointer; }
 button.state-menu-button:hover { text-decoration: underline; text-underline-offset: 2px; }
+/* The difficulty menu (Task-A01-pewter675): the same list; its button reads as the plain text it replaces. */
+button.difficulty-menu-button { background: none; padding: 0; border-radius: 0; font-weight: inherit; text-align: left; }
+button.difficulty-menu-button.muted { color: var(--muted); }
 .state-popover { min-width: 220px; max-width: 320px; cursor: default; }
 .state-popover .state-item { display: flex; flex-direction: column; }
 .state-popover button:disabled, .state-popover button:disabled span { color: var(--muted); cursor: not-allowed; background: none; }
@@ -902,6 +910,8 @@ button.tree-fold:hover { background: color-mix(in srgb, var(--c) 22%, var(--row-
 button.tree-fold:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .tree-fold svg { width: 8px; height: 8px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .tree-note { display: inline-block; margin-left: 8px; font-size: 11.5px; line-height: 1.5; padding: 0 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; vertical-align: 1px; }
+.tree-note.tree-dependency { background: transparent; font: 400 11.5px/1.5 var(--font); }
+.tree-note.tree-dependency:hover { color: var(--accent-ink); }
 .tree-note.tree-more { font-variant-numeric: tabular-nums; border-color: var(--accent); color: var(--accent-ink); }
 .task.tree-parent-finished .title { color: var(--muted); }
 /* Task-A01-lens781: the Show filter, ticks in two groups (states, labels with Yes and No). */
@@ -1105,6 +1115,7 @@ button.tree-fold:focus-visible { outline: 2px solid var(--accent); outline-offse
 .monitor-sessions { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .monitor-sessions input { width: 4.5em; font-size: 13px; }
 .monitor-stalled { color: var(--warn); font-weight: 600; }
+.monitor-paused { color: var(--warn); }
 /* The Monitors list (Task-A03-motor529): the tab bar's button at the right end, and the panel it opens. */
 .tabbar-monitors { flex: none; margin: 0 4px 6px auto; display: inline-flex; align-items: center; gap: 6px; border: 1px solid color-mix(in srgb, var(--ok) 35%, var(--line)); background: var(--ok-bg); color: var(--ok); border-radius: 99px; padding: 3px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
 .tabbar-monitors .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
@@ -1167,10 +1178,14 @@ button.tree-fold:focus-visible { outline: 2px solid var(--accent); outline-offse
 .monitor-rows { list-style: none; margin: 0; padding: 0; }
 .monitor-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; padding: 2px 0; }
 .monitor-row-text { flex: 1 1 auto; min-width: 0; }
+.monitor-task-id { border: 0; background: none; padding: 0; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
+.monitor-task-id:hover { text-decoration: underline; }
+.monitor-task-id:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 .monitor-row.stalled { color: var(--err); }
 .monitor-row.stalled .muted { color: var(--err); }
 .monitor-group .monitor-rows { padding-left: 12px; }
 .monitor-group-note { padding-left: 12px; }
+.monitor-let-go { margin: 4px 0 0; }
 .monitor-another { padding-top: 2px; }
 .monitor-section .monitor-notice { padding: 2px 0 0 14px; display: block; }
 .monitor-busy { color: var(--warn); }

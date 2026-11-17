@@ -197,6 +197,55 @@ pub fn start_failed(language: &str, agent: &str, id: &str, detail: &str) -> Stri
     }
 }
 
+/// An agent's quota is used up (A03-otter944): it gets no session until it comes back; `task`
+/// is the task it was to work, which is given out again; `resets` when it comes back, as the
+/// agent wrote it.
+pub fn quota_used_up(
+    language: &str,
+    agent: &str,
+    task: Option<&str>,
+    resets: Option<&str>,
+) -> String {
+    match lang(language) {
+        "zh-CN" => format!(
+            "{agent} 的额度用完了{}，先不开新会话{}；额度恢复后再派出任务。",
+            resets.map(|r| format!("（{r} 恢复）")).unwrap_or_default(),
+            task.map(|t| format!("，{t} 仍是就绪")).unwrap_or_default(),
+        ),
+        "ja" => format!(
+            "{agent} のクォータを使い切りました{}。新しいセッションはまだ開きません{}。クォータが戻ったらタスクをまた渡します。",
+            resets
+                .map(|r| format!("（{r} に回復）"))
+                .unwrap_or_default(),
+            task.map(|t| format!("（{t} は準備完了のまま）"))
+                .unwrap_or_default(),
+        ),
+        _ => format!(
+            "{agent}'s quota is used up{}: no new session for now{}; tasks are given out again once it comes back.",
+            resets
+                .map(|r| format!(" (back at {r})"))
+                .unwrap_or_default(),
+            task.map(|t| format!(", and {t} stays ready"))
+                .unwrap_or_default(),
+        ),
+    }
+}
+
+/// A session never claimed its task, for no reason the monitor could read (A03-otter944).
+pub fn not_started(language: &str, agent: &str, id: &str) -> String {
+    match lang(language) {
+        "zh-CN" => format!(
+            "为 {id} 开的 {agent} 会话 10 分钟都没领取任务，算作没开成；它的标签页还开着，可以看看原因。{id} 下次检查时再派出。"
+        ),
+        "ja" => format!(
+            "{id} のために開いた {agent} のセッションが 10 分たってもタスクを引き受けなかったので、開けなかったものとします。タブは開いたままなので理由を確かめられます。{id} は次の確認でまた渡します。"
+        ),
+        _ => format!(
+            "The {agent} session started for {id} did not claim it in 10 minutes, so it counts as not started; its tab stays open for you to see why. {id} is given out again at the next check."
+        ),
+    }
+}
+
 /// The taskbag cannot be read; the run goes on trying (Task-A03-raven398). `detail` is the
 /// failure in English, as the log has it: named only for an ordinary failure (a format problem is
 /// said in the person's words, and its English is written for agents).

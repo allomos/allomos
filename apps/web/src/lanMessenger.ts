@@ -12,6 +12,7 @@
 import type { Messenger } from "./messenger";
 import type { Area, Iteration, Opened, Task, TaskHistory } from "./types";
 import type { FolderInfo as ProjectFolderInfo } from "./folderFlow";
+import type { TaskChange } from "./taskChangeFlow";
 
 export type Lost = "no_app" | "pairing";
 
@@ -96,7 +97,7 @@ export function lanMessenger(
       }
       return Promise.resolve();
     },
-    editTask: (root, id, edit) => change<Task>(root, "edit_task", { id, edit }),
+    editTask: (root, id, edit) => change<TaskChange>(root, "edit_task", { id, edit }),
     reviewAiDecisions: (root, id) => change<void>(root, "review_ai_decisions", { id }),
     // Desktop only for now (approver, 2026-11-08): the computer refuses these (companion_desktop_only).
     approveTask: (root, id, shown, expires, ready) => change<void>(root, "approve_task", { id, shown, expires, ready }),

@@ -33,7 +33,8 @@ pub fn home() -> PathBuf {
 }
 
 /// Folders where command-line tools usually live. A macOS app does not get the person's shell
-/// path, so these are searched besides `PATH`.
+/// `PATH`; npm-installed commands use `#!/usr/bin/env node`, so their Node folders are searched
+/// after `PATH` and the existing common tool folders.
 pub fn tool_dirs(home: &Path) -> Vec<PathBuf> {
     let mut dirs: Vec<PathBuf> = std::env::var_os("PATH")
         .map(|p| std::env::split_paths(&p).collect())
@@ -67,7 +68,182 @@ pub fn tool_dirs(home: &Path) -> Vec<PathBuf> {
         dirs.push("/opt/homebrew/bin".into());
         dirs.push("/usr/local/bin".into());
     }
+    let prefixes = [PathBuf::from("/opt/homebrew"), PathBuf::from("/usr/local")];
+    for dir in node_dirs(home, &prefixes) {
+        if !dirs.contains(&dir) {
+            dirs.push(dir);
+        }
+    }
     dirs
+}
+
+/// Node folders to add when checking npm-installed terminal agents. A macOS app does not inherit
+/// the shell's `PATH`, and those commands rely on `#!/usr/bin/env node`; only folders with an
+/// executable `node` are included. `prefixes` keeps Homebrew discovery testable without reading the
+/// computer's real installations. Windows leaves this to `PATH`, where npm's `.cmd` and Node live.
+#[cfg(windows)]
+pub fn node_dirs(_home: &Path, _prefixes: &[PathBuf]) -> Vec<PathBuf> {
+    Vec::new()
+}
+
+#[cfg(not(windows))]
+pub fn node_dirs(home: &Path, prefixes: &[PathBuf]) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+
+    for prefix in prefixes {
+        let opt = prefix.join("opt");
+        push_node_dir(&mut dirs, opt.join("node").join("bin"));
+
+        let mut versioned = std::fs::read_dir(&opt)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter_map(|entry| {
+                let name = entry.file_name();
+                let version = name
+                    .to_str()?
+                    .strip_prefix("node@")
+                    .and_then(version_parts)?;
+                let bin = entry.path().join("bin");
+                Some((version, bin))
+            })
+            .collect::<Vec<_>>();
+        versioned.sort_by(|(a_version, a_path), (b_version, b_path)| {
+            b_version.cmp(a_version).then_with(|| a_path.cmp(b_path))
+        });
+        for (_, bin) in versioned {
+            push_node_dir(&mut dirs, bin);
+        }
+    }
+
+    push_node_dir(&mut dirs, home.join(".volta/bin"));
+
+    let nvm = home.join(".nvm");
+    let versions = nvm_versions(&nvm);
+    let default = std::fs::read_to_string(nvm.join("alias/default")).ok();
+    let selected_nvm = default
+        .as_deref()
+        .and_then(|alias| matching_nvm_version(alias, &nvm, &versions))
+        .or_else(|| versions.first().map(|(_, bin)| bin.clone()));
+    if let Some(bin) = selected_nvm {
+        push_node_dir(&mut dirs, bin);
+    }
+
+    for bin in [
+        home.join(".local/share/fnm/aliases/default/bin"),
+        home.join("Library/Application Support/fnm/aliases/default/bin"),
+        home.join(".asdf/shims"),
+        home.join(".local/share/mise/shims"),
+    ] {
+        push_node_dir(&mut dirs, bin);
+    }
+
+    dirs
+}
+
+#[cfg(not(windows))]
+fn nvm_versions(nvm: &Path) -> Vec<(Vec<u64>, PathBuf)> {
+    let mut versions = std::fs::read_dir(nvm.join("versions/node"))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|entry| {
+            let name = entry.file_name();
+            let version = name.to_str()?.strip_prefix('v').and_then(version_parts)?;
+            let bin = entry.path().join("bin");
+            Some((version, bin))
+        })
+        .filter(|(_, bin)| has_executable_node(bin))
+        .collect::<Vec<_>>();
+    versions.sort_by(|(a_version, a_path), (b_version, b_path)| {
+        b_version.cmp(a_version).then_with(|| a_path.cmp(b_path))
+    });
+    versions
+}
+
+#[cfg(not(windows))]
+fn matching_nvm_version(
+    alias: &str,
+    nvm: &Path,
+    versions: &[(Vec<u64>, PathBuf)],
+) -> Option<PathBuf> {
+    let alias = alias.trim();
+    if alias == "lts/*" {
+        return std::fs::read_dir(nvm.join("alias/lts"))
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter_map(|entry| std::fs::read_to_string(entry.path()).ok())
+            .filter_map(|alias| matching_nvm_version_value(&alias, versions))
+            .max_by_key(|bin| {
+                versions
+                    .iter()
+                    .find(|(_, version_bin)| version_bin == bin)
+                    .map(|(version, _)| version.clone())
+            });
+    }
+
+    if let Some(name) = alias.strip_prefix("lts/") {
+        if name.is_empty() || name.contains('/') {
+            return None;
+        }
+        let target = std::fs::read_to_string(nvm.join("alias/lts").join(name)).ok()?;
+        return matching_nvm_version_value(&target, versions);
+    }
+
+    matching_nvm_version_value(alias, versions)
+}
+
+#[cfg(not(windows))]
+fn matching_nvm_version_value(alias: &str, versions: &[(Vec<u64>, PathBuf)]) -> Option<PathBuf> {
+    let alias = alias.trim();
+    let requested = alias.strip_prefix('v').unwrap_or(alias);
+    let requested = version_parts(requested)?;
+    versions
+        .iter()
+        .find(|(version, _)| {
+            requested.len() <= version.len()
+                && requested
+                    .iter()
+                    .zip(version)
+                    .all(|(wanted, installed)| wanted == installed)
+        })
+        .map(|(_, bin)| bin.clone())
+}
+
+#[cfg(not(windows))]
+fn version_parts(version: &str) -> Option<Vec<u64>> {
+    let parts = version.split('.').collect::<Vec<_>>();
+    if parts.is_empty() || parts.iter().any(|part| part.is_empty()) {
+        return None;
+    }
+    parts
+        .into_iter()
+        .map(str::parse::<u64>)
+        .collect::<Result<Vec<_>, _>>()
+        .ok()
+}
+
+#[cfg(not(windows))]
+fn push_node_dir(dirs: &mut Vec<PathBuf>, bin: PathBuf) {
+    if has_executable_node(&bin) && !dirs.contains(&bin) {
+        dirs.push(bin);
+    }
+}
+
+#[cfg(not(windows))]
+fn has_executable_node(bin: &Path) -> bool {
+    let node = bin.join("node");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        node.metadata()
+            .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+    }
+    #[cfg(not(unix))]
+    {
+        node.is_file()
+    }
 }
 
 /// The file names a command called `name` may have: on Windows a program (`claude.exe`) or the
@@ -86,16 +262,18 @@ pub fn tool_names(name: &str, windows: bool) -> Vec<String> {
 /// The first `name` executable in `dirs` that answers `--version` (so a broken install is not offered).
 pub fn find_tool(name: &str, dirs: &[PathBuf]) -> Option<PathBuf> {
     let names = tool_names(name, cfg!(windows));
+    let path = std::env::join_paths(dirs).ok()?;
     dirs.iter()
         .flat_map(|d| names.iter().map(move |n| d.join(n)))
         .filter(|p| p.is_file())
         // Asked twice: a tool updating itself can fail its first answer (seen once with `claude`).
-        .find(|p| runs(p) || runs(p))
+        .find(|p| runs(p, &path) || runs(p, &path))
 }
 
-fn runs(program: &Path) -> bool {
+fn runs(program: &Path, path: &OsStr) -> bool {
     let Ok(mut child) = command(program)
         .arg("--version")
+        .env("PATH", path)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -191,13 +369,46 @@ pub fn powershell_script(project: &Path, found: &str, alm_dir: Option<&Path>) ->
     }
 }
 
+/// What a monitored Codex session is started with ahead of its request (Task-A03-plaza436).
+const CODEX_SANDBOX: &str = "--sandbox workspace-write ";
+/// Quiet monitored sessions do not ask for approval and can use the network (Task-A03-trail745).
+const CODEX_QUIET_POLICY: &str =
+    "--ask-for-approval never --config sandbox_workspace_write.network_access=true ";
+/// The app-access prompt is separate from command approvals. Allow only Allomos, only in the
+/// quiet macOS process; this command-line override does not change the person's Codex settings.
+const CODEX_QUIET_MACOS_APP_ACCESS: &str =
+    "--config 'computer_use.macos.bundle_ids={\"io.allomos\"=\"allow\"}' ";
+
+fn codex_quiet_policy() -> String {
+    let app_access = if cfg!(target_os = "macos") {
+        CODEX_QUIET_MACOS_APP_ACCESS
+    } else {
+        ""
+    };
+    format!("{CODEX_QUIET_POLICY}{app_access}")
+}
+
 /// The command line that starts a terminal agent with the request read from `file` (and the file
 /// removed once read), for Monitor ready tasks (Task-A03-moth285): `claude --session-id <id>`
 /// takes the session ID Allomos made, so the app knows the session before it claims; Codex picks
 /// its own, and so does Antigravity's `agy`, which takes an initial prompt only after `-i`
 /// (`--prompt-interactive`; Task-A03-queen969). The request goes through a file because a long, many-line request typed into a
-/// terminal window breaks at its first line end.
+/// terminal window breaks at its first line end. Codex always starts in the `workspace-write`
+/// sandbox, whatever the person's own Codex settings say, so it can change files in the project
+/// folder without a person approving each edit (Task-A03-plaza436). Only quiet monitored sessions
+/// set its approval policy to `never` and allow network access in the sandbox (Task-A03-trail745).
+/// On macOS they also allow the Allomos app in this process only, so Computer Use does not ask for
+/// app access. User settings are untouched.
 pub fn session_command(id: &str, file: &Path, session_id: Option<&str>) -> Option<String> {
+    session_command_with_quiet(id, file, session_id, false)
+}
+
+fn session_command_with_quiet(
+    id: &str,
+    file: &Path,
+    session_id: Option<&str>,
+    quiet: bool,
+) -> Option<String> {
     let file = shell_quote(&file.display().to_string());
     let request = format!("\"$(cat {file}; rm -f {file})\"");
     match (id, session_id) {
@@ -205,7 +416,14 @@ pub fn session_command(id: &str, file: &Path, session_id: Option<&str>) -> Optio
             Some(format!("claude --session-id {} {request}", shell_quote(s)))
         }
         ("claude_cli", None) => Some(format!("claude {request}")),
-        ("codex_cli", _) => Some(format!("codex {request}")),
+        ("codex_cli", _) => Some(format!(
+            "codex {CODEX_SANDBOX}{}{request}",
+            if quiet {
+                codex_quiet_policy()
+            } else {
+                String::new()
+            }
+        )),
         ("antigravity_cli", _) => Some(format!("agy -i {request}")),
         _ => None,
     }
@@ -221,9 +439,30 @@ pub fn powershell_session(
     alm_dir: Option<&Path>,
     config: Option<(&str, &Path)>,
 ) -> String {
+    powershell_session_with_quiet(id, project, found, file, session_id, alm_dir, config, false)
+}
+
+fn powershell_session_with_quiet(
+    id: &str,
+    project: &Path,
+    found: &str,
+    file: &Path,
+    session_id: Option<&str>,
+    alm_dir: Option<&Path>,
+    config: Option<(&str, &Path)>,
+    quiet: bool,
+) -> String {
     let file = powershell_quote(&file.display().to_string());
     let session = match (id, session_id) {
         ("claude_cli", Some(s)) => format!("--session-id {} ", powershell_quote(s)),
+        ("codex_cli", _) => format!(
+            "{CODEX_SANDBOX}{}",
+            if quiet {
+                codex_quiet_policy()
+            } else {
+                String::new()
+            }
+        ),
         ("antigravity_cli", _) => "-i ".to_string(),
         _ => String::new(),
     };
@@ -268,7 +507,8 @@ pub fn plain_session_id(id: &str) -> bool {
 
 /// **Monitor ready tasks** (Task-A03-moth285): start a new session of a terminal agent in
 /// `project` with `request` already sent, in a terminal window of its own, so nobody has to press
-/// Return. The agent's own permission settings stay as they are (Allomos never changes them).
+/// Return. It never edits the user's Codex configuration; a quiet monitored Codex session gets
+/// only the per-process approval and network settings approved for this task.
 /// `id` is the agent (`claude_cli`, `codex_cli`, `antigravity_cli`), `found` its command's path;
 /// `alm_dir` the folder of the `alm` the session should use, put first in its `PATH`.
 pub fn start_session(
@@ -279,6 +519,7 @@ pub fn start_session(
     session_id: Option<&str>,
     alm_dir: Option<&Path>,
     config: Option<(&str, &Path)>,
+    quiet: bool,
 ) -> Result<Option<crate::session_tab::SessionTab>, Problem> {
     if !cfg!(any(target_os = "macos", windows)) {
         return Err(ask_failed(id, "not available on this system yet"));
@@ -291,14 +532,16 @@ pub fn start_session(
         .map(|d| d.as_nanos())
         .unwrap_or_default();
     let file = std::env::temp_dir().join(format!("allomos-request-{stamp}.txt"));
-    let Some(program) = session_command(id, &file, session_id) else {
+    let Some(program) = session_command_with_quiet(id, &file, session_id, quiet) else {
         return Err(ask_failed(id, "no way to start it"));
     };
     // An extra account's folder variable goes in front of the command, for that command only.
     let program = with_config(&program, config);
     std::fs::write(&file, request).map_err(|e| ask_failed(id, e))?;
     if cfg!(windows) {
-        let script = powershell_session(id, project, found, &file, session_id, alm_dir, config);
+        let script = powershell_session_with_quiet(
+            id, project, found, &file, session_id, alm_dir, config, quiet,
+        );
         return new_console("powershell.exe")
             .args(["-NoExit", "-NoLogo", "-Command", &script])
             .spawn()
@@ -358,6 +601,47 @@ pub fn find_terminal_agents() -> Vec<(String, PathBuf)> {
 mod tests {
     use super::*;
 
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
+    #[cfg(unix)]
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[cfg(unix)]
+    struct TempDir(PathBuf);
+
+    #[cfg(unix)]
+    impl TempDir {
+        fn new(name: &str) -> Self {
+            static NEXT: AtomicUsize = AtomicUsize::new(0);
+            let path = std::env::temp_dir().join(format!(
+                "allomos-terminal-{name}-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            let _ = std::fs::remove_dir_all(&path);
+            std::fs::create_dir_all(&path).unwrap();
+            Self(path)
+        }
+
+        fn path(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    #[cfg(unix)]
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[cfg(unix)]
+    fn executable(path: &Path, contents: &str) {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, contents).unwrap();
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
     #[test]
     fn quoting_survives_quotes() {
         assert_eq!(shell_quote("it's"), r"'it'\''s'");
@@ -383,7 +667,7 @@ mod tests {
         assert_eq!(
             session_command("codex_cli", file, Some("ignored")).as_deref(),
             Some(
-                "codex \"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\""
+                "codex --sandbox workspace-write \"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\""
             )
         );
         assert_eq!(
@@ -404,6 +688,18 @@ mod tests {
             ),
             r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\agy\bin\agy.exe' -i $request"
         );
+        assert_eq!(
+            powershell_session(
+                "codex_cli",
+                Path::new(r"C:\p"),
+                r"C:\npm\codex.cmd",
+                Path::new(r"C:\t\r.txt"),
+                Some("ignored"),
+                None,
+                None
+            ),
+            r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\npm\codex.cmd' --sandbox workspace-write $request"
+        );
         assert_eq!(session_command("claude_app", file, None), None);
         assert!(plain_session_id("8f0e5a52-1c2d-4e3f-9a0b-1c2d3e4f5a6b"));
         assert!(!plain_session_id("x; rm -rf ~"));
@@ -421,6 +717,51 @@ mod tests {
             ),
             format!(
                 r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-12' $request"
+            )
+        );
+    }
+
+    #[test]
+    fn quiet_monitor_codex_has_no_approval_prompts_and_its_sandbox_can_use_the_network() {
+        let file = Path::new("/tmp/allomos-request-1.txt");
+        let request = "\"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\"";
+        let app_access = if cfg!(target_os = "macos") {
+            "--config 'computer_use.macos.bundle_ids={\"io.allomos\"=\"allow\"}' "
+        } else {
+            ""
+        };
+        assert_eq!(
+            session_command_with_quiet("codex_cli", file, None, true).as_deref(),
+            Some(format!(
+                "codex --sandbox workspace-write --ask-for-approval never --config sandbox_workspace_write.network_access=true {app_access}{request}"
+            ).as_str())
+        );
+        assert_eq!(
+            session_command("codex_cli", file, None).as_deref(),
+            Some(format!("codex --sandbox workspace-write {request}").as_str())
+        );
+        assert_eq!(
+            session_command_with_quiet("claude_cli", file, Some("ab-12"), true).as_deref(),
+            Some(format!("claude --session-id 'ab-12' {request}").as_str())
+        );
+        assert_eq!(
+            session_command_with_quiet("antigravity_cli", file, None, true).as_deref(),
+            Some(format!("agy -i {request}").as_str())
+        );
+
+        assert_eq!(
+            powershell_session_with_quiet(
+                "codex_cli",
+                Path::new(r"C:\p"),
+                r"C:\npm\codex.cmd",
+                Path::new(r"C:\t\r.txt"),
+                None,
+                None,
+                None,
+                true
+            ),
+            format!(
+                "Set-Location -LiteralPath 'C:\\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\\t\\r.txt'; Remove-Item -LiteralPath 'C:\\t\\r.txt'; & 'C:\\npm\\codex.cmd' --sandbox workspace-write --ask-for-approval never --config sandbox_workspace_write.network_access=true {app_access}$request"
             )
         );
     }
@@ -485,5 +826,68 @@ mod tests {
             ["codex.exe", "codex.cmd", "codex.bat"]
         );
         assert_eq!(tool_names("codex", false), ["codex"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn node_dirs_sort_homebrew_versions_numerically_and_skip_missing_nodes() {
+        let home = TempDir::new("brew-home");
+        let prefix = TempDir::new("brew-prefix");
+        let node20 = prefix.path().join("opt/node@20/bin");
+        let node22 = prefix.path().join("opt/node@22/bin");
+        let missing = prefix.path().join("opt/node@99/bin");
+        executable(&node20.join("node"), "#!/bin/sh\nexit 0\n");
+        executable(&node22.join("node"), "#!/bin/sh\nexit 0\n");
+        std::fs::create_dir_all(&missing).unwrap();
+
+        assert_eq!(
+            node_dirs(home.path(), &[prefix.path().to_path_buf()]),
+            [node22, node20]
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn nvm_default_alias_selects_that_version_and_missing_alias_uses_the_highest() {
+        let home = TempDir::new("nvm-home");
+        let nvm = home.path().join(".nvm");
+        let node20 = nvm.join("versions/node/v20.1.0/bin");
+        let node22 = nvm.join("versions/node/v22.3.0/bin");
+        let node23 = nvm.join("versions/node/v23.0.0/bin");
+        executable(&node20.join("node"), "#!/bin/sh\nexit 0\n");
+        executable(&node22.join("node"), "#!/bin/sh\nexit 0\n");
+        executable(&node23.join("node"), "#!/bin/sh\nexit 0\n");
+
+        let default = nvm.join("alias/default");
+        std::fs::create_dir_all(default.parent().unwrap()).unwrap();
+        std::fs::write(&default, "20\n").unwrap();
+        assert_eq!(node_dirs(home.path(), &[]), [node20]);
+
+        let lts = nvm.join("alias/lts");
+        std::fs::create_dir_all(&lts).unwrap();
+        std::fs::write(lts.join("iron"), "v20.1.0\n").unwrap();
+        std::fs::write(lts.join("jod"), "v22.3.0\n").unwrap();
+        std::fs::write(&default, "lts/*\n").unwrap();
+        assert_eq!(node_dirs(home.path(), &[]), [node22]);
+
+        std::fs::remove_file(default).unwrap();
+        assert_eq!(node_dirs(home.path(), &[]), [node23]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn find_tool_gives_the_probe_the_candidate_path_for_env_node() {
+        let dir = TempDir::new("probe-path");
+        executable(
+            &dir.path().join("allomos-node-probe"),
+            "#!/bin/sh\nexit 0\n",
+        );
+        let tool = dir.path().join("allomos-tool-probe");
+        executable(&tool, "#!/usr/bin/env allomos-node-probe\nexit 0\n");
+
+        assert_eq!(
+            find_tool("allomos-tool-probe", &[dir.path().to_path_buf()]),
+            Some(tool)
+        );
     }
 }

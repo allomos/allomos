@@ -48,7 +48,7 @@ test("changes go to the desktop app under the name kept on this device (Task-A04
   const items = new Map<string, string>();
   const store = { getItem: (k: string) => items.get(k) ?? null, setItem: (k: string, v: string) => void items.set(k, v) };
   const sent: { url: string; body: unknown }[] = [];
-  let reply = () => answer(200, { ok: { id: "A1-01", title: "x" } });
+  let reply = () => answer(200, { ok: { task: { id: "A1-01", title: "x" }, version: "v", whole: false } });
   const m = lanMessenger(
     "tok",
     () => undefined,
@@ -63,7 +63,7 @@ test("changes go to the desktop app under the name kept on this device (Task-A04
   await m.saveOwnerName(" Will ");
   assert.equal(await m.ownerName(), "Will");
   const t = await m.editTask("/p", "A1-01", { field: "state", state: "ready" });
-  assert.equal(t.id, "A1-01");
+  assert.equal(t.task.id, "A1-01");
   assert.deepEqual(sent[0], { url: "/api/change", body: { root: "/p", name: "Will", op: "edit_task", args: { id: "A1-01", edit: { field: "state", state: "ready" } } } });
   // A refusal is the window's Problem, so the page words it the same way.
   reply = () => answer(400, { problem: { code: "task_changed", params: { id: "A1-01" } } });

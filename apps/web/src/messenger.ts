@@ -29,6 +29,7 @@ export type MonitorRequest =
   | { action: "mode"; quiet: boolean };
 import { withDecisions } from "./stopFlow";
 import type { AskedNow, QueueRow } from "./queueFlow";
+import type { TaskChange } from "./taskChangeFlow";
 import type { StartWith, WindowStart } from "./tabsFlow";
 import type { AgentAccount, AgentAccounts } from "./monitorFlow";
 import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, AuditSettings, KeyReplaced, RedactDone, ThisComputer, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, IdentityLevel, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck, WitnessWhen } from "./types";
@@ -271,7 +272,9 @@ export interface Messenger {
    * under the taskbag's lock, recorded in its history. Resolves to the task as saved; rejects with
    * the same Problem `alm` gives, and then nothing was changed.
    */
-  editTask(root: string, id: string, edit: Edit): Promise<Task>;
+  /** Changes one field of a task; answers the task as changed and what the window needs to show
+   * it without reading the whole taskbag again (Task-A01-parade485). */
+  editTask(root: string, id: string, edit: Edit): Promise<TaskChange>;
   /**
    * The person has reviewed task `id`'s AI decisions (Task-A03-19), like `alm reviewed`: one
    * `reviewed` event under the lock. Rejects with a Problem (`nothing_to_review`, `holder_missing`).
@@ -666,7 +669,7 @@ export const desktopMessenger: Messenger = {
   taskHistory: (root, id) => invoke<TaskHistory>("task_history", { root, id }),
   ownerName: () => invoke<string | null>("owner_name"),
   saveOwnerName: (name) => invoke<void>("save_owner_name", { name }),
-  editTask: (root, id, edit) => invoke<Task>("edit_task", { root, id, edit }),
+  editTask: (root, id, edit) => invoke<TaskChange>("edit_task", { root, id, edit }),
   reviewAiDecisions: (root, id) => invoke<void>("review_ai_decisions", { root, id }),
   approveTask: (root, id, shown, expires, ready) => invoke<void>("approve_task", { root, id, shown, expires, ready }),
   withdrawApproval: (root, id, reason) => invoke<void>("withdraw_approval", { root, id, reason }),

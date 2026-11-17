@@ -39,7 +39,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v39)
+## Tasks: Allomos (v40)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -132,6 +132,26 @@ the project notes (below).
   with `alm ai-decided` for review. A question about something cheap to undo, still unanswered
   when the run ends, is settled by your proposal, recorded with `alm ai-decided`. Details:
   `alm guide workflow`, step 8.
+- Risk: before you finish a task (before `alm done`), record its risk yourself, with one
+  sentence of why: `alm classify <id> --risk low|medium|high --touches
+  production|others-data|none --why "<one sentence: which rules apply, and what in the work
+  makes them apply>"`. You judge; alm records what you say and checks nothing, and the
+  approver may change it when reviewing. When several rules apply, the highest one counts:
+  - High: H1 an outside effect (a hosted resource, SQL on a real target, a deployment, a secret,
+    sending email, creating a repository, adding or changing a remote, other people's data);
+    H2 a release; H3 a change of data format (the format of the files of tasks, events or the
+    taskbag; a migration); H4 removing something (a feature, a command, data, files);
+    H5 permissions and security (credentials, pairing, sign-in, signing, who may do what);
+    H6 a change of shared rules (AGENTS.md, `alm guide`); H7 making `alm` do one more check of
+    its own.
+  - Medium: M1 a large change (say 500 lines or more, or 3 modules or more); M2 a check that
+    was not run, or finishing with `--without-human-check`; M3 words and look that users see;
+    M4 the principle of how something is built (the kind of AI decision the approver reviews).
+  - Low: everything else: only documents, internal tidying or tests, with every check passed.
+  Read the rules this project added too (its settings, Risk management; kept in the
+  taskbag's `project.json`, under `risk`, `rules`) and apply them the same way. This is about
+  what is reviewed first once the work is done; what needs the approver before the work (below)
+  stays as it is.
 - Needs a human: `alm human` lists the tasks to check, to answer and to review. When the person
   says they checked one: `alm checked <id>`. When its work changes after that, you decide: send
   it back to To check with `alm recheck <id> --reason "<what changed>"`.
