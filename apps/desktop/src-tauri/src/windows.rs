@@ -278,7 +278,7 @@ pub(crate) fn focused_window(app: &AppHandle) -> Option<String> {
     let windows = app.webview_windows();
     let projects = || {
         windows.iter().filter(|(label, _)| {
-            label.as_str() != crate::ABOUT_WINDOW && label.as_str() != crate::for_you::WINDOW
+            label.as_str() != crate::menu::ABOUT_WINDOW && label.as_str() != crate::for_you::WINDOW
         })
     };
     projects()
