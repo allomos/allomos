@@ -405,7 +405,9 @@ fn codex_quiet_policy() -> String {
 /// to this file?" for the taskbag's `project-notes.md` or another project folder (approver,
 /// 2026-11-17: every project folder of the taskbag, for sessions Allomos starts only; the person's
 /// agy settings are untouched). A folder missing on this computer is left out, and so is a folder
-/// that cannot be listed: the session then starts as it did before.
+/// that cannot be listed: the session then starts as it did before. A monitored Codex session gets
+/// the same folders, made writable in its `workspace-write` sandbox (Task-A03-bag625; approver,
+/// 2026-11-17: every project folder, for sessions Allomos starts only).
 pub fn workspace_dirs(taskbag: &Path, project: &Path) -> Vec<PathBuf> {
     let whole = |p: &Path| allomos_store::tidy(&std::path::absolute(p).unwrap_or(p.to_path_buf()));
     let project = whole(project);
@@ -449,7 +451,9 @@ fn add_dirs(dirs: &[PathBuf], quote: fn(&str) -> String) -> String {
 /// set its approval policy to `never` and allow network access in the sandbox (Task-A03-trail745).
 /// On macOS they also allow the Allomos app in this process only, so Computer Use does not ask for
 /// app access. User settings are untouched. Antigravity adds `dirs` to its workspace
-/// ([`workspace_dirs`], Task-A03-latch882); the other agents ignore them.
+/// ([`workspace_dirs`], Task-A03-latch882), and Codex makes them writable in its sandbox
+/// (`--add-dir`, Task-A03-bag625), so a quiet session's writes to the taskbag do not fail
+/// silently; Claude ignores them.
 pub fn session_command(
     id: &str,
     file: &Path,
@@ -474,7 +478,8 @@ fn session_command_with_quiet(
         }
         ("claude_cli", None) => Some(format!("claude {request}")),
         ("codex_cli", _) => Some(format!(
-            "codex {CODEX_SANDBOX}{}{request}",
+            "codex {CODEX_SANDBOX}{}{}{request}",
+            add_dirs(dirs, shell_quote),
             if quiet {
                 codex_quiet_policy()
             } else {
@@ -517,7 +522,8 @@ fn powershell_session_with_quiet(
     let session = match (id, session_id) {
         ("claude_cli", Some(s)) => format!("--session-id {} ", powershell_quote(s)),
         ("codex_cli", _) => format!(
-            "{CODEX_SANDBOX}{}",
+            "{CODEX_SANDBOX}{}{}",
+            add_dirs(dirs, powershell_quote),
             if quiet {
                 codex_quiet_policy()
             } else {
@@ -572,7 +578,8 @@ pub fn plain_session_id(id: &str) -> bool {
 /// only the per-process approval and network settings approved for this task.
 /// `id` is the agent (`claude_cli`, `codex_cli`, `antigravity_cli`), `found` its command's path;
 /// `alm_dir` the folder of the `alm` the session should use, put first in its `PATH`; `dirs` the
-/// folders an Antigravity session adds to its workspace ([`workspace_dirs`]).
+/// folders an Antigravity session adds to its workspace and a Codex session may also write
+/// ([`workspace_dirs`]).
 pub fn start_session(
     id: &str,
     found: &str,
@@ -788,8 +795,7 @@ mod tests {
     }
 
     /// Task-A03-latch882: an Antigravity session adds the taskbag and the taskbag's other project
-    /// folders to its workspace, one `--add-dir` each, quoted (spaces too); the other agents
-    /// take none.
+    /// folders to its workspace, one `--add-dir` each, quoted (spaces too); Claude takes none.
     #[test]
     fn antigravity_adds_the_taskbag_and_its_project_folders_to_its_workspace() {
         let file = Path::new("/tmp/allomos-request-1.txt");
@@ -814,8 +820,8 @@ mod tests {
             )
         );
         assert_eq!(
-            session_command("codex_cli", file, None, &several).as_deref(),
-            Some(format!("codex --sandbox workspace-write {request}").as_str())
+            session_command("claude_cli", file, None, &several).as_deref(),
+            Some(format!("claude {request}").as_str())
         );
         let windows_one = [PathBuf::from(r"C:\my tb\.allomos\taskbag")];
         let windows_several = [
@@ -896,6 +902,97 @@ mod tests {
             workspace_dirs(&taskbag, &w.join("my site")),
             [taskbag.clone(), w.join("app"), w.join("docs")]
         );
+    }
+
+    /// Task-A03-bag625: a monitored Codex session makes the taskbag and the taskbag's other
+    /// project folders writable in its sandbox, one `--add-dir` each after `--sandbox`, quoted,
+    /// in quiet and normal mode, on macOS and on Windows.
+    #[test]
+    fn codex_makes_the_taskbag_and_its_project_folders_writable() {
+        let file = Path::new("/tmp/allomos-request-1.txt");
+        let request = "\"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\"";
+        let app_access = if cfg!(target_os = "macos") {
+            "--config 'computer_use.macos.bundle_ids={\"io.allomos\"=\"allow\"}' "
+        } else {
+            ""
+        };
+        let quiet = format!(
+            "--ask-for-approval never --config sandbox_workspace_write.network_access=true {app_access}"
+        );
+        let one = [PathBuf::from("/w/my tb/.allomos/taskbag")];
+        let several = [
+            PathBuf::from("/w/tb/.allomos/taskbag"),
+            PathBuf::from("/w/site"),
+            PathBuf::from("/w/O'Neil app"),
+        ];
+        assert_eq!(
+            session_command_with_quiet("codex_cli", file, None, true, &one).as_deref(),
+            Some(
+                format!(
+                    "codex --sandbox workspace-write --add-dir '/w/my tb/.allomos/taskbag' {quiet}{request}"
+                )
+                .as_str()
+            )
+        );
+        assert_eq!(
+            session_command_with_quiet("codex_cli", file, None, true, &several).as_deref(),
+            Some(
+                format!(
+                    "codex --sandbox workspace-write --add-dir '/w/tb/.allomos/taskbag' --add-dir '/w/site' --add-dir '/w/O'\\''Neil app' {quiet}{request}"
+                )
+                .as_str()
+            )
+        );
+        assert_eq!(
+            session_command("codex_cli", file, None, &one).as_deref(),
+            Some(
+                format!(
+                    "codex --sandbox workspace-write --add-dir '/w/my tb/.allomos/taskbag' {request}"
+                )
+                .as_str()
+            )
+        );
+        let start = r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\npm\codex.cmd' --sandbox workspace-write";
+        let windows_one = [PathBuf::from(r"C:\my tb\.allomos\taskbag")];
+        let windows_several = [
+            PathBuf::from(r"C:\tb\.allomos\taskbag"),
+            PathBuf::from(r"C:\site"),
+        ];
+        for (dirs, args) in [
+            (&windows_one[..], r"--add-dir 'C:\my tb\.allomos\taskbag' "),
+            (
+                &windows_several[..],
+                r"--add-dir 'C:\tb\.allomos\taskbag' --add-dir 'C:\site' ",
+            ),
+        ] {
+            assert_eq!(
+                powershell_session_with_quiet(
+                    "codex_cli",
+                    Path::new(r"C:\p"),
+                    r"C:\npm\codex.cmd",
+                    Path::new(r"C:\t\r.txt"),
+                    None,
+                    None,
+                    None,
+                    true,
+                    dirs
+                ),
+                format!("{start} {args}{quiet}$request")
+            );
+            assert_eq!(
+                powershell_session(
+                    "codex_cli",
+                    Path::new(r"C:\p"),
+                    r"C:\npm\codex.cmd",
+                    Path::new(r"C:\t\r.txt"),
+                    None,
+                    None,
+                    None,
+                    dirs
+                ),
+                format!("{start} {args}$request")
+            );
+        }
     }
 
     #[test]
