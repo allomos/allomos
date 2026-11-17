@@ -1027,7 +1027,6 @@
   "tree.collapse": "{id} の下のタスクを折りたたむ",
   "tree.expand": "{id} の下のタスクを開く",
   "tree.more_title": "折りたたみ中：この下の {count} 件を隠しています",
-  "tree.outside": "{id} · 非表示",
   "tree.unknown_title": "{id} にブロックされていますが、そのタスクはタスクバッグにありません。",
   "task.modified": "更新日時 {time}",
   "row.modified": "更新日時",

@@ -23,9 +23,6 @@ export interface TreeRow {
   hidden: number;
   /** Its other blockers shown in this group: it is drawn under one parent only. */
   also: string[];
-  /** Its blockers that are not shown in this group (another iteration or area, hidden by a
-   * filter, or unknown). */
-  outside: string[];
 }
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
@@ -84,7 +81,6 @@ export function depTreeRows(sorted: Task[], folded: string[] = [], idRank?: Map<
       folded: isFolded,
       hidden: isFolded ? size(task.id) : 0,
       also: inGroup.get(task.id)!.filter((id) => id !== p),
-      outside: [...new Set(task.blocked_by ?? [])].filter((id) => id !== task.id && !rank.has(id)),
     });
     if (isFolded) return;
     const next = depth === 0 ? [] : [...lines, !last];

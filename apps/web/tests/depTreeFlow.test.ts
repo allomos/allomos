@@ -54,8 +54,6 @@ test("several parents: under the one first in the sort, shown once, the others n
 test("a parent in another group: the task is a root here, or hangs under its parent in the group", () => {
   const rows = depTreeRows([task("A01-1"), task("A01-2", ["A02-9"]), task("A01-3", ["A02-9", "A01-1"])]);
   assert.deepEqual(shape(rows), ["0:A01-1", "1:A01-3", "0:A01-2"]);
-  assert.deepEqual(row(rows, "A01-2").outside, ["A02-9"]);
-  assert.deepEqual(row(rows, "A01-3").outside, ["A02-9"]);
   assert.deepEqual(row(rows, "A01-3").also, []);
 });
 
