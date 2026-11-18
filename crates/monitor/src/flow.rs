@@ -14,7 +14,9 @@ use crate::session_tab::SessionTab;
 pub const FREQUENCIES: [u32; 7] = [1, 5, 10, 30, 60, 90, 120];
 /// The frequency a run starts with when none is given.
 pub const FIRST_FREQUENCY: u32 = 30;
-/// A session with no sign of life this long is shown as stalled; Allomos never ends it.
+/// A session with no sign of life this long is shown as stalled; Allomos never ends it. A session
+/// whose task it holds and beats for is judged by its heartbeat instead (A03-plum984): see
+/// [`Working::changed`].
 pub const STALL_MS: i64 = 30 * 60 * 1000;
 /// A session that has not claimed its task this long after it was started did not start
 /// (A03-otter944): a session that works claims its task within a minute or two.
@@ -50,7 +52,11 @@ pub struct Working {
     pub at: i64,
     /// Seen held by someone since it was started: it was claimed.
     pub seen_held: bool,
-    /// The task as last seen (what changes when the session works it), and since when (ms).
+    /// The task as last seen (what changes when the session works it), and since when (ms): the
+    /// last sign of life [`Run::stalled`] looks at. While the session holds its task and beats for
+    /// it, its heartbeat decides instead, as for `alm next` (A03-plum984, [`heartbeat::lost`]):
+    /// not lost, `changed` is the time it was last followed; lost, `changed` is moved back far
+    /// enough for the session to show as stalled.
     pub seen: String,
     pub changed: i64,
     /// The holder's name once the task was seen held by this session (A03-cart761): a later
@@ -304,11 +310,13 @@ impl Run {
     /// tasks are finished, in the order they were started. A task another session holds is let
     /// go instead (A03-cart761): it leaves the sessions at work, which frees its slot, and is
     /// noted in [`Run::let_go`]; it is not among the finished ones (its tab stays open).
-    pub fn follow(&mut self, tasks: &[Task], now: i64) -> Vec<Working> {
+    /// `lost_after_secs`: the project's limit for a held task's heartbeat
+    /// (`heartbeat::applied(..).lost_after_secs`).
+    pub fn follow(&mut self, tasks: &[Task], lost_after_secs: i64, now: i64) -> Vec<Working> {
         let mut finished = Vec::new();
         let mut working = Vec::new();
         for cur in self.working.drain(..) {
-            match follow_one(&cur, tasks, now) {
+            match follow_one(&cur, tasks, lost_after_secs, now) {
                 Followed::Working(next) => working.push(next),
                 Followed::Finished => finished.push(cur),
                 Followed::Others(holder) => self.let_go.push(LetGo {
@@ -503,6 +511,17 @@ fn seen_of(task: Option<&Task>) -> String {
     .unwrap_or_default()
 }
 
+/// Whether `task` is in progress and its holder has beaten for it: then [`heartbeat::lost`] tells
+/// whether its session is still alive. A session that never beat (one not yet claimed, or an
+/// older `alm`) is timed by its task's changes instead.
+fn beats_for(task: &Task) -> bool {
+    task.state == State::InProgress
+        && task
+            .holder
+            .as_ref()
+            .is_some_and(|h| task.heartbeat.as_ref().is_some_and(|b| &b.by == h))
+}
+
 /// What following one session's task found.
 enum Followed {
     /// Still its session's: the session as it is now.
@@ -536,7 +555,7 @@ fn others(cur: &Working, task: &Task) -> Option<String> {
 }
 
 /// One session's task as it is now (see [`Followed`]).
-fn follow_one(cur: &Working, tasks: &[Task], now: i64) -> Followed {
+fn follow_one(cur: &Working, tasks: &[Task], lost_after_secs: i64, now: i64) -> Followed {
     let task = tasks.iter().find(|t| t.id == cur.id);
     if let Some(holder) = task.and_then(|t| others(cur, t)) {
         return Followed::Others(holder);
@@ -556,6 +575,15 @@ fn follow_one(cur: &Working, tasks: &[Task], now: i64) -> Followed {
     let mut next = cur.clone();
     if seen != cur.seen {
         next.changed = now;
+    }
+    // A session beating for the task it holds is judged by its heartbeat (A03-plum984), the same
+    // way `alm next` tells a lost task.
+    if let Some(t) = task.filter(|t| beats_for(t)) {
+        if heartbeat::lost(t, now.div_euclid(1000), lost_after_secs, None).is_some() {
+            next.changed = next.changed.min(now - STALL_MS);
+        } else {
+            next.changed = now;
+        }
     }
     next.seen = seen;
     next.seen_held = seen_held;
@@ -586,6 +614,9 @@ pub fn waiting_alert(id: &str, tasks: &[Task]) -> Option<Stuck> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The default limit for a held task's heartbeat (30 minutes), in seconds.
+    const LOST: i64 = 30 * 60;
 
     fn task(id: &str, state: State, holder: Option<&str>) -> Task {
         let mut t: Task = serde_json::from_value(serde_json::json!({
@@ -668,14 +699,14 @@ mod tests {
             task("A01-1", State::Ready, None),
             task("A01-2", State::Ready, None),
         ];
-        assert!(r.follow(&ready, 20).is_empty());
+        assert!(r.follow(&ready, LOST, 20).is_empty());
         assert_eq!(r.working.len(), 2);
         // Codex sessions claim both (another agent, another session ID).
         let tasks = [
             claimed("A01-1", "codex-a01-1", Some("codex"), Some("theirs-1")),
             claimed("A01-2", "codex-a01-2", Some("codex"), None),
         ];
-        let finished = r.follow(&tasks, 30);
+        let finished = r.follow(&tasks, LOST, 30);
         assert!(
             finished.is_empty(),
             "let go, not finished: no tab is closed"
@@ -735,16 +766,16 @@ mod tests {
             claimed("A01-2", "codex-a01-2", Some("codex"), Some("its-own")),
             task("A01-3", State::InProgress, Some("someone")),
         ];
-        assert!(r.follow(&tasks, 20).is_empty());
+        assert!(r.follow(&tasks, LOST, 20).is_empty());
         assert_eq!(r.working.len(), 3);
         assert!(r.let_go.is_empty());
         assert_eq!(r.working[0].changed, 20);
         assert_eq!(r.working[0].holder.as_deref(), Some("claude-a01-1"));
         // Nothing changes: the time since the last sign of life goes on.
-        assert!(r.follow(&tasks, 30).is_empty());
+        assert!(r.follow(&tasks, LOST, 30).is_empty());
         assert_eq!(r.working[0].changed, 20);
         // Released after the claim: finished as before, not let go.
-        let finished = r.follow(&[task("A01-1", State::Ready, None)], 40);
+        let finished = r.follow(&[task("A01-1", State::Ready, None)], LOST, 40);
         assert_eq!(finished.len(), 3);
         assert!(r.let_go.is_empty());
     }
@@ -782,7 +813,7 @@ mod tests {
             claimed("A01-2", "codex-a01-2", Some("codex"), Some("c-1")),
             claimed("A01-3", "codex-a01-3", Some("codex"), Some("c-2")),
         ];
-        assert!(r.follow(&own, 20).is_empty());
+        assert!(r.follow(&own, LOST, 20).is_empty());
         assert_eq!(r.working.len(), 3);
         // A01-1: another Claude Code session (another ID). A01-2: taken with nothing passed, so
         // the record still shows the former holder's session. A01-3: the same name, still held.
@@ -793,7 +824,7 @@ mod tests {
             bare,
             own[2].clone(),
         ];
-        assert!(r.follow(&taken, 30).is_empty());
+        assert!(r.follow(&taken, LOST, 30).is_empty());
         let ids: Vec<&str> = r.working.iter().map(|w| w.id.as_str()).collect();
         assert_eq!(ids, ["A01-3"]);
         let noted: Vec<(&str, &str)> = r
@@ -813,7 +844,7 @@ mod tests {
         );
         let mut done = claimed("A01-9", "codex-a01-9", Some("codex"), None);
         done.state = State::Done;
-        assert!(r.follow(&[done], 20).is_empty());
+        assert!(r.follow(&[done], LOST, 20).is_empty());
         assert_eq!(r.let_go.len(), 1);
     }
 
@@ -824,7 +855,7 @@ mod tests {
         for n in 0..LET_GO_KEPT + 2 {
             let id = format!("A01-{n}");
             r.take("claude_cli", &task(&id, State::Ready, None), None, None, 10);
-            r.follow(&[claimed(&id, "codex-x", Some("codex"), None)], 20);
+            r.follow(&[claimed(&id, "codex-x", Some("codex"), None)], LOST, 20);
         }
         assert_eq!(r.let_go.len(), LET_GO_KEPT);
         assert_eq!(r.let_go[0].id, "A01-2");
@@ -860,7 +891,7 @@ mod tests {
             task("A01-1", State::InProgress, Some("s1")),
             task("A01-2", State::Ready, None),
         ];
-        assert!(r.follow(&tasks, 20).is_empty());
+        assert!(r.follow(&tasks, LOST, 20).is_empty());
         assert!(r.working[0].seen_held);
         assert_eq!(r.working[0].changed, 20);
         // Released after the claim, and done: both finished.
@@ -868,7 +899,7 @@ mod tests {
             task("A01-1", State::Ready, None),
             task("A01-2", State::Done, Some("s2")),
         ];
-        let finished = r.follow(&tasks, 30);
+        let finished = r.follow(&tasks, LOST, 30);
         let ids: Vec<&str> = finished.iter().map(|w| w.id.as_str()).collect();
         assert_eq!(ids, ["A01-1", "A01-2"]);
         // Never claimed and still ready: still waiting for its session.
@@ -880,10 +911,10 @@ mod tests {
             40,
         );
         assert!(
-            r.follow(&[task("A01-3", State::Ready, None)], 50)
+            r.follow(&[task("A01-3", State::Ready, None)], LOST, 50)
                 .is_empty()
         );
-        assert!(r.follow(&[], 60).len() == 1);
+        assert!(r.follow(&[], LOST, 60).len() == 1);
         assert_eq!(r.free_agents(), ["claude_cli", "codex_cli"]);
     }
 
@@ -921,7 +952,7 @@ mod tests {
             task("A01-1", State::Done, Some("s1")),
             task("A01-2", State::InProgress, Some("s2")),
         ];
-        assert_eq!(r.follow(&tasks, 20).len(), 1);
+        assert_eq!(r.follow(&tasks, LOST, 20).len(), 1);
         assert_eq!(r.free_agents(), ["codex_cli"]);
         // A count below one is ignored.
         r.set_sessions("claude_cli", 0);
@@ -1143,7 +1174,7 @@ mod tests {
         // Claimed, then released after the claim: finished as before, not "did not start".
         let held = [task("A01-1", State::InProgress, Some("s"))];
         assert!(r.unclaimed(&held, 1).is_empty());
-        r.follow(&held, 1);
+        r.follow(&held, LOST, 1);
         assert!(
             r.unclaimed(&[task("A01-1", State::Ready, None)], NOT_STARTED_MS)
                 .is_empty()
@@ -1173,5 +1204,101 @@ mod tests {
         let text = serde_json::to_string(&r).unwrap();
         assert!(text.contains(r#""scope":{"kind":"iteration","id":"I-sand"}"#));
         assert_eq!(serde_json::from_str::<Run>(&text).unwrap(), r);
+    }
+
+    /// A03-plum984: `A01-7` held by `me`, its last heartbeat `beat_min` minutes after `T0`, with
+    /// a busy window to `busy_min` when given.
+    fn beating(beat_min: i64, busy_min: Option<i64>) -> Task {
+        let at = |m: i64| heartbeat::format_utc(T0 / 1000 + m * 60);
+        let mut beat = serde_json::json!({ "at": at(beat_min), "by": "me" });
+        if let Some(b) = busy_min {
+            beat["busy_until"] = serde_json::json!(at(b));
+        }
+        serde_json::from_value(serde_json::json!({
+            "id": "A01-7", "title": "A01-7", "area": "A01", "state": "in_progress",
+            "holder": "me", "heartbeat": beat
+        }))
+        .unwrap()
+    }
+
+    /// 2026-11-16T10:00:00Z, in ms.
+    const T0: i64 = 1_794_823_200_000;
+    const MIN: i64 = 60 * 1000;
+
+    /// A run whose one session took `A01-7` at `T0` and claimed it a minute later.
+    fn claimed_at_t0() -> Run {
+        let mut r = run(&["claude_cli"]);
+        r.take(
+            "claude_cli",
+            &task("A01-7", State::Ready, None),
+            None,
+            None,
+            T0,
+        );
+        assert!(r.follow(&[beating(1, None)], LOST, T0 + MIN).is_empty());
+        r
+    }
+
+    /// A session that only beats (nothing else of its task changes) is not stalled after 30
+    /// minutes, nor after an hour (A03-plum984: A01-muffin353 beat on and was shown as stalled).
+    #[test]
+    fn a_session_still_beating_is_not_stalled() {
+        let mut r = claimed_at_t0();
+        for m in [11, 21, 31, 41, 61, 91] {
+            r.follow(&[beating(m - 1, None)], LOST, T0 + m * MIN);
+            assert!(r.stalled(T0 + m * MIN).is_empty(), "{m} minutes");
+        }
+    }
+
+    /// A session whose heartbeat stopped is stalled exactly when `alm next` lists its task as
+    /// lost, with the project's limit (here 30 minutes, then 15).
+    #[test]
+    fn a_session_whose_heartbeat_stopped_is_stalled_when_its_task_is_lost() {
+        for limit in [LOST, 15 * 60] {
+            let mut r = claimed_at_t0();
+            let task = beating(1, None);
+            for m in [2, 10, 16, 20, 31, 32, 60] {
+                let now = T0 + m * MIN;
+                r.follow(std::slice::from_ref(&task), limit, now);
+                let lost = heartbeat::lost(&task, now / 1000, limit, None).is_some();
+                assert_eq!(
+                    !r.stalled(now).is_empty(),
+                    lost,
+                    "{m} minutes, limit {limit}s"
+                );
+            }
+            assert!(!r.stalled(T0 + 60 * MIN).is_empty());
+        }
+    }
+
+    /// A session that declared a busy window is not stalled while it runs, and is once the
+    /// window is over by more than the limit.
+    #[test]
+    fn a_busy_session_is_not_stalled_in_its_busy_window() {
+        let mut r = claimed_at_t0();
+        let task = beating(1, Some(90));
+        for m in [31, 60, 89, 119] {
+            r.follow(std::slice::from_ref(&task), LOST, T0 + m * MIN);
+            assert!(r.stalled(T0 + m * MIN).is_empty(), "{m} minutes");
+        }
+        r.follow(std::slice::from_ref(&task), LOST, T0 + 121 * MIN);
+        assert_eq!(r.stalled(T0 + 121 * MIN).len(), 1);
+    }
+
+    /// A session not claimed yet has no heartbeat: it is timed from its start, as before.
+    #[test]
+    fn a_session_not_claimed_yet_is_timed_from_its_start() {
+        let mut r = run(&["claude_cli"]);
+        r.take(
+            "claude_cli",
+            &task("A01-7", State::Ready, None),
+            None,
+            None,
+            T0,
+        );
+        let ready = [task("A01-7", State::Ready, None)];
+        r.follow(&ready, LOST, T0 + 9 * MIN);
+        assert!(r.stalled(T0 + 29 * MIN).is_empty());
+        assert_eq!(r.stalled(T0 + 30 * MIN).len(), 1);
     }
 }
