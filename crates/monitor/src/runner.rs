@@ -461,7 +461,8 @@ impl Loop {
         let gone = self.record.run.unclaimed(&bag.tasks, now);
         let gone_any = !gone.is_empty();
         self.not_started(gone, now);
-        let finished = self.record.run.follow(&bag.tasks, now);
+        let lost_after = allomos_core::heartbeat::applied(&bag.project).lost_after_secs;
+        let finished = self.record.run.follow(&bag.tasks, lost_after, now);
         for cur in &finished {
             log(&format!("{} finished ({})", cur.id, cur.agent));
             if let Some(tab) = tab_to_close(cur, &bag.tasks) {
