@@ -352,6 +352,31 @@ pub fn terminal_script(project: &Path, program: &str, alm_dir: Option<&Path>) ->
     }
 }
 
+/// The start script a new Terminal window runs (macOS, Task-A03-golf005): it removes itself, then
+/// does what [`terminal_script`] says. The command is not typed into the window: Terminal types
+/// `do script` text into the terminal device, and a line longer than the device's input limit
+/// (1024 bytes on macOS) is cut off before the shell reads it, so a long command (Antigravity's
+/// `--settings` with the person's permission rules) reached zsh with an open quote and stopped at
+/// its continuation prompt. zsh reads the script from the file, whatever its length.
+pub fn start_script(
+    script: &Path,
+    project: &Path,
+    program: &str,
+    alm_dir: Option<&Path>,
+) -> String {
+    format!(
+        "rm -f {}\n{}\n",
+        shell_quote(&script.display().to_string()),
+        terminal_script(project, program, alm_dir)
+    )
+}
+
+/// The short line a new Terminal window types to run the start script (macOS): `. '<script>'`, read
+/// by the window's own shell, so the agent runs there as if typed.
+pub fn start_line(script: &Path) -> String {
+    format!(". {}", shell_quote(&script.display().to_string()))
+}
+
 /// What a new PowerShell window runs (Windows): the same, with `$env:PATH`. The tool is started
 /// by its full path: a new window does not always get the same `PATH`.
 /// `dirs`: folders an Antigravity session adds to its workspace ([`workspace_dirs`]; empty for the
@@ -703,9 +728,14 @@ pub fn start_session(
     }
     // The new tab's window and terminal device are kept, to close that tab once its task is done
     // (Task-A03-sierra014).
+    // The command goes through a script file: typed into the window, a long one is cut off
+    // (Task-A03-golf005, [`start_script`]).
+    let start = std::env::temp_dir().join(format!("allomos-start-{stamp}.sh"));
+    std::fs::write(&start, start_script(&start, project, &program, alm_dir))
+        .map_err(|e| ask_failed(id, e))?;
     let script = format!(
         "tell application \"Terminal\"\nset t to do script {}\nset w to (first window whose tabs contains t)\nreturn (id of w as text) & \", \" & (tty of t)\nend tell",
-        applescript_string(&terminal_script(project, &program, alm_dir))
+        applescript_string(&start_line(&start))
     );
     let out = command("/usr/bin/osascript")
         .args(["-e", &script])
@@ -1208,6 +1238,94 @@ mod tests {
             .starts_with(r"${env:CODEX_HOME} = 'C:\acct'; Set-Location -LiteralPath 'C:\p';"),
             true
         );
+    }
+
+    /// Task-A03-golf005: a new Terminal window types only a short line; the start script, however
+    /// long, parses in zsh and sh and hands the agent every argument and the request whole, with
+    /// quotes, backslashes, line ends and shell characters in the paths and the text.
+    #[cfg(unix)]
+    #[test]
+    fn terminal_start_script_hands_the_agent_everything_whole() {
+        let dir = TempDir::new("start");
+        let project = dir.path().join("my \"proj\" it's $(x) `y`");
+        let added = dir.path().join("task bag's \\ \"dir\"");
+        let bin = dir.path().join("bin");
+        for folder in [&project, &added, &bin] {
+            std::fs::create_dir_all(folder).unwrap();
+        }
+        let out = dir.path().join("args");
+        executable(
+            &bin.join("agy"),
+            &format!(
+                "#!/bin/sh\npwd -P > {o}.pwd\nfor a in \"$@\"; do printf '%s\\0' \"$a\"; done > {o}\n",
+                o = shell_quote(&out.display().to_string())
+            ),
+        );
+        let request = format!(
+            "Task 'A03' \"quoted\" \\ back $HOME $(touch {}) `id` ; | & > <\nsecond line\n\n{}",
+            shell_quote(&dir.path().join("pwned").display().to_string()),
+            "long text ".repeat(500)
+        );
+        // As long as the person's permission rules make it (more than the 1024-byte line limit).
+        let settings = format!(
+            r#"{{"permissions":{{"allow":["command(regex:^git push origin it's \\+[^ ]+$)",{}]}}}}"#,
+            vec![r#""command(regex:^echo x$)""#; 120].join(",")
+        );
+        for shell in ["/bin/zsh", "/bin/sh"] {
+            if !Path::new(shell).exists() {
+                continue;
+            }
+            let file = dir.path().join("request.txt");
+            std::fs::write(&file, &request).unwrap();
+            let program = session_command("antigravity_cli", &file, None, &[added.clone()])
+                .unwrap()
+                .replacen(
+                    " -i ",
+                    &format!(" --settings {} -i ", shell_quote(&settings)),
+                    1,
+                );
+            let script = dir.path().join("start.sh");
+            std::fs::write(
+                &script,
+                start_script(&script, &project, &program, Some(&bin)),
+            )
+            .unwrap();
+            let line = start_line(&script);
+            assert!(line.len() < 200 && !line.contains('\n'), "{line}");
+            assert!(std::fs::read_to_string(&script).unwrap().len() > 2048);
+            let syntax = command(shell).arg("-n").arg(&script).status().unwrap();
+            assert!(syntax.success(), "{shell} -n");
+            let run = command(shell).arg("-c").arg(&line).status().unwrap();
+            assert!(run.success(), "{shell} ran {line}");
+            let args = std::fs::read_to_string(&out).unwrap();
+            let args: Vec<&str> = args.trim_end_matches('\0').split('\0').collect();
+            assert_eq!(
+                args,
+                [
+                    "--add-dir",
+                    &added.display().to_string(),
+                    "--settings",
+                    &settings,
+                    "-i",
+                    request.trim_end_matches('\n'),
+                ],
+                "{shell}"
+            );
+            assert_eq!(
+                std::fs::read_to_string(format!("{}.pwd", out.display()))
+                    .unwrap()
+                    .trim_end(),
+                std::fs::canonicalize(&project)
+                    .unwrap()
+                    .display()
+                    .to_string()
+            );
+            assert!(!script.exists() && !file.exists(), "both files removed");
+            assert!(
+                !dir.path().join("pwned").exists(),
+                "the request ran nothing"
+            );
+        }
     }
 
     #[test]
