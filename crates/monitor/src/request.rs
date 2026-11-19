@@ -5,7 +5,7 @@
 use crate::session_tab::CloseTexts;
 
 /// The three languages the monitor speaks: the task language when it is one of them, else English.
-fn lang(language: &str) -> &'static str {
+pub(crate) fn lang(language: &str) -> &'static str {
     match language {
         "zh-CN" | "zh" | "zh-Hans" => "zh-CN",
         "ja" => "ja",
@@ -50,13 +50,13 @@ fn with_antigravity_push_rule(mode: String, agent: &str, quiet: bool, language: 
     }
     let instruction = match lang(language) {
         "zh-CN" => {
-            "本安静 Antigravity 会话只有单独执行普通推送 `git push origin refs/heads/<branch>`（替换成当前分支名）才会免确认。不要裸用 `git push`，不要加强推、删除、镜像或清理远端分支的参数，也不要把推送和合并、删除工作树或删分支合并成一条命令；其他操作仍遵守 CLI 的权限确认。"
+            "本安静 Antigravity 会话只有单独执行普通推送 `git push origin refs/heads/<branch>`（替换成当前分支名）才会免确认。其他推送写法（裸 `git push`、`git push origin main` 这类简写、强推、删除、镜像或清理远端分支、推标签、和别的命令写在一起）以及 `git reset --hard`、`git clean -f`、`git branch -D`、`rm -rf` 会被直接拒绝，不会弹出确认。被拒后不要换写法、换工具或用脚本绕过：改用允许的写法；确实非做不可时，用 alm wait 搁置并写明要批准的操作。其他操作仍遵守 CLI 的权限确认。"
         }
         "ja" => {
-            "この静かな Antigravity セッションで確認なしに実行できる通常の push は、単独の `git push origin refs/heads/<branch>`（現在のブランチ名に置き換える）だけです。裸の `git push`、強制 push、削除・mirror・prune のオプションは使わず、push を merge、worktree の削除、ブランチ削除と一つのコマンドにまとめないでください。それ以外の操作は CLI の権限確認に従ってください。"
+            "この静かな Antigravity セッションで確認なしに実行できる通常の push は、単独の `git push origin refs/heads/<branch>`（現在のブランチ名に置き換える）だけです。ほかの push の書き方（裸の `git push`、`git push origin main` のような省略形、強制 push、削除・mirror・prune、タグの push、他のコマンドとの連結）と `git reset --hard`、`git clean -f`、`git branch -D`、`rm -rf` は確認なしにすぐ拒否されます。拒否されたら、書き方や道具を変えたりスクリプトで回避したりせず、許可された書き方を使ってください。どうしても必要なら、承認が必要な操作を書いて alm wait で保留にしてください。それ以外の操作は CLI の権限確認に従ってください。"
         }
         _ => {
-            "In this quiet Antigravity session, only a standalone ordinary push written as `git push origin refs/heads/<branch>` (replace it with the current branch name) is auto-allowed. Do not use bare `git push`, force, delete, mirror, or prune options, and do not combine the push with a merge, worktree removal, or branch deletion. Keep every other operation under the CLI's normal permission checks."
+            "In this quiet Antigravity session, only a standalone ordinary push written as `git push origin refs/heads/<branch>` (replace it with the current branch name) is auto-allowed. Other pushes (bare `git push`, short forms such as `git push origin main`, force, delete, mirror or prune, tags, a push joined to other commands) and `git reset --hard`, `git clean -f`, `git branch -D` and `rm -rf` are refused at once, without a prompt. When refused, do not work around it with other wording, tools or scripts: use the allowed form; when you truly need the action, park the task with alm wait, naming the action to approve. Keep every other operation under the CLI's normal permission checks."
         }
     };
     format!("{mode}\n\n{instruction}")
@@ -274,6 +274,22 @@ pub fn notify_waiting(language: &str, id: &str, on: &str) -> String {
 }
 
 /// An agent could not be started for a task: it is taken off the run.
+/// A quiet Antigravity session shows a confirmation (Task-A03-candle790): the person approves or
+/// refuses it in the session's tab; meanwhile the monitor goes on with other tasks.
+pub fn waiting_for_approval(language: &str, id: &str) -> String {
+    match lang(language) {
+        "zh-CN" => format!(
+            "{id} 在等你批准一个操作：请到它的终端标签页（标题显示“等待批准”）选择允许或拒绝。监测先接着做别的任务。"
+        ),
+        "ja" => format!(
+            "{id} が操作の承認を待っています：そのターミナルのタブ（タイトルに「承認待ち」）で許可か拒否を選んでください。監視はその間ほかのタスクを進めます。"
+        ),
+        _ => format!(
+            "{id} is waiting for you to approve an action: choose allow or deny in its terminal tab (titled \"waiting for approval\"). The monitor goes on with other tasks meanwhile."
+        ),
+    }
+}
+
 pub fn start_failed(language: &str, agent: &str, id: &str, detail: &str) -> String {
     match lang(language) {
         "zh-CN" => format!("没能为 {id} 启动 {agent}。{detail}"),

@@ -22,3 +22,6 @@ libc = "=0.2.190"
 
 [dev-dependencies]
 allomos-store = { workspace = true, features = ["test-settings"] }
+# Checks the quiet Antigravity deny rules against sample commands (Task-A03-candle790): the
+# version already in Cargo.lock, pinned deliberately; tests only.
+regex = "=1.13.1"

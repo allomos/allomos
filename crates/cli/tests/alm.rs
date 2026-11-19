@@ -10023,7 +10023,10 @@ fn the_risk_limits_refuse_a_high_risk_finish_and_tell_the_quiet_run_not_to_merge
     let guide_off =
         String::from_utf8_lossy(&alm(&repo, &["guide", "run-modes", "--language", "en"]).stdout)
             .to_string();
-    assert!(!guide_off.contains("you merge high-risk tasks"), "{guide_off}");
+    assert!(
+        !guide_off.contains("you merge high-risk tasks"),
+        "{guide_off}"
+    );
     ok(&repo, &["classify", "A01-01", "--risk", "high"]);
     ok(&repo, &["--as", "a", "claim", "A01-01"]);
     ok(&repo, &finish("A01-01"));
@@ -10035,17 +10038,19 @@ fn the_risk_limits_refuse_a_high_risk_finish_and_tell_the_quiet_run_not_to_merge
     fs::write(&project, serde_json::to_string_pretty(&p).unwrap()).unwrap();
 
     // Recording high risk tells the limits.
-    let text = String::from_utf8_lossy(
-        &alm(&repo, &["classify", "A01-02", "--risk", "high"]).stdout,
-    )
-    .to_string();
+    let text =
+        String::from_utf8_lossy(&alm(&repo, &["classify", "A01-02", "--risk", "high"]).stdout)
+            .to_string();
     assert!(text.contains("alm wait <id> --on"), "{text}");
     ok(&repo, &["--as", "a", "claim", "A01-02"]);
     let v = refused(&repo, &finish("A01-02"), 1, "high_risk_needs_human_check");
     assert!(v["error"]["message"].as_str().unwrap().contains("A01-02"));
     assert_eq!(task_file(&repo, "A01-02")["state"], "in_progress");
     // Checked by a person, it finishes.
-    ok(&repo, &["--as", "a", "label", "A01-02", "locally verified by human"]);
+    ok(
+        &repo,
+        &["--as", "a", "label", "A01-02", "locally verified by human"],
+    );
     ok(&repo, &["--as", "a", "done", "A01-02"]);
 
     // Not high (or not recorded): finished as before; the listed rules name the limits.

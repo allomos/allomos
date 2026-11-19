@@ -340,6 +340,51 @@ impl Loop {
     /// The sessions found lost while they held their task (A03-husky861): their slots are free
     /// and their tasks go out again. A tab that says the quota is used up pauses the agent until
     /// it comes back. The sessions themselves are left as they are.
+    /// Follow the confirmations of quiet Antigravity sessions (Task-A03-candle790,
+    /// [`crate::confirm`]): one that shows a confirmation waits for the person, so its slot is free
+    /// and the person is told once; one that went on takes its slot again. True when one has just
+    /// begun to wait.
+    fn look_at_prompts(&mut self) -> bool {
+        if !self.record.run.quiet {
+            return false;
+        }
+        let looks: Vec<(String, Option<i64>)> = self
+            .record
+            .run
+            .working
+            .iter()
+            .filter(|w| accounts::base_agent(&w.agent) == "antigravity_cli")
+            .filter_map(|w| {
+                let tab = w.tab.as_ref()?;
+                Some((w.id.clone(), crate::confirm::pending_since(&tab.tty, w.at)))
+            })
+            .collect();
+        let mut began = false;
+        for (id, since) in looks {
+            let was = self
+                .record
+                .run
+                .working
+                .iter()
+                .any(|w| w.id == id && w.awaiting_approval.is_some());
+            if self.record.run.set_awaiting(&id, since) {
+                began = true;
+                log(&format!(
+                    "{id} waits for an approval in its tab; its slot is free"
+                ));
+                notify::show(
+                    &self.dir,
+                    &self.id,
+                    request::notify_title(&self.record.language),
+                    &request::waiting_for_approval(&self.record.language, &id),
+                );
+            } else if was && since.is_none() {
+                log(&format!("{id} went on after its approval"));
+            }
+        }
+        began
+    }
+
     fn lost(&mut self, gone: Vec<Working>, now: i64) {
         for w in gone {
             let used = w
@@ -527,6 +572,8 @@ impl Loop {
     fn pass(&mut self, bag: &Taskbag) -> (bool, bool) {
         let now = now_ms();
         let before = self.record.run.clone();
+        // Quiet Antigravity sessions at a confirmation free their slots first (Task-A03-candle790).
+        let waiting = self.look_at_prompts();
         // Sessions that never claimed their task did not start (A03-otter944).
         let gone = self.record.run.unclaimed(&bag.tasks, now);
         let gone_any = !gone.is_empty();
@@ -540,6 +587,9 @@ impl Loop {
         let finished = self.record.run.follow(&bag.tasks, lost_after, now);
         for cur in &finished {
             log(&format!("{} finished ({})", cur.id, cur.agent));
+            if let Some(tab) = &cur.tab {
+                crate::confirm::clear(&tab.tty);
+            }
             if let Some(tab) = tab_to_close(cur, &bag.tasks) {
                 // Its own process unless that cannot start (then a thread, kept for the run to wait for).
                 let handle = session_tab::close_when_done(
@@ -569,7 +619,7 @@ impl Loop {
         }
         // A slot freed by a finished, a let-go (A03-cart761) or a not-started task (A03-otter944)
         // is filled at once.
-        let freed = !finished.is_empty() || gone_any || run.let_go != before.let_go;
+        let freed = !finished.is_empty() || gone_any || waiting || run.let_go != before.let_go;
         let due = freed || now >= run.next_check();
         self.look_at_pauses(now);
         let run = &self.record.run;
@@ -609,6 +659,12 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
         });
     };
     let mut options = options;
+    // The title script quiet Antigravity sessions tell their confirmations with (Task-A03-candle790).
+    if let Err(e) = crate::confirm::write_script(&options.language) {
+        log(&format!(
+            "the Antigravity title script could not be written: {e}"
+        ));
+    }
     let root = options.taskbag.clone();
     let project = project_of(&root);
     let bag = read(&root)?;

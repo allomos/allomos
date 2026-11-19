@@ -84,6 +84,7 @@ dependencies = [
  "allomos-store",
  "fs4",
  "libc",
+ "regex",
  "serde",
  "serde_json",
 ]
