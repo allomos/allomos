@@ -1407,6 +1407,7 @@
   "monitor.not_started_quota_at": "quota used up, back {resets}",
   "monitor.not_started_no_claim": "did not claim the task in 10 minutes",
   "monitor.not_started_again": "found at {time}; the task is given out again",
+  "monitor.not_started_found": "found at {time}",
   "monitor.session_taking_over": "starting to take over from {holder}, which was lost · waiting for it to claim the task · {time}",
   "monitor.lost_title": "Lost sessions",
   "monitor.lost_no_beat": "no heartbeat past the limit; its slot is free",

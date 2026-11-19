@@ -36,6 +36,7 @@ import {
   stalled,
   stateCounts,
   workedFor,
+  dayTimeText,
   notStartedShown,
   lostShown,
 } from "./monitorFlow";
@@ -497,6 +498,7 @@ function RunPanel({
   const { t } = useI18n();
   const free = freeAgents(run);
   const late = stalled(run, now);
+  const notStarted = notStartedShown(run, tasks, now);
   // With several sessions, the badge counts the quiet ones.
   const badge =
     state === "running"
@@ -610,18 +612,18 @@ function RunPanel({
                             : t("monitor.lost_quota")
                           : t("monitor.lost_no_beat")}
                       </span>
-                      <span className="muted small"> · {t(`monitor.lost_${state}`, { time: timeOf(l.found) })}</span>
+                      <span className="muted small"> · {t(`monitor.lost_${state}`, { time: dayTimeText(l.found, now) })}</span>
                     </span>
                   </li>
                 ))}
               </ul>
             </>
           )}
-          {notStartedShown(run).length > 0 && (
+          {notStarted.length > 0 && (
             <>
               <h4 className="monitor-sessions-title small">{t("monitor.not_started_title")}</h4>
               <ul className="monitor-rows">
-                {notStartedShown(run).map((n) => (
+                {notStarted.map(({ item: n, state }) => (
                   <li key={`${n.id}-${n.found}`} className="monitor-row not-started">
                     <span className="monitor-row-text">
                       <strong>{n.id}</strong>
@@ -634,7 +636,17 @@ function RunPanel({
                             : t("monitor.not_started_quota")
                           : t("monitor.not_started_no_claim")}
                       </span>
-                      <span className="muted small"> · {t(run.givenUp.includes(n.id) ? "monitor.lost_given_up" : "monitor.not_started_again", { time: timeOf(n.found) })}</span>
+                      <span className="muted small">
+                        {" · "}
+                        {t(
+                          state === "given_up"
+                            ? "monitor.lost_given_up"
+                            : state === "again"
+                              ? "monitor.not_started_again"
+                              : "monitor.not_started_found",
+                          { time: dayTimeText(n.found, now) },
+                        )}
+                      </span>
                     </span>
                   </li>
                 ))}

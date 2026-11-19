@@ -490,6 +490,12 @@ impl Run {
             self.let_go.drain(..self.let_go.len() - LET_GO_KEPT);
         }
         self.working = working;
+        let now_secs = now.div_euclid(1000);
+        self.not_started.retain(|n| {
+            tasks
+                .iter()
+                .any(|t| t.id == n.id && can_dispatch_again(t, now_secs, lost_after_secs))
+        });
         finished
     }
 
@@ -636,6 +642,7 @@ impl Run {
         tab: Option<SessionTab>,
         now: i64,
     ) {
+        self.not_started.retain(|n| n.id != task.id);
         self.taken.push(task.id.clone());
         self.taken_by.insert(task.id.clone(), agent.to_string());
         self.working.push(Working {
@@ -677,6 +684,13 @@ impl Run {
         w.awaiting_approval = since;
         began
     }
+}
+
+/// Whether `task` is still open for a monitor to give out again: ready and held by no one, or
+/// in progress with a lost holder (A03-throne493).
+fn can_dispatch_again(task: &Task, now_secs: i64, lost_after_secs: i64) -> bool {
+    (task.state == State::Ready && task.holder.is_none())
+        || heartbeat::lost(task, now_secs, lost_after_secs, None).is_some()
 }
 
 /// What of a task its session changes as it works it.
@@ -1758,5 +1772,68 @@ mod tests {
         }
         let back: Run = serde_json::from_value(v).unwrap();
         assert_eq!(back, r);
+    }
+
+    #[test]
+    fn not_started_is_cleared_when_re_dispatched_and_done() {
+        let mut r = run(&["codex_cli"]);
+        let t = leveled("A01-iris713", 3);
+        let bag = bag_of(vec![t.clone()]);
+        r.take("codex_cli", &t, None, None, T0);
+        let gone = r.unclaimed(&bag.tasks, T0 + NOT_STARTED_MS);
+        assert_eq!(gone.len(), 1);
+        r.did_not_start(&gone[0], PauseWhy::NoClaim, None, T0 + NOT_STARTED_MS);
+        assert_eq!(r.not_started.len(), 1);
+
+        // Re-dispatched later, claimed, then finished as done: no stale not_started left.
+        r.resume("codex_cli");
+        let shares = r.share(&bag, (T0 + 40 * MIN) / 1000);
+        assert_eq!(shares.len(), 1);
+        r.take("codex_cli", &shares[0].1, None, None, T0 + 40 * MIN);
+        assert!(r.not_started.is_empty());
+
+        let claimed_task = task("A01-iris713", State::InProgress, Some("codex/1"));
+        assert!(r.follow(&[claimed_task], LOST, T0 + 45 * MIN).is_empty());
+        let done_task = task("A01-iris713", State::Done, None);
+        assert_eq!(r.follow(&[done_task], LOST, T0 + 60 * MIN).len(), 1);
+        assert!(r.not_started.is_empty());
+    }
+
+    #[test]
+    fn stale_not_started_is_dropped_when_task_is_no_longer_dispatchable() {
+        let mut r = run(&["codex_cli"]);
+        let now = T0 + 60 * MIN;
+        let ids = [
+            "A01-ready",
+            "A01-lost",
+            "A01-claimed",
+            "A01-done",
+            "A01-dropped",
+            "A01-waiting",
+            "A01-backlog",
+            "A01-gone",
+        ];
+        for id in ids {
+            r.not_started.push(NotStarted {
+                agent: "codex_cli".into(),
+                id: id.into(),
+                at: T0,
+                found: T0 + NOT_STARTED_MS,
+                why: PauseWhy::NoClaim,
+                resets: None,
+            });
+        }
+        let tasks = vec![
+            task("A01-ready", State::Ready, None),
+            held_by("A01-lost", "codex/old", "old-sid", 0),
+            held_by("A01-claimed", "codex/live", "live-sid", 55),
+            task("A01-done", State::Done, None),
+            task("A01-dropped", State::Dropped, None),
+            task("A01-waiting", State::Waiting, None),
+            task("A01-backlog", State::Backlog, None),
+        ];
+        r.follow(&tasks, LOST, now);
+        let kept: Vec<&str> = r.not_started.iter().map(|n| n.id.as_str()).collect();
+        assert_eq!(kept, ["A01-ready", "A01-lost"]);
     }
 }

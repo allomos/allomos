@@ -660,10 +660,77 @@ export function sessionGroups(run: Run): SessionGroup[] {
   }));
 }
 
-/** The sessions that did not start whose task no session works now, newest first: the panel
- * lists them under the sessions (A03-otter944). */
-export function notStartedShown(run: Run): NotStarted[] {
-  return [...run.notStarted].reverse().filter((n, i, all) => !run.working.some((w) => w.id === n.id) && all.findIndex((m) => m.id === n.id) === i);
+/** What became of a not-started session's task (A03-throne493): this run will give it out again,
+ * gave it up after several failures, or will not give it out again (stopping, blocked, or outside
+ * the run's scope or difficulty range). */
+export type NotStartedState = "again" | "given_up" | "not_again";
+
+const parseUtc = (stamp: string | null | undefined): number | null => {
+  if (!stamp) return null;
+  const ms = new Date(stamp.replace(/T(\d\d:\d\d)Z$/, "T$1:00Z")).getTime();
+  return Number.isNaN(ms) ? null : ms;
+};
+
+/** Whether `task` is in progress with a holder whose heartbeat has passed the lost limit and has
+ * no busy window running (mirrors `heartbeatFlow.ts` and `crates/core/src/heartbeat.rs`). */
+function isLostTask(task: Task, now: number, lostAfterMinutes = 30): boolean {
+  if (task.state !== "in_progress" || !task.holder) return false;
+  const mine = task.heartbeat && task.heartbeat.by === task.holder ? task.heartbeat : null;
+  const at = parseUtc(mine?.at);
+  const until = parseUtc(mine?.busy_until);
+  if (until !== null && until > now) return false;
+  const since = at !== null || until !== null ? Math.max(at ?? -Infinity, until ?? -Infinity) : null;
+  return since !== null && now - since > lostAfterMinutes * 60_000;
+}
+
+function isDispatchable(task: Task, now: number, lostAfterMinutes = 30): boolean {
+  return (task.state === "ready" && !task.holder) || isLostTask(task, now, lostAfterMinutes);
+}
+
+function willDispatchAgain(run: Run, task: Task): boolean {
+  if (run.stopping) return false;
+  if (run.scope.kind === "iteration" && task.iteration !== run.scope.id) return false;
+  if ((task.open_blockers?.length ?? 0) > 0) return false;
+  const d = task.difficulty ?? 3;
+  return run.agents.some((a) => {
+    const l = levelsOf(run, a);
+    return d >= l.low && d <= l.high;
+  });
+}
+
+/** The sessions that did not start whose task is still open to be given out (ready and unheld, or
+ * lost) and not worked by a session of this run now, newest first, each task once (A03-otter944,
+ * A03-throne493). */
+export function notStartedShown(
+  run: Run,
+  tasks: Task[],
+  now: number,
+  lostAfterMinutes = 30,
+): { item: NotStarted; state: NotStartedState }[] {
+  return [...run.notStarted]
+    .reverse()
+    .filter((n, i, all) => !run.working.some((w) => w.id === n.id) && all.findIndex((m) => m.id === n.id) === i)
+    .flatMap((item) => {
+      const task = tasks.find((t) => t.id === item.id);
+      if (!task || !isDispatchable(task, now, lostAfterMinutes)) return [];
+      const state: NotStartedState = run.givenUp.includes(item.id)
+        ? "given_up"
+        : willDispatchAgain(run, task)
+          ? "again"
+          : "not_again";
+      return [{ item, state }];
+    });
+}
+
+/** A local time as the panel shows it: `HH:MM` on the same local day as `now`, otherwise
+ * `YYYY-MM-DD HH:MM` so records from an earlier day are never mistaken for today (A03-throne493). */
+export function dayTimeText(ms: number, now: number): string {
+  const d = new Date(ms);
+  const cur = new Date(now);
+  const p = (n: number) => String(n).padStart(2, "0");
+  const clock = `${p(d.getHours())}:${p(d.getMinutes())}`;
+  const sameDay = d.getFullYear() === cur.getFullYear() && d.getMonth() === cur.getMonth() && d.getDate() === cur.getDate();
+  return sameDay ? clock : `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${clock}`;
 }
 
 /** What became of a lost session's task (A03-husky861): a new session of the run works it now,

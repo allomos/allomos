@@ -1407,6 +1407,7 @@
   "monitor.not_started_quota_at": "额度用完，{resets} 恢复",
   "monitor.not_started_no_claim": "10 分钟没领取任务",
   "monitor.not_started_again": "{time} 发现；任务会再派出",
+  "monitor.not_started_found": "{time} 发现",
   "monitor.session_taking_over": "正在开会话接手失联的 {holder} · 等它领取任务 · 已 {time}",
   "monitor.lost_title": "失联的会话",
   "monitor.lost_no_beat": "超过失联时限没有心跳，名额已让出",

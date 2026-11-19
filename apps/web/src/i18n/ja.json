@@ -1407,6 +1407,7 @@
   "monitor.not_started_quota_at": "クォータ切れ、{resets} に回復",
   "monitor.not_started_no_claim": "10 分たってもタスクを引き受けませんでした",
   "monitor.not_started_again": "{time} に判明。タスクはまた渡します",
+  "monitor.not_started_found": "{time} に判明",
   "monitor.session_taking_over": "連絡が途絶えた {holder} から引き継ぐセッションを開いています · タスクを引き受けるのを待っています · {time}経過",
   "monitor.lost_title": "連絡が途絶えたセッション",
   "monitor.lost_no_beat": "期限を過ぎてもハートビートがなく、枠を空けました",

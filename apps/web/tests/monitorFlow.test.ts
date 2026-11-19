@@ -20,6 +20,8 @@ import {
   levelsOf,
   levelsText,
   lostShown,
+  dayTimeText,
+  notStartedShown,
   nextCheck,
   parseLevels,
   readEntry,
@@ -361,4 +363,86 @@ test("lost sessions are read with what became of their tasks (A03-husky861)", ()
   const old = readEntry(entry(), null);
   assert.ok(old && isRun(old));
   assert.deepEqual([old.lost, old.givenUp], [[], []]);
+});
+
+test("notStartedShown hides tasks that are done, dropped, claimed, or otherwise not dispatchable (A03-throne493)", () => {
+  const now = Date.parse("2026-11-20T00:35:00Z");
+  const r = readEntry(
+    entry({
+      scope: { kind: "iteration", id: "I-water" },
+      agents: ["codex_cli"],
+      difficulties: { codex_cli: "1-3" },
+      given_up: ["A01-givenup"],
+      working: [{ agent: "codex_cli", id: "A01-working", at: now - 60_000, changed: now - 60_000 }],
+      not_started: [
+        { agent: "codex_cli", id: "A01-iris713", at: now - 48 * 3600_000, found: now - 47 * 3600_000, why: "no_claim", resets: null },
+        { agent: "codex_cli", id: "A01-dropped", at: now - 20 * 60_000, found: now - 10 * 60_000, why: "no_claim", resets: null },
+        { agent: "codex_cli", id: "A01-claimed", at: now - 20 * 60_000, found: now - 10 * 60_000, why: "no_claim", resets: null },
+        { agent: "codex_cli", id: "A01-waiting", at: now - 20 * 60_000, found: now - 10 * 60_000, why: "no_claim", resets: null },
+        { agent: "codex_cli", id: "A01-backlog", at: now - 20 * 60_000, found: now - 10 * 60_000, why: "no_claim", resets: null },
+        { agent: "codex_cli", id: "A01-missing", at: now - 20 * 60_000, found: now - 10 * 60_000, why: "no_claim", resets: null },
+        { agent: "codex_cli", id: "A01-working", at: now - 20 * 60_000, found: now - 10 * 60_000, why: "no_claim", resets: null },
+        { agent: "codex_cli", id: "A01-ready", at: now - 30 * 60_000, found: now - 20 * 60_000, why: "no_claim", resets: null },
+        { agent: "codex_cli", id: "A01-ready", at: now - 15 * 60_000, found: now - 5 * 60_000, why: "quota", resets: "01:00" },
+        { agent: "codex_cli", id: "A01-lost", at: now - 20 * 60_000, found: now - 10 * 60_000, why: "no_claim", resets: null },
+        { agent: "codex_cli", id: "A01-givenup", at: now - 20 * 60_000, found: now - 10 * 60_000, why: "no_claim", resets: null },
+        { agent: "codex_cli", id: "A01-other-iter", at: now - 20 * 60_000, found: now - 10 * 60_000, why: "no_claim", resets: null },
+        { agent: "codex_cli", id: "A01-blocked", at: now - 20 * 60_000, found: now - 10 * 60_000, why: "no_claim", resets: null },
+        { agent: "codex_cli", id: "A01-too-hard", at: now - 20 * 60_000, found: now - 10 * 60_000, why: "no_claim", resets: null },
+      ],
+    }),
+    null,
+  );
+  assert.ok(r && isRun(r));
+  const tasks: Task[] = [
+    task("A01-iris713", { state: "done", iteration: "I-water" }),
+    task("A01-dropped", { state: "dropped", iteration: "I-water" }),
+    task("A01-claimed", {
+      state: "in_progress",
+      holder: "codex/live",
+      iteration: "I-water",
+      heartbeat: { by: "codex/live", at: "2026-11-20T00:30:00Z" },
+    }),
+    task("A01-waiting", { state: "waiting", iteration: "I-water" }),
+    task("A01-backlog", { state: "backlog", iteration: "I-water" }),
+    task("A01-working", { state: "ready", iteration: "I-water" }),
+    task("A01-ready", { state: "ready", iteration: "I-water", difficulty: 2 }),
+    task("A01-lost", {
+      state: "in_progress",
+      holder: "codex/old",
+      iteration: "I-water",
+      heartbeat: { by: "codex/old", at: "2026-11-19T23:50:00Z" },
+    }),
+    task("A01-givenup", { state: "ready", iteration: "I-water", difficulty: 2 }),
+    task("A01-other-iter", { state: "ready", iteration: "I-other", difficulty: 2 }),
+    task("A01-blocked", { state: "ready", iteration: "I-water", difficulty: 2, open_blockers: ["A01-01"] }),
+    task("A01-too-hard", { state: "ready", iteration: "I-water", difficulty: 5 }),
+  ];
+  assert.deepEqual(
+    notStartedShown(r, tasks, now).map(({ item, state }) => [item.id, state, item.why]),
+    [
+      ["A01-too-hard", "not_again", "no_claim"],
+      ["A01-blocked", "not_again", "no_claim"],
+      ["A01-other-iter", "not_again", "no_claim"],
+      ["A01-givenup", "given_up", "no_claim"],
+      ["A01-lost", "again", "no_claim"],
+      ["A01-ready", "again", "quota"],
+    ],
+  );
+  // While stopping, a ready task will not be given out again.
+  const stopping = { ...r, stopping: true };
+  assert.deepEqual(
+    notStartedShown(stopping, [task("A01-ready", { state: "ready", iteration: "I-water", difficulty: 2 })], now).map(
+      ({ item, state }) => [item.id, state],
+    ),
+    [["A01-ready", "not_again"]],
+  );
+});
+
+test("dayTimeText shows HH:MM on the same day and YYYY-MM-DD HH:MM on another day (A03-throne493)", () => {
+  const now = new Date(2026, 10, 20, 0, 35).getTime();
+  const sameDay = new Date(2026, 10, 20, 0, 25).getTime();
+  const twoDaysAgo = new Date(2026, 10, 18, 0, 25).getTime();
+  assert.equal(dayTimeText(sameDay, now), "00:25");
+  assert.equal(dayTimeText(twoDaysAgo, now), "2026-11-18 00:25");
 });
