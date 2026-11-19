@@ -5,6 +5,7 @@
 //! folder ([`registry`]), never in the taskbag.
 
 pub mod accounts;
+pub mod confirm;
 pub mod flow;
 pub mod notify;
 pub mod quota;

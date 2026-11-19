@@ -29,6 +29,8 @@ import {
   sessionsOf,
   setAgents,
   stalled,
+  needYou,
+  runState,
 } from "../src/monitorFlow.ts";
 import { toCheck } from "../src/stopFlow.ts";
 import { levelsHold } from "../src/difficultyFlow.ts";
@@ -247,12 +249,23 @@ const entry = (over: Record<string, unknown> = {}) => ({
   },
 });
 
+test("a session at a confirmation frees its slot, is not stalled and needs you (Task-A03-candle790)", () => {
+  const waiting = [{ agent: "claude_cli", id: "A01-02", session_id: "s-1", tab: { window: 7, tty: "/dev/ttys004" }, at: 10, seen_held: true, seen: "", changed: 20, awaiting_approval: 30 }];
+  const r = readEntry(entry({ working: waiting }), "I-haul");
+  assert.ok(r && isRun(r));
+  assert.equal(r.working[0].awaitingApproval, 30);
+  assert.deepEqual(freeAgents(r), ["claude_cli", "codex_cli"]);
+  assert.deepEqual(stalled(r, 10 * 60 * 60_000), []);
+  assert.deepEqual(needYou(r, []), ["A01-02"]);
+  assert.equal(runState(r, [], 10 * 60 * 60_000), "need_you");
+});
+
 test("a run is read from its file: scope, agents, sessions at work, next check", () => {
   const r = readEntry(entry(), "I-haul");
   assert.ok(r && isRun(r));
   assert.deepEqual(r.scope, { kind: "iteration", id: "I-haul", current: true });
   assert.equal(nextCheck(r), 1_900_000);
-  assert.deepEqual(r.working, [{ agent: "claude_cli", id: "A01-02", sessionId: "s-1", tab: { window: 7, tty: "/dev/ttys004" }, at: 10, changed: 20, claimed: true, takeoverFrom: null }]);
+  assert.deepEqual(r.working, [{ agent: "claude_cli", id: "A01-02", sessionId: "s-1", tab: { window: 7, tty: "/dev/ttys004" }, at: 10, changed: 20, claimed: true, takeoverFrom: null, awaitingApproval: null }]);
   assert.deepEqual(freeAgents(r), ["codex_cli"]);
   assert.deepEqual(readEntry(entry(), "I-knit") && (readEntry(entry(), "I-knit") as { scope: unknown }).scope, { kind: "iteration", id: "I-haul", current: false });
   // An agent alm does not know and a frequency the app does not offer are left out.

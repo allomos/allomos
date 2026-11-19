@@ -1387,6 +1387,7 @@
   "monitor.sessions_none": "作業中のセッションはありません。",
   "monitor.session_working": "作業中 · {time}経過",
   "monitor.session_finishing": "仕上げ中 · {time}経過",
+  "monitor.session_awaiting_approval": "承認待ち：ターミナルのタブで選んでください · 枠は空いています",
   "monitor.session_starting": "セッションを開いています · タスクを引き受けるのを待っています · {time}経過",
   "monitor.paused_quota": "クォータを使い切りました。新しいセッションはまだ開きません。{time} にクォータをまた確かめます。",
   "monitor.paused_quota_at": "クォータを使い切りました（{resets} に回復）。新しいセッションはまだ開きません。{time} にクォータをまた確かめます。",

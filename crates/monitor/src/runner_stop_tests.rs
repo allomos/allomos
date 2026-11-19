@@ -54,6 +54,7 @@ fn waiting_can_exit_without_touching_agents_tasks_or_other_runs() {
             holder: Some("synthetic-session".into()),
             prior: None,
             prior_session: None,
+            awaiting_approval: None,
         });
         let options = Options {
             taskbag: root.clone(),

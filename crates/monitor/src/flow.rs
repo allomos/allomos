@@ -70,6 +70,11 @@ pub struct Working {
     pub prior: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prior_session: Option<String>,
+    /// Since when (ms) this session shows a confirmation and waits for the person
+    /// (Task-A03-candle790, [`crate::confirm`]): it does not take a slot, it is not lost while it
+    /// waits (it sends no heartbeat), and its task stays its own, so no other session is given it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub awaiting_approval: Option<i64>,
 }
 
 /// A session the run stopped following because its task went lost while it held it
@@ -317,6 +322,7 @@ impl Run {
         let (gone, kept): (Vec<Working>, Vec<Working>) = self.working.drain(..).partition(|w| {
             tasks.iter().find(|t| t.id == w.id).is_some_and(|t| {
                 w.seen_held
+                    && w.awaiting_approval.is_none()
                     && !prior_holds(w, t)
                     && others(w, t).is_none()
                     && beats_for(t)
@@ -425,7 +431,13 @@ impl Run {
     pub fn free_agents(&self) -> Vec<String> {
         let mut free = Vec::new();
         for agent in self.agents.iter().filter(|a| !self.paused.contains_key(*a)) {
-            let at_work = self.working.iter().filter(|w| &w.agent == agent).count() as u32;
+            // A session waiting at a confirmation leaves its slot free (Task-A03-candle790); once
+            // it goes on, the agent may have one session more than its count for a while.
+            let at_work = self
+                .working
+                .iter()
+                .filter(|w| &w.agent == agent && w.awaiting_approval.is_none())
+                .count() as u32;
             for _ in at_work..self.sessions_of(agent) {
                 free.push(agent.clone());
             }
@@ -642,6 +654,7 @@ impl Run {
                 .holder
                 .as_ref()
                 .and_then(|_| present_session(task).and_then(|s| s.id.clone())),
+            awaiting_approval: None,
         });
         self.checked = now;
     }
@@ -650,8 +663,19 @@ impl Run {
     pub fn stalled(&self, now: i64) -> Vec<&Working> {
         self.working
             .iter()
-            .filter(|w| now - w.changed >= STALL_MS)
+            .filter(|w| w.awaiting_approval.is_none() && now - w.changed >= STALL_MS)
             .collect()
+    }
+
+    /// Record whether `id`'s session shows a confirmation now (`since`, ms) or not (none); true when
+    /// it has just begun to (Task-A03-candle790).
+    pub fn set_awaiting(&mut self, id: &str, since: Option<i64>) -> bool {
+        let Some(w) = self.working.iter_mut().find(|w| w.id == id) else {
+            return false;
+        };
+        let began = w.awaiting_approval.is_none() && since.is_some();
+        w.awaiting_approval = since;
+        began
     }
 }
 
@@ -1560,6 +1584,45 @@ mod tests {
         assert!(r.follow(&[held], LOST, T0 + 2 * MIN).is_empty());
         assert!(r.working[0].seen_held);
         r
+    }
+
+    /// Task-A03-candle790: a session at a confirmation frees its slot at once, is neither lost nor
+    /// stalled while it waits without a heartbeat, and its task is not given out again; once it
+    /// goes on it takes its slot again.
+    #[test]
+    fn a_session_waiting_for_an_approval_frees_its_slot_but_keeps_its_task() {
+        let mut r = holding_a01_7();
+        let held = held_by("A01-7", "claude-a", "mine", 1);
+        assert!(r.free_agents().is_empty());
+        assert!(r.set_awaiting("A01-7", Some(T0 + 3 * MIN)));
+        assert!(!r.set_awaiting("A01-7", Some(T0 + 3 * MIN)), "told once");
+        assert_eq!(r.free_agents(), ["claude_cli"]);
+        // Long past the heartbeat limit: still its own, neither lost nor stalled.
+        assert!(r.lost_ones(&[held.clone()], LOST, T0 + 90 * MIN).is_empty());
+        assert!(r.follow(&[held.clone()], LOST, T0 + 90 * MIN).is_empty());
+        assert!(r.stalled(T0 + 90 * MIN).is_empty());
+        assert_eq!(r.working.len(), 1);
+        assert!(r.taken.contains(&"A01-7".to_string()));
+        let bag = bag_of(vec![held.clone()]);
+        assert!(r.share(&bag, (T0 + 90 * MIN) / 1000).is_empty());
+        // Approved: it takes its slot again.
+        assert!(!r.set_awaiting("A01-7", None));
+        assert!(r.free_agents().is_empty());
+        assert!(!r.set_awaiting("A09-9", Some(T0)), "no such session");
+        // The run file keeps it, and an older one reads without it.
+        r.set_awaiting("A01-7", Some(T0 + 3 * MIN));
+        let saved = serde_json::to_value(&r).unwrap();
+        assert_eq!(
+            saved["working"][0]["awaiting_approval"],
+            serde_json::json!(T0 + 3 * MIN)
+        );
+        let mut older = saved.clone();
+        older["working"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("awaiting_approval");
+        let read: Run = serde_json::from_value(older).unwrap();
+        assert_eq!(read.working[0].awaiting_approval, None);
     }
 
     #[test]

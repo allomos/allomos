@@ -690,7 +690,7 @@ function SessionRow({
   const { t } = useI18n();
   const task = tasks.find((x) => x.id === cur.id);
   const place = task ? sessionPlace(task) : null;
-  const quiet = now - cur.changed >= STALL_MS;
+  const quiet = cur.awaitingApproval === null && now - cur.changed >= STALL_MS;
   const time = forText(cur.at, now, t);
   return (
     <li className={`monitor-row${quiet ? " stalled" : ""}`}>
@@ -699,6 +699,7 @@ function SessionRow({
         {!inGroup && <span className="muted"> · {monitorAgentName(cur.agent, t)}</span>}
         <span className="muted small"> · {!cur.claimed && cur.takeoverFrom ? t("monitor.session_taking_over", { holder: cur.takeoverFrom, time }) : t(!cur.claimed ? "monitor.session_starting" : finishing ? "monitor.session_finishing" : "monitor.session_working", { time })}</span>
         {quiet && <span className="monitor-stalled small"> · {t("monitor.session_stalled")}</span>}
+        {cur.awaitingApproval !== null && <span className="monitor-stalled small"> · {t("monitor.session_awaiting_approval")}</span>}
       </span>
       {place && (
         <button
