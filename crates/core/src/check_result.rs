@@ -28,6 +28,14 @@ pub const COMMAND: &str = "check-result";
 /// The written results, in the order they are listed: failed, not run, passed.
 pub const RESULTS: [&str; 3] = ["fail", "not-run", "pass"];
 
+/// The folder beside a task's `task.json` that keeps its screenshots (decision 0029 § 6,
+/// Task-A01-fondue470): `tasks/<id>/evidence/`.
+pub const EVIDENCE_DIR: &str = "evidence";
+/// The most screenshots one task keeps (approver 2026-11-20: "最多提交3张").
+pub const MOST_SCREENSHOTS: usize = 3;
+/// The largest screenshot taken, in bytes (2 MB).
+pub const MOST_BYTES: u64 = 2 * 1024 * 1024;
+
 /// One check's result as recorded.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CheckResult {
@@ -38,6 +46,10 @@ pub struct CheckResult {
     /// One sentence: what ran, or why it failed or did not run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
+    /// The screenshots that go with a failed check: file names in the task's
+    /// [`EVIDENCE_DIR`] (Task-A01-fondue470). Only a `fail` has any.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub screenshots: Vec<String>,
     #[serde(flatten)]
     pub extra: crate::model::Extra,
 }
@@ -66,6 +78,71 @@ pub fn result_of(given: &str) -> Result<&'static str, Problem> {
             result: given.to_string(),
         }),
     }
+}
+
+/// The kind of picture `bytes` hold, by their first bytes: `png`, `jpeg` or `webp`; `None` for
+/// anything else (decision 0029 § 6: only these three are taken).
+pub fn image_kind(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        Some("png")
+    } else if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        Some("jpeg")
+    } else if bytes.len() >= 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+        Some("webp")
+    } else {
+        None
+    }
+}
+
+/// Why the file `file` (as the agent gave it), `size` bytes long and starting with `head`, cannot
+/// be a screenshot: larger than [`MOST_BYTES`] (`screenshot_too_large`, with how to make it
+/// smaller) or not a PNG, JPEG or WebP picture (`screenshot_not_image`).
+pub fn screenshot_problem(file: &str, size: u64, head: &[u8]) -> Option<Problem> {
+    if image_kind(head).is_none() {
+        return Some(Problem::ScreenshotNotImage {
+            file: file.to_string(),
+        });
+    }
+    (size > MOST_BYTES).then(|| Problem::ScreenshotTooLarge {
+        file: file.to_string(),
+        size: format!("{:.1} MB", size as f64 / (1024.0 * 1024.0)),
+    })
+}
+
+/// The name a screenshot is kept under in the task's [`EVIDENCE_DIR`]: the given file's own name,
+/// with anything but letters, digits, `.`, `-` and `_` made `-`, its ending set by its `kind`
+/// (`.png`, `.jpg`, `.webp`), and `-2`, `-3` … added while `taken` has it.
+pub fn screenshot_name(given: &str, kind: &str, taken: &[String]) -> String {
+    let base = given.rsplit(['/', '\\']).next().unwrap_or_default();
+    let stem = match base.rsplit_once('.') {
+        Some((stem, _)) if !stem.is_empty() => stem,
+        _ => base,
+    };
+    let mut stem: String = stem
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    stem = stem.trim_matches('-').chars().take(60).collect();
+    if stem.is_empty() {
+        stem = "screenshot".to_string();
+    }
+    let ending = match kind {
+        "jpeg" => "jpg",
+        other => other,
+    };
+    let mut name = format!("{stem}.{ending}");
+    let mut n = 2;
+    while taken.iter().any(|t| t.eq_ignore_ascii_case(&name)) {
+        name = format!("{stem}-{n}.{ending}");
+        n += 1;
+    }
+    name
 }
 
 /// Every task's results, by task ID, from `events` (oldest first): the last record of each name,
@@ -114,7 +191,14 @@ pub fn ordered(results: &[Recorded]) -> Vec<Recorded> {
 /// task, one someone else holds (the holder rule; done and dropped tasks may be recorded on too, a
 /// result is often written down at the end), a check without a name (`check_name_missing`), and a
 /// result that is none of the three (`check_result_unknown`). `None` as the change: the same
-/// result and detail are recorded already.
+/// result, detail and screenshots are recorded already.
+///
+/// `shots` are the new screenshots' names (already checked as pictures, [`screenshot_problem`]),
+/// `kept` the files the task's [`EVIDENCE_DIR`] holds now. Refused (decision 0029 § 6): a
+/// screenshot with a result other than `fail` (`screenshot_needs_fail`), and more than
+/// [`MOST_SCREENSHOTS`] for the task (`screenshots_full`, naming those it has). A failed check
+/// recorded again keeps its earlier screenshots and adds the new ones; a pass or not run has none.
+#[allow(clippy::too_many_arguments)]
 pub fn record(
     taskbag: &Taskbag,
     recorded: &BTreeMap<String, Vec<Recorded>>,
@@ -123,6 +207,8 @@ pub fn record(
     name: &str,
     result: &str,
     detail: Option<&str>,
+    shots: &[String],
+    kept: &[String],
 ) -> Result<(Option<Change>, CheckResult), Problem> {
     let task = find_task(taskbag, id)?;
     check_holder(&task, me)?;
@@ -131,23 +217,47 @@ pub fn record(
         return Err(Problem::CheckNameMissing);
     }
     let result = result_of(result)?;
+    if !shots.is_empty() && result != "fail" {
+        return Err(Problem::ScreenshotNeedsFail {
+            result: result.to_string(),
+        });
+    }
+    if kept.len() + shots.len() > MOST_SCREENSHOTS {
+        return Err(Problem::ScreenshotsFull {
+            id: task.id.clone(),
+            count: kept.len().to_string(),
+            have: if kept.is_empty() {
+                "none".to_string()
+            } else {
+                kept.join(", ")
+            },
+            room: MOST_SCREENSHOTS.saturating_sub(kept.len()).to_string(),
+        });
+    }
     let detail = detail
         .map(|d| d.split_whitespace().collect::<Vec<_>>().join(" "))
         .filter(|d| !d.is_empty());
+    let before = recorded
+        .get(&task.id)
+        .and_then(|list| list.iter().find(|r| r.check.name == name))
+        .map(|r| r.check.clone());
+    let mut screenshots = Vec::new();
+    if result == "fail" {
+        if let Some(b) = before.as_ref().filter(|b| b.result == "fail") {
+            screenshots.extend(b.screenshots.iter().cloned());
+        }
+        screenshots.extend(shots.iter().cloned());
+    }
     let after = CheckResult {
         name,
         result: result.to_string(),
         detail,
+        screenshots,
         extra: Default::default(),
     };
-    let before = recorded
-        .get(&task.id)
-        .and_then(|list| list.iter().find(|r| r.check.name == after.name))
-        .map(|r| r.check.clone());
-    if before
-        .as_ref()
-        .is_some_and(|b| b.result == after.result && b.detail == after.detail)
-    {
+    if before.as_ref().is_some_and(|b| {
+        b.result == after.result && b.detail == after.detail && b.screenshots == after.screenshots
+    }) {
         return Ok((None, after));
     }
     let value = |c: &CheckResult| serde_json::to_value(c).expect("a check result serializes");

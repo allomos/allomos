@@ -264,7 +264,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             let check_results = allomos_store::check_results::by_task(&root)
                 .remove(&task.id)
                 .unwrap_or_default();
-            text.push_str(&check_results::lines(&check_results));
+            text.push_str(&check_results::lines(&task.id, &check_results));
             let withdrawn = allomos_core::approval::withdrawn_notice(&task, &approvals);
             if let Some(r) = withdrawn {
                 text.push_str(&approve::withdrawn_line(

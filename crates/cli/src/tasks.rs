@@ -416,7 +416,8 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             name,
             result,
             detail,
-        } => check_results::record(cli, cwd, id, name, result, detail.as_deref()),
+            screenshot,
+        } => check_results::record(cli, cwd, id, name, result, detail.as_deref(), screenshot),
         Command::Links { reference } => links::list(cli, cwd, reference.as_deref()),
         Command::Reviewed { id } => {
             let root = locate(cli, cwd)?;

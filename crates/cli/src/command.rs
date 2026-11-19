@@ -486,6 +486,10 @@ pub(crate) enum Command {
         /// One sentence: what ran, or why it failed or did not run.
         #[arg(long, value_name = "TEXT")]
         detail: Option<String>,
+        /// A screenshot of the failure (PNG, JPEG or WebP, at most 2 MB), only with
+        /// --result fail; may be given again; a task keeps at most 3.
+        #[arg(long, value_name = "FILE")]
+        screenshot: Vec<std::path::PathBuf>,
     },
     /// The tasks a commit (by its hash, 7 digits or more), branch, PR, run, tag or web address
     /// goes with; with none given, every task's links.
