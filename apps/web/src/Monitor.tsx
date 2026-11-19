@@ -221,6 +221,7 @@ export function useMonitor({
     },
     stop: (run: Run) => ask(run, { action: "stop" }),
     undoStop: (run: Run) => ask(run, { action: "undo_stop" }),
+    stopNow: (run: Run) => ask(run, { action: "stop_now" }),
     checkNow: (run: Run) => ask(run, { action: "check" }),
     /** Edit monitor…'s Save (A03-yolk481): one request for each setting that changed, in order. */
     edit: (run: Run, next: MonitorSettings) => {
@@ -527,9 +528,14 @@ function RunPanel({
             </button>
           )}
           {run.stopping ? (
-            <button type="button" className="small" onClick={() => monitor.undoStop(run)}>
-              {t("monitor.undo_stop")}
-            </button>
+            <>
+              <button type="button" className="small" onClick={() => monitor.undoStop(run)}>
+                {t("monitor.undo_stop")}
+              </button>
+              <button type="button" className="small stop" title={t("monitor.stop_now_hint")} onClick={() => monitor.stopNow(run)}>
+                {t("monitor.stop_now")}
+              </button>
+            </>
           ) : (
             <button type="button" className="small stop" onClick={() => monitor.stop(run)}>
               {t("monitor.stop_monitor")}
@@ -537,6 +543,8 @@ function RunPanel({
           )}
         </span>
       </div>
+      {run.stopping && <p className="muted small">{t("monitor.stop_now_hint")}</p>}
+      {late.length > 0 && <p className="monitor-stalled small" role="status">{t("monitor.task_lost", { ids: late.map((w) => w.id).join(", ") })}</p>}
       {open && (
         <div className="monitor-panel-body">
           <p className="muted small monitor-settings">{settings}</p>

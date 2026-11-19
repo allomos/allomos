@@ -60,6 +60,9 @@ pub(crate) enum MonitorWhat {
         /// The run, by its ID or process number; needed when the project has several.
         #[arg(long = "run", value_name = "ID|PID")]
         run: Option<String>,
+        /// Exit this monitor now. Started agent sessions keep running; tasks and work stay.
+        #[arg(long)]
+        now: bool,
     },
     /// Change a running monitor's settings from its next check on (A03-yolk481): which tasks, the
     /// run mode, the frequency, the agents, their sessions and difficulty ranges. The sessions at
@@ -726,7 +729,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
                 ),
             ))
         }
-        MonitorWhat::Stop { run } => {
+        MonitorWhat::Stop { run, now } => {
             let root = crate::locate(cli, cwd)?;
             let entries = registry::of_project(&dir, &root);
             let chosen = choose(&entries, run.as_deref(), "stop")?;
@@ -744,9 +747,22 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
                     ))
                 }
                 Entry::Running(r) => {
-                    ask(&dir, &r.id, &Request::Stop)?;
+                    ask(
+                        &dir,
+                        &r.id,
+                        if *now {
+                            &Request::StopNow
+                        } else {
+                            &Request::Stop
+                        },
+                    )?;
                     let working: Vec<&str> = r.run.working.iter().map(|w| w.id.as_str()).collect();
-                    let text = if working.is_empty() {
+                    let text = if *now {
+                        format!(
+                            "Asked monitor {} to exit now; started agent sessions keep running, and tasks and work are kept.\n",
+                            r.id
+                        )
+                    } else if working.is_empty() {
                         format!(
                             "Asked monitor {} to stop; it starts no new session and ends within a few seconds.\n",
                             r.id
@@ -759,7 +775,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path, what: &MonitorWhat) -> Result<Done,
                         )
                     };
                     Ok(Done::new(
-                        json!({ "taskbag": root, "run": r.id, "asked": "stop", "working": working }),
+                        json!({ "taskbag": root, "run": r.id, "asked": if *now { "stop_now" } else { "stop" }, "working": working }),
                         text,
                     ))
                 }

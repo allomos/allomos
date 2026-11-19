@@ -19,6 +19,7 @@ export type MonitorRequest =
   | { action: "check" }
   | { action: "stop" }
   | { action: "undo_stop" }
+  | { action: "stop_now" }
   | { action: "every"; minutes: number }
   | { action: "agents"; agents: string[] }
   | { action: "sessions"; agent: string; count: number }

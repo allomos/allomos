@@ -57,6 +57,9 @@ pub(super) fn entry_text(e: &Entry, with_project: bool) -> String {
                     working.join(", ")
                 },
             );
+            for w in run.stalled(runner::now_ms()) {
+                text.push_str(&format!("  {}: task lost; it may not finish automatically. To exit monitoring only: alm monitor stop --run {} --now\n", w.id, r.id));
+            }
             if !run.no_task.is_empty() {
                 let words: Vec<&str> = run.no_task.iter().map(|a| agent_word(a)).collect();
                 text.push_str(&format!(
@@ -120,4 +123,3 @@ pub(super) fn entry_text(e: &Entry, with_project: bool) -> String {
         }
     }
 }
-

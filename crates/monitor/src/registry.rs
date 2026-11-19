@@ -209,6 +209,8 @@ pub enum Request {
     Stop,
     /// Take back a stop while sessions are still at work.
     UndoStop,
+    /// Exit this monitor without following or interrupting its sessions.
+    StopNow,
     /// A new frequency, in minutes.
     Every { minutes: u32 },
     /// These agents from now on.

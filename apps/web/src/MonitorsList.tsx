@@ -11,7 +11,7 @@ import type { CSSProperties, ReactNode, RefObject } from "react";
 import { useI18n } from "./i18n";
 import type { Messenger, MonitorRequest } from "./messenger";
 import { monitorAgentName } from "./AgentPicker";
-import { freeAgents, listedRuns, nextCheck, type ListedRun, type Run } from "./monitorFlow";
+import { freeAgents, listedRuns, nextCheck, stalled, type ListedRun, type Run } from "./monitorFlow";
 import { askJump } from "./iterationJumpFlow";
 import { askTaskJump } from "./taskJumpFlow";
 import { isProblem } from "./types";
@@ -181,6 +181,7 @@ export function MonitorsList({
                   onOpenTask={row.root ? (id) => askTaskJump({ root: row.root!, id }, () => messenger.monitorOpen(row.root!)).then(onClose).catch(fail) : undefined}
                   onCheck={() => ask(row.run!.id, { action: "check" })}
                   onStop={() => ask(row.run!.id, { action: row.run!.stopping ? "undo_stop" : "stop" })}
+                  onStopNow={() => ask(row.run!.id, { action: "stop_now" })}
                 />
               ) : (
                 <div className="monitors-lines">
@@ -214,6 +215,7 @@ function RunRow({
   onOpenTask,
   onCheck,
   onStop,
+  onStopNow,
 }: {
   run: Run;
   name: string | null;
@@ -223,9 +225,11 @@ function RunRow({
   onIteration?: (iteration: string) => void;
   onCheck: () => void;
   onStop: () => void;
+  onStopNow: () => void;
 }) {
   const { t } = useI18n();
   const free = freeAgents(run);
+  const late = stalled(run, now);
   const iterationName = run.scope.kind === "iteration" ? run.scope.id : null;
   const lines: ReactNode[] = [];
   const taskLink = (id: string) => onOpenTask ? <button type="button" className="link monitors-task" onClick={() => onOpenTask(id)}>{id}</button> : id;
@@ -267,6 +271,8 @@ function RunRow({
           {line}
         </div>
       ))}
+      {late.length > 0 && <p className="monitor-stalled small" role="status">{t("monitor.task_lost", { ids: late.map((w) => w.id).join(", ") })}</p>}
+      {run.stopping && <p className="muted small">{t("monitor.stop_now_hint")}</p>}
       <div className="row-actions">
         {!run.stopping && free.length > 0 && (
           <button type="button" className="small" onClick={onCheck}>
@@ -276,6 +282,7 @@ function RunRow({
         <button type="button" className={run.stopping ? "small" : "small stop"} onClick={onStop}>
           {run.stopping ? t("monitor.undo_stop") : t("monitor.stop")}
         </button>
+        {run.stopping && <button type="button" className="small stop" title={t("monitor.stop_now_hint")} onClick={onStopNow}>{t("monitor.stop_now")}</button>}
       </div>
     </div>
   );

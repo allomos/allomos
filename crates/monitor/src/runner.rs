@@ -166,6 +166,8 @@ struct Loop {
     alm: Option<PathBuf>,
     taskbag_arg: String,
     last_written: Instant,
+    /// Process-local: immediate exit never becomes a resumable run setting.
+    stop_now: bool,
     /// The closing countdowns of finished tasks' tabs, each with its thread (A03-pocket537).
     countdowns: Vec<(Closing, std::thread::JoinHandle<()>)>,
 }
@@ -200,6 +202,7 @@ impl Loop {
             Request::Check => {
                 run.checked = 0;
             }
+            Request::StopNow => self.stop_now = true,
             Request::Stop => run.stopping = true,
             Request::UndoStop => run.stopping = false,
             Request::Every { minutes } => {
@@ -586,6 +589,7 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
         alm: options.alm.clone(),
         taskbag_arg: taskbag_arg(&project, &root),
         last_written: Instant::now(),
+        stop_now: false,
         countdowns,
     };
     log(&format!(
@@ -631,6 +635,11 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
             changed |= lp.apply(req);
             read_now = true;
         }
+        // Stop before any taskbag read, follow, quota probe or dispatch, even if another
+        // request in the same batch asked to check or undo the graceful stop.
+        if lp.stop_now {
+            break;
+        }
         if read_now || last_read.is_none_or(|t| t.elapsed() >= READ_EVERY) {
             last_read = Some(Instant::now());
             match read(&root) {
@@ -641,7 +650,7 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
                     changed |= lp.record.run.unreadable.take().is_some();
                     let (c, over) = lp.pass(&bag);
                     changed |= c;
-                    if over {
+                    if over && lp.countdowns.iter().all(|(_, h)| h.is_finished()) {
                         break;
                     }
                 }
@@ -697,8 +706,10 @@ pub fn run(dir: &Path, id: &str, options: Options) -> Result<(), Problem> {
     }
     // The countdowns of done tasks' tabs finish before the run is gone: it stays listed (stopping)
     // until then, and a stop in the meantime finds it still there.
-    for (_, handle) in lp.countdowns.drain(..) {
-        let _ = handle.join();
+    if !lp.stop_now {
+        for (_, handle) in lp.countdowns.drain(..) {
+            let _ = handle.join();
+        }
     }
     let _ = std::fs::remove_file(registry::record_path(dir, id));
     // Only what finding and controlling a running run needs stays on this computer (approver,
@@ -772,3 +783,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "runner_stop_tests.rs"]
+mod stop_tests;
