@@ -92,6 +92,13 @@ pub struct Run {
     /// it). An agent not listed takes every level, 1 to 5 (Task-A03-wave335).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub difficulties: BTreeMap<String, String>,
+    /// The model each agent's sessions start with (agent ID → a value from the online model
+    /// list, A03-alto709). An agent not listed starts with its own setting: no model is given.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub models: BTreeMap<String, String>,
+    /// The reasoning effort each agent's sessions start with, the same way (A03-alto709).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub efforts: BTreeMap<String, String>,
     /// The agents with a free session slot that no ready task in their range fitted at the last
     /// check: the status bar says why they got no session (Task-A03-wave335).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -139,6 +146,24 @@ pub struct Run {
     /// (A03-otter944). Their tasks are given out again.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub not_started: Vec<NotStarted>,
+}
+
+/// The model and reasoning effort a session is started with (A03-alto709). None: the agent's own
+/// setting, so its command is the same as without a choice.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Choice {
+    pub model: Option<String>,
+    pub effort: Option<String>,
+}
+
+/// A model or effort value is one plain word (letters, digits, `.`, `-`, `_`, `:`, `/`, `[`, `]`),
+/// at most 80 characters: it goes into the command that starts the agent.
+pub fn plain_choice(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 80
+        && value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || ".-_:/[]".contains(c))
 }
 
 /// Why an agent gets no session for now.
@@ -214,6 +239,8 @@ impl Run {
             started: now,
             sessions: BTreeMap::new(),
             difficulties: BTreeMap::new(),
+            models: BTreeMap::new(),
+            efforts: BTreeMap::new(),
             no_task: Vec::new(),
             taken: Vec::new(),
             taken_by: BTreeMap::new(),
@@ -260,6 +287,33 @@ impl Run {
     pub fn set_difficulty(&mut self, agent: &str, range: &str) {
         if let Ok(r) = Range::parse(range) {
             self.difficulties.insert(agent.to_string(), r.text());
+        }
+    }
+
+    /// The model and the reasoning effort `agent`'s sessions start with (A03-alto709): none for
+    /// either is the agent's own setting.
+    pub fn choice_of(&self, agent: &str) -> Choice {
+        Choice {
+            model: self.models.get(agent).cloned(),
+            effort: self.efforts.get(agent).cloned(),
+        }
+    }
+
+    /// Start `agent`'s sessions with this model and effort (A03-alto709); none is its own setting.
+    /// A value that is not a plain word ([`plain_choice`]) is left out.
+    pub fn set_choice(&mut self, agent: &str, choice: &Choice) {
+        for (map, value) in [
+            (&mut self.models, &choice.model),
+            (&mut self.efforts, &choice.effort),
+        ] {
+            match value.as_deref().map(str::trim) {
+                Some(v) if plain_choice(v) => {
+                    map.insert(agent.to_string(), v.to_string());
+                }
+                _ => {
+                    map.remove(agent);
+                }
+            }
         }
     }
 
@@ -626,6 +680,34 @@ mod tests {
         t.state = state;
         t.holder = holder.map(String::from);
         t
+    }
+
+    #[test]
+    fn a_chosen_model_and_effort_are_kept_and_a_default_or_odd_value_is_left_out() {
+        let mut r = run(&["claude_cli", "codex_cli"]);
+        assert_eq!(r.choice_of("claude_cli"), Choice::default());
+        let pick = |m: Option<&str>, e: Option<&str>| Choice {
+            model: m.map(str::to_string),
+            effort: e.map(str::to_string),
+        };
+        r.set_choice("claude_cli", &pick(Some("opus"), Some("high")));
+        r.set_choice("codex_cli", &pick(None, Some("xhigh")));
+        assert_eq!(r.choice_of("claude_cli"), pick(Some("opus"), Some("high")));
+        assert_eq!(r.choice_of("codex_cli"), pick(None, Some("xhigh")));
+        // Saved with the run, and an older run's file without them reads as the defaults.
+        let text = serde_json::to_string(&r).unwrap();
+        let back: Run = serde_json::from_str(&text).unwrap();
+        assert_eq!(
+            back.choice_of("claude_cli"),
+            pick(Some("opus"), Some("high"))
+        );
+        let plain = serde_json::to_string(&run(&["claude_cli"])).unwrap();
+        assert!(!plain.contains("models") && !plain.contains("efforts"));
+        // Back to the default, and a value that is not one plain word is not kept.
+        r.set_choice("claude_cli", &pick(None, Some("high; rm -rf ~")));
+        assert_eq!(r.choice_of("claude_cli"), Choice::default());
+        assert!(plain_choice("gpt-6.2-astra") && plain_choice("opus[1m]"));
+        assert!(!plain_choice("") && !plain_choice("a b") && !plain_choice("$(x)"));
     }
 
     fn run(agents: &[&str]) -> Run {

@@ -53,6 +53,10 @@ struct Settings {
     /// (`false`); missing: on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     auto_download: Option<bool>,
+    /// **Model list address** (A03-alto709): where the app reads the online list of each agent's
+    /// models and reasoning efforts. Missing: Allomos's own address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    models_url: Option<String>,
 }
 
 /// What Allomos opens when it starts again (Task-A01-marble320, approver 2026-10-29), the app's
@@ -263,6 +267,21 @@ pub fn auto_download() -> bool {
 pub fn save_auto_download(on: bool) -> io::Result<()> {
     let mut settings = read_settings();
     settings.auto_download = (!on).then_some(false);
+    write_settings(&settings)
+}
+
+/// The **Model list address** the person set (A03-alto709); none: Allomos's own address.
+pub fn models_url() -> Option<String> {
+    read_settings().models_url.filter(|u| !u.trim().is_empty())
+}
+
+/// Remember the **Model list address**; none (or empty) goes back to Allomos's own address.
+pub fn save_models_url(url: Option<&str>) -> io::Result<()> {
+    let mut settings = read_settings();
+    settings.models_url = url
+        .map(str::trim)
+        .filter(|u| !u.is_empty())
+        .map(str::to_string);
     write_settings(&settings)
 }
 
@@ -501,6 +520,21 @@ mod tests {
                 .contains("auto_download")
         );
         assert_eq!(update_memory().latest.as_deref(), Some("0.1.6"));
+
+        // The model list address (A03-alto709): missing is Allomos's own; set, then back.
+        assert_eq!(models_url(), None);
+        save_models_url(Some(" https://example.org/m.json ")).unwrap();
+        assert_eq!(models_url().as_deref(), Some("https://example.org/m.json"));
+        save_models_url(Some("")).unwrap();
+        assert_eq!(models_url(), None);
+        save_models_url(Some("https://example.org/m.json")).unwrap();
+        save_models_url(None).unwrap();
+        assert_eq!(models_url(), None);
+        assert!(
+            !fs::read_to_string(dir.join(SETTINGS_FILE))
+                .unwrap()
+                .contains("models_url")
+        );
 
         // A cancelled check is put back as it was (Task-A07-fact210): the answer and its time go,
         // and the skipped version stays.

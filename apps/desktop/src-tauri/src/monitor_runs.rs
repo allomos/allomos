@@ -65,7 +65,11 @@ pub fn monitor_open(app: AppHandle, root: PathBuf) -> Result<(), Problem> {
 /// Start a run with the app's own `alm` (`monitor start`); resolves with its ID. `sessions`: how
 /// many sessions each chosen agent may have at work at once (Task-A03-weasel276); one not listed
 /// has one. `difficulties`: the difficulty range each chosen agent takes tasks from, as `1-3`
-/// (Task-A03-wave335); one not listed takes every level.
+/// (Task-A03-wave335); one not listed takes every level. `models` and `efforts`: the model and
+/// reasoning effort each chosen agent's sessions start with (A03-alto709); one not listed starts
+/// with its own setting.
+// A Tauri command: the window passes each argument by name.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn monitor_start(
     root: PathBuf,
@@ -75,6 +79,8 @@ pub async fn monitor_start(
     iteration: Option<String>,
     sessions: BTreeMap<String, u32>,
     difficulties: BTreeMap<String, String>,
+    models: Option<BTreeMap<String, String>>,
+    efforts: Option<BTreeMap<String, String>>,
 ) -> Result<String, Problem> {
     let alm = crate::alm_command::own().ok_or_else(|| Problem::BadUsage {
         detail: "the app's own alm was not found beside it".to_string(),
@@ -104,6 +110,16 @@ pub async fn monitor_start(
     for (a, range) in difficulties.iter().filter(|(a, _)| agents.contains(a)) {
         args.push("--difficulty".into());
         args.push(format!("{a}={range}"));
+    }
+    for (flag, chosen) in [("--model", models), ("--effort", efforts)] {
+        for (a, v) in chosen
+            .unwrap_or_default()
+            .iter()
+            .filter(|(a, v)| agents.contains(a) && !v.trim().is_empty())
+        {
+            args.push(flag.into());
+            args.push(format!("{a}={}", v.trim()));
+        }
     }
     if let Some(i) = iteration {
         args.push("--iteration".into());

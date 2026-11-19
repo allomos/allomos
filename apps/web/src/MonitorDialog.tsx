@@ -21,6 +21,9 @@ import type { AccountRow, AgentAccount, Frequency, Levels, MonitorSettings, Open
 import { useAgentAccounts } from "./useAgentAccounts";
 import { levelsHold } from "./difficultyFlow";
 import type { Key } from "./i18n";
+import { ModelListLine, ModelPicker, useAgentModels } from "./ModelPicker";
+import { chosenArgs } from "./agentModelsFlow";
+import type { ModelsRead, Picks } from "./agentModelsFlow";
 
 /** The agents an extra account can be added to (Task-A03-oven548). */
 const ACCOUNT_AGENTS: readonly string[] = ["claude_cli", "codex_cli"];
@@ -67,7 +70,8 @@ export function MonitorDialog({
   /** `agents` chosen, in the order they are shown; `offered`: every one that could be chosen,
    * offered again in the status bar while the run goes on; `sessions`: how many sessions each
    * chosen agent may have at work at once (Task-A03-weasel276); `difficulties`: the levels each
-   * chosen agent takes tasks from (Task-A03-wave335). */
+   * chosen agent takes tasks from (Task-A03-wave335); `models` and `efforts`: the model and
+   * reasoning effort each chosen agent's sessions start with, only those not Default (A03-alto709). */
   onStart: (
     scope: Scope,
     agents: TerminalAgent[],
@@ -76,6 +80,8 @@ export function MonitorDialog({
     offered: TerminalAgent[],
     sessions: Partial<Record<TerminalAgent, number>>,
     difficulties: Partial<Record<TerminalAgent, Levels>>,
+    models: Record<string, string>,
+    efforts: Record<string, string>,
   ) => void;
   onClose: () => void;
 }) {
@@ -126,6 +132,10 @@ export function MonitorDialog({
   // The difficulty levels each agent takes tasks from (Task-A03-wave335): every level unless set.
   const [levels, setLevels] = useState<Partial<Record<TerminalAgent, Levels>>>(() => (editing ? { ...editing.difficulties } : {}));
   const levelsOfAgent = (a: TerminalAgent): Levels => levels[a] ?? ALL_LEVELS;
+  // The model and effort each agent starts with (A03-alto709): Default unless picked. Offered when
+  // a run starts; a running monitor keeps the ones it started with.
+  const models = useAgentModels(messenger);
+  const [picks, setPicks] = useState<Partial<Record<TerminalAgent, Picks>>>({});
   // The counts of the Which tasks choices: the ready tasks any chosen agent may take (all when
   // none is chosen yet).
   const options = scopeOptions(tasks, areas, iterations, activeIteration, (task) =>
@@ -245,15 +255,8 @@ export function MonitorDialog({
       onSave?.({ scope, agents: picked, quiet, every, sessions, difficulties });
       return;
     }
-    onStart(
-      scope,
-      picked,
-      quiet,
-      every,
-      offered,
-      sessions,
-      difficulties,
-    );
+    const chosen = chosenArgs(picked, picks, models.read);
+    onStart(scope, picked, quiet, every, offered, sessions, difficulties, chosen.models, chosen.efforts);
   };
 
   const isOther = scope.kind === "iteration" && !scope.current;
@@ -368,7 +371,9 @@ export function MonitorDialog({
             onAdd={(a) => setAdding(a)}
             busy={(a) => editing?.working.filter((w) => w.agent === a).map((w) => w.id) ?? []}
             codexRules={codexRules}
+            models={editing ? undefined : { read: models.read, picks, onPicks: (a, p) => setPicks((s) => ({ ...s, [a]: p })) }}
           />
+          {!editing && <ModelListLine read={models.read} reading={models.reading} onRefresh={() => void models.refresh()} />}
           {adding && (
             <AddAccount
               messenger={messenger}
@@ -444,6 +449,7 @@ function AgentChecklist({
   onAdd,
   busy,
   codexRules,
+  models,
 }: {
   agents: Agent[] | null;
   slow: boolean;
@@ -462,6 +468,8 @@ function AgentChecklist({
   /** Allomos's rules for Codex (A03-pier032), shown under the Codex rows' note while one is checked;
    * each checked agent's note on what it may do sits under its rows (A03-jewel909). */
   codexRules?: ReactNode;
+  /** The model and effort choices (A03-alto709), when a run is being started. */
+  models?: { read: ModelsRead | null; picks: Partial<Record<TerminalAgent, Picks>>; onPicks: (agent: TerminalAgent, picks: Picks) => void };
 }) {
   const { t } = useI18n();
   if (agents === null) {
@@ -526,6 +534,9 @@ function AgentChecklist({
                         </span>
                       )}
                       {on && <LevelsPicker agent={row.key} name={label} levels={levelsOf(row.key)} onChange={(l) => onLevels(row.key, l)} />}
+                      {on && models && (
+                        <ModelPicker agent={row.key} name={label} read={models.read} picks={models.picks[row.key] ?? {}} onChange={(p) => models.onPicks(row.key, p)} />
+                      )}
                     </li>
                   );
                 });

@@ -11,7 +11,9 @@ use std::time::{Duration, Instant};
 
 use allomos_core::Problem;
 use allomos_monitor::accounts;
-use allomos_monitor::flow::{FIRST_FREQUENCY, FREQUENCIES, Run, Scope, TERMINAL_AGENTS};
+use allomos_monitor::flow::{
+    Choice, FIRST_FREQUENCY, FREQUENCIES, Run, Scope, TERMINAL_AGENTS, plain_choice,
+};
 use allomos_monitor::registry::{self, Entry, Request};
 use allomos_monitor::runner;
 use clap::{Args, Subcommand};
@@ -113,6 +115,15 @@ pub(crate) struct StartArgs {
     /// codex=1-2. Repeat for several. Default: every level, 1-5 (Task-A03-wave335).
     #[arg(long = "difficulty", value_name = "[AGENT=]RANGE")]
     difficulty: Vec<String>,
+    /// The model an agent's sessions start with, as AGENT=MODEL (for example claude-code=opus;
+    /// the app offers those of the online model list). Repeat for several agents. Default: the
+    /// agent's own setting (no model is given to it) (A03-alto709).
+    #[arg(long = "model", value_name = "AGENT=MODEL")]
+    model: Vec<String>,
+    /// The reasoning effort an agent's sessions start with, as AGENT=EFFORT (for example
+    /// codex=high). Repeat for several agents. Default: the agent's own setting.
+    #[arg(long = "effort", value_name = "AGENT=EFFORT")]
+    effort: Vec<String>,
 }
 
 /// What `alm monitor set` changes; whatever is not given stays as it is.
@@ -204,11 +215,19 @@ fn agents_text(run: &Run) -> Vec<String> {
                 format!(" ({})", range.text())
             };
             // An extra account is named as `--agent` takes it: `claude-code:<account ID>`.
-            let word = match a.split_once(':') {
-                Some((base, account)) => format!("{}:{account}", agent_word(base)),
-                None => agent_word(a).to_string(),
+            let word = agent_arg(a);
+            // The model and effort chosen for it (A03-alto709), when one is.
+            let c = run.choice_of(a);
+            let chosen: Vec<&str> = [c.model.as_deref(), c.effort.as_deref()]
+                .into_iter()
+                .flatten()
+                .collect();
+            let chosen = if chosen.is_empty() {
+                String::new()
+            } else {
+                format!(" [{}]", chosen.join(", "))
             };
-            format!("{word}{count}{levels}")
+            format!("{word}{count}{levels}{chosen}")
         })
         .collect()
 }
@@ -299,6 +318,7 @@ fn new_run(root: &Path, args: &StartArgs, now: i64) -> Result<Run, Problem> {
     };
     let difficulties = difficulties_of(&args.difficulty, &agents)?;
     let sessions = sessions_of(&args.sessions, &agents)?;
+    let choices = choices_of(&args.model, &args.effort, &agents)?;
     let (bag, _) = allomos_store::taskbag_of(root, allomos_store::load(root))?;
     let scope = match &args.iteration {
         Some(id) => {
@@ -343,7 +363,68 @@ fn new_run(root: &Path, args: &StartArgs, now: i64) -> Result<Run, Problem> {
             run.set_difficulty(a, range);
         }
     }
+    for (agent, choice) in &choices {
+        run.set_choice(agent, choice);
+    }
     Ok(run)
+}
+
+/// The `--model AGENT=MODEL` and `--effort AGENT=EFFORT` values as each agent's choice
+/// (A03-alto709): each agent must be one of `agents` (the run's), and each value one plain word,
+/// since it goes into the command that starts the agent. alm does not check the value against the
+/// online list: the agent itself says when it does not know it.
+fn choices_of(
+    models: &[String],
+    efforts: &[String],
+    agents: &[String],
+) -> Result<Vec<(String, Choice)>, Problem> {
+    let mut out: Vec<(String, Choice)> = Vec::new();
+    for (flag, given, is_model) in [("--model", models, true), ("--effort", efforts, false)] {
+        for g in given {
+            let bad = |why: &str| Problem::BadUsage {
+                detail: format!(
+                    "{flag} {g}: {why}; write it as AGENT=VALUE, for example claude-code={}",
+                    if is_model { "opus" } else { "high" }
+                ),
+            };
+            let (name, value) = g.split_once('=').ok_or_else(|| bad("no value given"))?;
+            let id = agent_key(name)?;
+            let value = value.trim();
+            if !plain_choice(value) {
+                return Err(bad(
+                    "the value is one word of letters, digits and . - _ : / [ ]",
+                ));
+            }
+            if !agents.iter().any(|a| *a == id) {
+                return Err(bad(&format!(
+                    "{} is not one of the run's agents (give it with --agent)",
+                    agent_word(&id)
+                )));
+            }
+            let at = match out.iter().position(|(a, _)| *a == id) {
+                Some(i) => i,
+                None => {
+                    out.push((id, Choice::default()));
+                    out.len() - 1
+                }
+            };
+            let slot = if is_model {
+                &mut out[at].1.model
+            } else {
+                &mut out[at].1.effort
+            };
+            *slot = Some(value.to_string());
+        }
+    }
+    Ok(out)
+}
+
+/// An agent ID as `--agent` takes it, an extra account's too (`claude-code:<account ID>`).
+fn agent_arg(id: &str) -> String {
+    match id.split_once(':') {
+        Some((base, account)) => format!("{}:{account}", agent_word(base)),
+        None => agent_word(id).to_string(),
+    }
 }
 
 /// The `--difficulty` values as (agent ID, or none for every chosen agent; range text). Each
@@ -424,11 +505,11 @@ fn run_words(id: &str, root: &Path, args: &StartArgs, language: &str, run: &Run)
     ];
     for a in &run.agents {
         w.push("--agent".to_string());
-        w.push(agent_word(a).to_string());
+        w.push(agent_arg(a));
     }
     for (a, n) in &run.sessions {
         w.push("--sessions".to_string());
-        w.push(format!("{}={n}", agent_word(a)));
+        w.push(format!("{}={n}", agent_arg(a)));
     }
     if let Some(i) = &args.iteration {
         w.push("--iteration".to_string());
@@ -436,7 +517,14 @@ fn run_words(id: &str, root: &Path, args: &StartArgs, language: &str, run: &Run)
     }
     for (a, range) in &run.difficulties {
         w.push("--difficulty".to_string());
-        w.push(format!("{}={range}", agent_word(a)));
+        w.push(format!("{}={range}", agent_arg(a)));
+    }
+    // The model and effort chosen for each agent (A03-alto709).
+    for (flag, values) in [("--model", &run.models), ("--effort", &run.efforts)] {
+        for (a, v) in values {
+            w.push(flag.to_string());
+            w.push(format!("{}={v}", agent_arg(a)));
+        }
     }
     w
 }
@@ -1081,6 +1169,77 @@ mod tests {
         c.sessions = vec!["codex=2".into()];
         assert!(set_requests(&c, &run, &its).is_err());
         assert!(set_requests(&set_args(), &run, &its).unwrap().0.is_empty());
+    }
+
+    #[test]
+    fn models_and_efforts_are_plain_values_of_the_runs_agents() {
+        let agents = vec!["claude_cli".to_string(), "codex_cli".to_string()];
+        let pick = |m: Option<&str>, e: Option<&str>| Choice {
+            model: m.map(str::to_string),
+            effort: e.map(str::to_string),
+        };
+        assert_eq!(choices_of(&[], &[], &agents).unwrap(), vec![]);
+        assert_eq!(
+            choices_of(
+                &["claude-code=opus".into(), "codex=gpt-6.2-sol".into()],
+                &["claude-code=high".into()],
+                &agents
+            )
+            .unwrap(),
+            vec![
+                ("claude_cli".to_string(), pick(Some("opus"), Some("high"))),
+                ("codex_cli".to_string(), pick(Some("gpt-6.2-sol"), None)),
+            ]
+        );
+        assert!(choices_of(&["opus".into()], &[], &agents).is_err());
+        assert!(choices_of(&["claude-code=".into()], &[], &agents).is_err());
+        assert!(choices_of(&[], &["codex=high;rm".into()], &agents).is_err());
+        assert!(choices_of(&["antigravity=x".into()], &[], &agents).is_err());
+    }
+
+    /// A03-alto709: the background run gets the same choices, accounts kept.
+    #[test]
+    fn run_words_carry_the_choices_and_the_accounts() {
+        let mut run = Run::start(
+            Scope::All,
+            vec!["claude_cli:work".to_string(), "codex_cli".to_string()],
+            vec![],
+            true,
+            30,
+            0,
+        );
+        run.set_choice(
+            "claude_cli:work",
+            &Choice {
+                model: Some("sonnet".into()),
+                effort: None,
+            },
+        );
+        run.set_choice(
+            "codex_cli",
+            &Choice {
+                model: None,
+                effort: Some("low".into()),
+            },
+        );
+        let args = StartArgs {
+            iteration: None,
+            agents: vec![],
+            sessions: vec![],
+            every: 30,
+            mode: "quiet".into(),
+            difficulty: vec![],
+            model: vec![],
+            effort: vec![],
+        };
+        let w = run_words("r1", Path::new("/tb"), &args, "en", &run).join(" ");
+        assert!(w.contains("--agent claude-code:work --agent codex"), "{w}");
+        assert!(w.contains("--model claude-code:work=sonnet"), "{w}");
+        assert!(w.contains("--effort codex=low"), "{w}");
+        assert!(!w.contains("--model codex"), "{w}");
+        let plain = Run::start(Scope::All, vec!["claude_cli".into()], vec![], true, 30, 0);
+        let w = run_words("r1", Path::new("/tb"), &args, "en", &plain).join(" ");
+        assert!(!w.contains("--model") && !w.contains("--effort"), "{w}");
     }
 
     #[test]

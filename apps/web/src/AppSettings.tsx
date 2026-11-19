@@ -19,6 +19,7 @@ import { isProblem } from "./types";
 import type { KeyReplaced, ThisComputer } from "./types";
 import { readRecent, readRecentInfo } from "./recentFlow";
 import { replacedSummary, seenState } from "./auditFlow";
+import { plainUrl } from "./agentModelsFlow";
 
 const CHOICES: { value: StartWith; key: "app_settings.reopen" | "app_settings.last" | "app_settings.blank" }[] = [
   { value: "reopen", key: "app_settings.reopen" },
@@ -107,12 +108,88 @@ export function AppGeneralSection({ settings }: { settings: Settings }) {
           <p className="muted small">{t("app_settings.auto_download_help")}</p>
         </div>
       </fieldset>
+      <ModelsUrlField settings={settings} />
       {error && (
         <p className="banner error" role="alert">
           {error}
         </p>
       )}
     </>
+  );
+}
+
+/** General → **Model list address** (A03-alto709): where Monitor ready tasks reads each agent's
+ * models and reasoning efforts. Saved with Save; Restore default goes back to Allomos's own. */
+function ModelsUrlField({ settings }: { settings: Settings }) {
+  const { t, problem } = useI18n();
+  const [saved, setSaved] = useState<{ url: string; default: string } | null>(null);
+  const [text, setText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    settings
+      .modelsUrl()
+      .then((u) => {
+        setSaved(u);
+        setText(u.url);
+      })
+      .catch(() => undefined);
+  }, [settings]);
+  const save = (url: string | null) => {
+    if (!saved) return;
+    setDone(false);
+    if (url !== null && url.trim() !== "" && !plainUrl(url)) {
+      setError(t("app_settings.models_url_bad"));
+      return;
+    }
+    setError(null);
+    settings
+      .setModelsUrl(url === null || url.trim() === "" ? null : url.trim())
+      .then(() => settings.modelsUrl())
+      .then((u) => {
+        setSaved(u);
+        setText(u.url);
+        setDone(true);
+      })
+      .catch((e: unknown) => setError(errorText(e, problem)));
+  };
+  const isDefault = saved !== null && saved.url === saved.default;
+  return (
+    <fieldset className="settings-choice">
+      <legend>
+        <label htmlFor="models-url">{t("app_settings.models_url")}</label>
+      </legend>
+      <p>
+        <input
+          id="models-url"
+          type="url"
+          spellCheck={false}
+          style={{ width: "100%" }}
+          value={text}
+          disabled={saved === null}
+          onChange={(e) => {
+            setText(e.target.value);
+            setDone(false);
+            setError(null);
+          }}
+        />
+      </p>
+      <p>
+        <button type="button" disabled={saved === null || text.trim() === saved.url} onClick={() => save(text)}>
+          {t("app_settings.models_url_save")}
+        </button>{" "}
+        <button type="button" disabled={saved === null || (isDefault && text.trim() === saved.url)} onClick={() => save(null)}>
+          {t("app_settings.models_url_default")}
+        </button>
+        {done && <span className="muted small"> {t("app_settings.models_url_saved")}</span>}
+      </p>
+      <p className="muted small">{t("app_settings.models_url_help")}</p>
+      {error && (
+        <p className="error small" role="alert">
+          {error}
+        </p>
+      )}
+    </fieldset>
   );
 }
 
