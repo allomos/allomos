@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useI18n } from "./i18n";
 import { Markdown } from "./Markdown";
+import { EvidenceShots } from "./EvidenceShots";
 import { linkText } from "./historyFlow";
 import { askText } from "./queueFlow";
 import { decisionsToReview, humanCheckNote, toReview } from "./stopFlow";
@@ -21,6 +22,7 @@ import {
   resultKey,
   type CodeChanges,
   type EvidencePart,
+  type EvidenceReader,
 } from "./evidenceFlow";
 import type { Task } from "./types";
 
@@ -30,7 +32,7 @@ export function EvidenceScreen({
   onLink,
   decisions,
   actions,
-  readChanges,
+  reader,
 }: {
   task: Task;
   /** What the person is asked to do, as the For You window words it; left out, it is worked out
@@ -41,9 +43,10 @@ export function EvidenceScreen({
   decisions: ReactNode;
   /** The pane's Checked button, drawn under the screen. */
   actions: ReactNode;
-  /** Reads the recorded commits' first lines and changed files from the project's own git (only
-   * reads); left out where git cannot be read (the companions): the commits show as links only. */
-  readChanges?: (hashes: string[]) => Promise<CodeChanges>;
+  /** Reads the recorded commits' first lines and changed files from the project's own git, and a
+   * failed check's screenshots from the taskbag (only reads); left out where they cannot be read
+   * (the companions): the commits show as links only, the screenshots by file name. */
+  reader?: EvidenceReader;
 }) {
   const { t } = useI18n();
   const parts = evidenceParts(task);
@@ -51,7 +54,7 @@ export function EvidenceScreen({
   const summary = task.evidence?.summary;
   const results = task.evidence?.check_results ?? [];
   const refs = codeLinks(task).map((l) => l.ref);
-  const changes = useChanges(refs, readChanges);
+  const changes = useChanges(refs, reader?.changes);
   const ownAsk = askText({ todo: toReview(task) ? ["check", "review"] : ["check"], decisions: decisionsToReview(task).length }, t);
 
   const part = (p: EvidencePart): ReactNode => {
@@ -121,6 +124,7 @@ export function EvidenceScreen({
                     <span className="evidence-result">{resultKey(r.result) ? t(resultKey(r.result)!) : r.result}</span>
                     <span className="evidence-test-name">{r.name}</span>
                     {r.detail && <span className="muted"> — {r.detail}</span>}
+                    {r.screenshots && <EvidenceShots task={task.id} check={r.name} files={r.screenshots} reader={reader} />}
                   </li>
                 ))}
               </ul>

@@ -152,6 +152,9 @@ export interface CheckResultRecord {
   /** `pass`, `fail` or `not-run`. */
   result: string;
   detail?: string;
+  /** A failed check's screenshots (Task-A01-fondue470, decision 0029 § 6): file names in the
+   * task's `evidence/` folder in the taskbag; left out when it has none. */
+  screenshots?: string[];
   at: string;
   by?: string;
 }

@@ -74,11 +74,11 @@ import { MonitorControl, useMonitor } from "./Monitor";
 import { MonitorDialog } from "./MonitorDialog";
 import { readyTasks, type OpenedFrom } from "./monitorFlow";
 import type { AppSettingsMessenger, Messenger } from "./messenger";
-import { isProblem } from "./types";
+import { evidenceReader } from "./evidenceFlow";
 import { intervalMinutes, lostAfterMinutes } from "./heartbeatFlow";
 import { TabActive } from "./tabActive";
 import type { TabStart } from "./tabsFlow";
-import type { AlmStatus, UpdateStatus, Edit, InstructionFiles, Issue, Iteration, NewIteration, NextIds, Opened, Problem, SetupState, Task, TaskHistory } from "./types";
+import { isProblem, type AlmStatus, type UpdateStatus, type Edit, type InstructionFiles, type Issue, type Iteration, type NewIteration, type NextIds, type Opened, type Problem, type SetupState, type Task, type TaskHistory } from "./types";
 
 /** The file manager's name on this computer, for the button's words. */
 const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
@@ -2138,7 +2138,7 @@ function TaskbagView({
                 onHandOver={canOpenSessions ? () => setHandingOver(selected.id) : undefined}
                 lostAfter={lostAfter}
                 lastChange={opened.last_changed?.[selected.id]}
-                readChanges={canOpenSessions ? (hashes) => messenger.codeChanges(opened.root, hashes) : undefined}
+                reader={canOpenSessions ? evidenceReader(messenger, opened.root) : undefined}
               />
             )}
           </div>

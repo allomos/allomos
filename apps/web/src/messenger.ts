@@ -147,6 +147,10 @@ export interface Messenger {
   /** The Evidence screen's What changed (Task-A01-hyena938): the recorded commits' first lines and
    * the files they changed, read from the project's own git. Only reads (no fetch). */
   codeChanges(taskbag: string, hashes: string[]): Promise<CodeChanges>;
+  /** A failed check's screenshot (Task-A01-fondue470): the picture's bytes, read from the task's
+   * `evidence/` folder in the taskbag. Only reads. Rejects with a Problem when this computer does
+   * not have it. */
+  evidenceScreenshot(taskbag: string, task: string, file: string): Promise<ArrayBuffer>;
   /** Monitor ready tasks (Task-A03-cow112): the runs of the taskbag at `root` (several may run at
    * once), as `alm monitor status --json` lists them; read again when `onMonitorsChanged` says. */
   monitorRuns(root: string): Promise<unknown[]>;
@@ -601,6 +605,7 @@ export const desktopMessenger: Messenger = {
   proceedManualRequest: (request) => invoke<string>("proceed_manual_request", { request }),
   formerWorktree: (taskbag, folder, working) => invoke<FormerWorktree | null>("former_worktree", { taskbag, folder, working }),
   codeChanges: (taskbag, hashes) => invoke<CodeChanges>("code_changes", { taskbag, hashes }),
+  evidenceScreenshot: (taskbag, task, file) => invoke<ArrayBuffer>("evidence_screenshot", { taskbag, task, file }),
   monitorRuns: (root) => invoke<unknown[]>("monitor_runs", { root }),
   monitorStart: (root, agents, every, quiet, iteration, sessions, difficulties, models, efforts) =>
     invoke<string>("monitor_start", { root, agents, every, quiet, iteration, sessions, difficulties, models, efforts }),

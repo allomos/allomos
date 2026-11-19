@@ -36,6 +36,32 @@ export interface CodeChanges {
   files: { path: string; added: number | null; removed: number | null }[];
 }
 
+/** What the Evidence screen reads where it can (the desktop app; left out in the companions):
+ * What changed from the project's git, and a failed check's screenshots from the taskbag
+ * (`evidence_screenshot`, Task-A01-fondue470), as the picture's bytes. */
+export interface EvidenceReader {
+  changes(hashes: string[]): Promise<CodeChanges>;
+  screenshot(task: string, file: string): Promise<ArrayBuffer>;
+}
+
+/** The reader for the taskbag at `root`, from the desktop app's messenger. */
+export function evidenceReader(
+  m: {
+    codeChanges(taskbag: string, hashes: string[]): Promise<CodeChanges>;
+    evidenceScreenshot(taskbag: string, task: string, file: string): Promise<ArrayBuffer>;
+  },
+  root: string,
+): EvidenceReader {
+  return { changes: (hashes) => m.codeChanges(root, hashes), screenshot: (task, file) => m.evidenceScreenshot(root, task, file) };
+}
+
+/** The picture type of a screenshot by its file name, as `alm` names them (`.png`, `.jpg`,
+ * `.webp`). */
+export function screenshotType(file: string): string {
+  const end = file.toLowerCase().split(".").pop();
+  return end === "jpg" || end === "jpeg" ? "image/jpeg" : end === "webp" ? "image/webp" : "image/png";
+}
+
 /** How many changed files are listed before "and n more". */
 export const MOST_FILES = 30;
 

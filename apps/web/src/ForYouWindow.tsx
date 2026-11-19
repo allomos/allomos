@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TaskLanguageProvider, useI18n } from "./i18n";
 import type { ForYouProject, Messenger } from "./messenger";
+import { evidenceReader } from "./evidenceFlow";
 import { projectFolder } from "./paths";
 import { askText, askedNow, forYouTitle, nextChoice, riskWord, splitQueue, todoText, waitedText, type QueueRow } from "./queueFlow";
 import { labelNames, toCheck, withBlocked } from "./stopFlow";
@@ -308,7 +309,7 @@ function ForYouBody({
               lostAfter={lostAfterMinutes(box?.project)}
               lastChange={opened.last_changed?.[selected.id]}
               ask={ask}
-              readChanges={(hashes) => messenger.codeChanges(root, hashes)}
+              reader={evidenceReader(messenger, root)}
             />
           </>
         ) : (
