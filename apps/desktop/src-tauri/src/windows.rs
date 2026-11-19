@@ -117,6 +117,31 @@ impl Windows {
         })
     }
 
+    /// Every project a tab shows, once each: window `first`'s tabs first (its tab in front, then
+    /// the others in their order), then the other windows' (in label order), for the For You window
+    /// when the project it showed was closed.
+    pub(crate) fn open_projects(&self, first: Option<&str>) -> Vec<crate::for_you::Project> {
+        let shown = self.shown();
+        let mut labels: Vec<&String> = shown.keys().collect();
+        labels.sort();
+        labels.sort_by_key(|l| Some(l.as_str()) != first);
+        let mut projects: Vec<crate::for_you::Project> = Vec::new();
+        for label in labels {
+            let s = &shown[label];
+            let in_front = s.tabs.get(s.active).into_iter();
+            for tab in in_front.chain(s.tabs.iter()) {
+                let Some(root) = &tab.root else { continue };
+                if projects.iter().all(|p| &p.root != root) {
+                    projects.push(crate::for_you::Project {
+                        root: root.clone(),
+                        name: tab.name.clone(),
+                    });
+                }
+            }
+        }
+        projects
+    }
+
     /// Every taskbag a tab shows, for Devices on Your Network.
     pub(crate) fn open_taskbags(&self) -> Vec<PathBuf> {
         let mut roots: Vec<PathBuf> = self
@@ -514,6 +539,7 @@ pub(crate) fn set_window_tabs(
     };
     let _ = window.set_title(&title);
     window_list::refresh(window.app_handle(), None);
+    crate::for_you::tabs_changed(window.app_handle(), window.label());
 }
 
 /// Another window's tab already shows `root`: bring it forward and say so, so the calling window
@@ -596,6 +622,53 @@ mod tests {
             root: root.map(same_place),
             name: None,
         }
+    }
+
+    #[test]
+    fn open_projects_list_the_window_last_in_use_first_once_each() {
+        let tab = |root: &str| Tab {
+            root: Some(PathBuf::from(root)),
+            name: None,
+        };
+        let windows = Windows::default();
+        windows.shown().insert(
+            "main".to_string(),
+            Shown {
+                tabs: vec![tab("/a"), tab("/b")],
+                active: 0,
+            },
+        );
+        windows.shown().insert(
+            "window-2".to_string(),
+            Shown {
+                tabs: vec![
+                    Tab {
+                        root: None,
+                        name: None,
+                    },
+                    tab("/c"),
+                    tab("/a"),
+                ],
+                active: 2,
+            },
+        );
+        let roots = |first| {
+            windows
+                .open_projects(first)
+                .into_iter()
+                .map(|p| p.root)
+                .collect::<Vec<_>>()
+        };
+        // Its tab in front first, then its other tabs, then the other windows'.
+        assert_eq!(
+            roots(Some("window-2")),
+            ["/a", "/c", "/b"].map(PathBuf::from)
+        );
+        assert_eq!(roots(None), ["/a", "/b", "/c"].map(PathBuf::from));
+        assert_eq!(
+            windows.front_project("window-2").map(|p| p.root),
+            Some(PathBuf::from("/a"))
+        );
     }
 
     #[test]
