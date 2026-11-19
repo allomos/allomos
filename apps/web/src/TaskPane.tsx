@@ -56,6 +56,7 @@ import { LEVELS, difficultyOf, difficultyText, levelText } from "./difficultyFlo
 import { riskClass, riskText } from "./taskRiskFlow";
 import { isProblem, type Area, type Edit, type Iteration, type NewIteration, type Task, type TaskHistory } from "./types";
 import { isPlainEnter } from "./enterKey";
+import { EvidenceScreen } from "./EvidenceScreen";
 
 export function TaskPane({
   task,
@@ -83,6 +84,7 @@ export function TaskPane({
   onOpenTask,
   lostAfter,
   lastChange,
+  ask,
 }: {
   task: Task;
   /** Every task of the taskbag: a blocked task's blockers, and the "Blocked by" picker (decision 0016). */
@@ -134,6 +136,8 @@ export function TaskPane({
   lostAfter: number;
   /** When the task last changed (UTC): where its holder never beat, the lost limit counts from it. */
   lastChange?: string;
+  /** What the person is asked to do, for the Evidence screen of a task to check (decision 0029). */
+  ask?: ReactNode;
 }) {
   const { t, problem } = useI18n();
   const taskT = useTaskT();
@@ -676,17 +680,6 @@ export function TaskPane({
     );
   const part = (p: FocusPart): ReactNode => {
     switch (p) {
-      case "check_steps":
-        return (
-          <section key={p} className="pane-focus">
-            <h3>{t("pane.human_check_steps")}</h3>
-            {task.human_check_steps?.trim() ? (
-              <Markdown source={task.human_check_steps} onLink={onLink} />
-            ) : (
-              <p className="muted small">{t("pane.no_steps")}</p>
-            )}
-          </section>
-        );
       case "question":
         return (
           <section key={p} className="pane-focus">
@@ -723,6 +716,63 @@ export function TaskPane({
     }
   };
 
+  const checkBox = toCheck(task) && (
+    <div className="pane-check">
+      <HumanCheckBadge task={task} />
+      {asking === "checked" && !ownerName ? (
+        nameForm()
+      ) : (
+        <>
+          <button type="button" className="primary" onClick={() => void markDone("checked")} disabled={busy}>
+            {t("pane.checked_button")}
+          </button>
+          <p className="muted small">{t("pane.checked_hint", { label: labelText(checkedLabel(task), taskT) })}</p>
+          {error && !editing && asking !== "reviewed" && reason === null && <p className="banner error small">{error}</p>}
+        </>
+      )}
+    </div>
+  );
+  const reviewBox = toReview(task) && (
+    <div className="pane-check pane-review">
+      <AiDecidedBadge task={task} />
+      <h3>{t("pane.ai_decisions")}</h3>
+      <ul className="ai-decisions">
+        {decisionsToReview(task).map((d, i) => (
+          <li key={`${d.at}-${i}`}>
+            {d.kind && <span className="muted small">{t(`pane.ai_decision_kind.${d.kind}` as Key)} · </span>}
+            {d.text}{" "}
+            <span className="muted small">{t("pane.ai_decision_by", { by: d.by || t("pane.history_someone"), at: localTime(d.at) })}</span>
+          </li>
+        ))}
+      </ul>
+      {asking === "reviewed" && !ownerName ? (
+        nameForm()
+      ) : (
+        <>
+          <button type="button" className="primary" onClick={() => void markDone("reviewed")} disabled={busy}>
+            {t("pane.reviewed_button")}
+          </button>
+          <p className="muted small">{t("pane.reviewed_hint")}</p>
+          {error && !editing && asking === "reviewed" && <p className="banner error small">{error}</p>}
+        </>
+      )}
+    </div>
+  );
+  const detailsBox = decisionDetails(task).length > 0 && (
+    <details className="pane-check pane-details">
+      <summary>{t("pane.ai_details", { count: decisionDetails(task).length })}</summary>
+      <ul className="ai-decisions">
+        {decisionDetails(task).map((d, i) => (
+          <li key={`${d.at}-${i}`}>
+            {d.text}{" "}
+            <span className="muted small">{t("pane.ai_decision_by", { by: d.by || t("pane.history_someone"), at: localTime(d.at) })}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="muted small">{t("pane.ai_details_hint")}</p>
+    </details>
+  );
+
   return (
     <aside className="task-pane" ref={ref} aria-label={t("pane.label_aria", { id: task.id })}>
       <header className="pane-head">
@@ -744,61 +794,10 @@ export function TaskPane({
           ×
         </button>
       </header>
-      {toCheck(task) && (
-        <div className="pane-check">
-          <HumanCheckBadge task={task} />
-          {asking === "checked" && !ownerName ? (
-            nameForm()
-          ) : (
-            <>
-              <button type="button" className="primary" onClick={() => void markDone("checked")} disabled={busy}>
-                {t("pane.checked_button")}
-              </button>
-              <p className="muted small">{t("pane.checked_hint", { label: labelText(checkedLabel(task), taskT) })}</p>
-              {error && !editing && asking !== "reviewed" && reason === null && <p className="banner error small">{error}</p>}
-            </>
-          )}
-        </div>
-      )}
-      {toReview(task) && (
-        <div className="pane-check pane-review">
-          <AiDecidedBadge task={task} />
-          <h3>{t("pane.ai_decisions")}</h3>
-          <ul className="ai-decisions">
-            {decisionsToReview(task).map((d, i) => (
-              <li key={`${d.at}-${i}`}>
-                {d.kind && <span className="muted small">{t(`pane.ai_decision_kind.${d.kind}` as Key)} · </span>}
-                {d.text}{" "}
-                <span className="muted small">{t("pane.ai_decision_by", { by: d.by || t("pane.history_someone"), at: localTime(d.at) })}</span>
-              </li>
-            ))}
-          </ul>
-          {asking === "reviewed" && !ownerName ? (
-            nameForm()
-          ) : (
-            <>
-              <button type="button" className="primary" onClick={() => void markDone("reviewed")} disabled={busy}>
-                {t("pane.reviewed_button")}
-              </button>
-              <p className="muted small">{t("pane.reviewed_hint")}</p>
-              {error && !editing && asking === "reviewed" && <p className="banner error small">{error}</p>}
-            </>
-          )}
-        </div>
-      )}
-      {decisionDetails(task).length > 0 && (
-        <details className="pane-check pane-details">
-          <summary>{t("pane.ai_details", { count: decisionDetails(task).length })}</summary>
-          <ul className="ai-decisions">
-            {decisionDetails(task).map((d, i) => (
-              <li key={`${d.at}-${i}`}>
-                {d.text}{" "}
-                <span className="muted small">{t("pane.ai_decision_by", { by: d.by || t("pane.history_someone"), at: localTime(d.at) })}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="muted small">{t("pane.ai_details_hint")}</p>
-        </details>
+      {toCheck(task) ? (
+        <EvidenceScreen task={task} history={history} ask={ask} onLink={onLink} decisions={(reviewBox || detailsBox) && <>{reviewBox}{detailsBox}</>} actions={checkBox} />
+      ) : (
+        <>{reviewBox}{detailsBox}</>
       )}
       {focus.map(part)}
       {((task.approvals ?? []).length > 0 || onApprove) && (
@@ -1050,7 +1049,7 @@ export function TaskPane({
       </dl>
       </details>
       {!focus.includes("description") && (
-        <details className="pane-more">
+        <details className="pane-more pane-description">
           <summary>{t("pane.description")}</summary>
           <p className="small">{changeButton("description")}</p>
           {descriptionBody}
