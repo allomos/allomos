@@ -50,10 +50,13 @@ pub fn unshared_app_changes(root: &Path) -> AppChanges {
         });
         let id = e.id.as_deref().unwrap_or_default();
         let item: Vec<String> = match e.kind {
-            Kind::Task => vec![
-                format!("tasks/{id}/task.json"),
-                format!("tasks/{id}/description.md"),
-            ],
+            Kind::Task => {
+                let mut task_files = vec![format!("tasks/{id}/task.json")];
+                if e.changes.iter().any(|c| c.field == "description") {
+                    task_files.push(format!("tasks/{id}/description.md"));
+                }
+                task_files
+            }
             Kind::Area => vec![format!("areas/{id}.json")],
             Kind::Iteration => vec![format!("iterations/{id}.json")],
             Kind::Project => vec!["project.json".to_string()],

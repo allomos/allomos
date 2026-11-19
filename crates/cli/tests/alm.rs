@@ -1627,6 +1627,8 @@ fn app_changes_not_shared_yet_come_with_the_next_change() {
         allomos_core::ops::make_ready(bag, "A01-02", None).map(|o| (o, "ready"))
     })
     .unwrap();
+    // An unrelated description must not be included in a status-only app batch.
+    std::fs::write(root.join("tasks/A01-02/description.md"), "Unrelated text").unwrap();
     // `alm next` lists them as well.
     let v = ok(&repo, &["next"]);
     assert_eq!(v["app_changes"]["count"], 1, "{v}");

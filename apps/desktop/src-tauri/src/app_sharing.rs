@@ -26,7 +26,7 @@ pub(crate) fn share_app_changes(
     let chosen = found
         .iter()
         .find(|a| a.id == agent)
-        .ok_or_else(|| Problem::AgentNotFound { agent })?;
+        .ok_or(Problem::AgentNotFound { agent })?;
     let request = allomos_store::app_share_request::request(&taskbag, &language)?;
     agents::ask(chosen, &project, &taskbag, &request)
 }
