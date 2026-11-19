@@ -28,6 +28,7 @@ use allomos_core::{
 use serde::Serialize;
 
 mod agent_files;
+pub mod app_sharing;
 pub mod approvals;
 pub mod cadence;
 pub mod cards;
