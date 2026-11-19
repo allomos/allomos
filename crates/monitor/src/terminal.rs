@@ -9,6 +9,7 @@ use std::process::Command;
 use std::time::Duration;
 
 use allomos_core::Problem;
+use crate::flow::Choice;
 
 /// A program started without a window. On Windows a windowed app's command-line child (`claude
 /// --version`) otherwise gets a console window that flashes on screen (task A07-05).
@@ -552,7 +553,33 @@ pub fn session_command(
     session_id: Option<&str>,
     dirs: &[PathBuf],
 ) -> Option<String> {
-    session_command_with_quiet(id, file, session_id, false, dirs)
+    session_command_with_quiet(id, file, session_id, false, dirs, &Choice::default())
+}
+
+/// The words a chosen model and reasoning effort add to agent `id`'s command (A03-alto709), each
+/// ending in a space; nothing for the agent's own setting, so the command is as it was. Claude Code
+/// and Antigravity take `--model` and `--effort`; Codex takes `-m` and its
+/// `model_reasoning_effort` setting for this process only. Values are quoted with `quote`.
+pub fn choice_args(id: &str, choice: &Choice, quote: fn(&str) -> String) -> String {
+    let (model, effort): (&str, fn(&str) -> String) = match id {
+        "claude_cli" | "antigravity_cli" => ("--model", |v| format!("--effort {v}")),
+        "codex_cli" => ("-m", |v| format!("--config {v}")),
+        _ => return String::new(),
+    };
+    let mut out = String::new();
+    if let Some(m) = choice.model.as_deref() {
+        out.push_str(&format!("{model} {} ", quote(m)));
+    }
+    if let Some(e) = choice.effort.as_deref() {
+        let value = if id == "codex_cli" {
+            quote(&format!("model_reasoning_effort={e}"))
+        } else {
+            quote(e)
+        };
+        out.push_str(&effort(&value));
+        out.push(' ');
+    }
+    out
 }
 
 fn session_command_with_quiet(
@@ -561,16 +588,19 @@ fn session_command_with_quiet(
     session_id: Option<&str>,
     quiet: bool,
     dirs: &[PathBuf],
+    choice: &Choice,
 ) -> Option<String> {
     let file = shell_quote(&file.display().to_string());
     let request = format!("\"$(cat {file}; rm -f {file})\"");
+    let chosen = choice_args(id, choice, shell_quote);
     match (id, session_id) {
-        ("claude_cli", Some(s)) => {
-            Some(format!("claude --session-id {} {request}", shell_quote(s)))
-        }
-        ("claude_cli", None) => Some(format!("claude {request}")),
+        ("claude_cli", Some(s)) => Some(format!(
+            "claude --session-id {} {chosen}{request}",
+            shell_quote(s)
+        )),
+        ("claude_cli", None) => Some(format!("claude {chosen}{request}")),
         ("codex_cli", _) => Some(format!(
-            "codex {CODEX_SANDBOX}{}{}{request}",
+            "codex {CODEX_SANDBOX}{}{}{chosen}{request}",
             add_dirs(dirs, shell_quote),
             if quiet {
                 codex_quiet_policy()
@@ -579,7 +609,7 @@ fn session_command_with_quiet(
             }
         )),
         ("antigravity_cli", _) => Some(format!(
-            "agy {}{}-i {request}",
+            "agy {}{}{chosen}-i {request}",
             add_dirs(dirs, shell_quote),
             if quiet {
                 antigravity_quiet_settings_arg(shell_quote)
@@ -603,7 +633,16 @@ pub fn powershell_session(
     dirs: &[PathBuf],
 ) -> String {
     powershell_session_with_quiet(
-        id, project, found, file, session_id, alm_dir, config, false, dirs,
+        id,
+        project,
+        found,
+        file,
+        session_id,
+        alm_dir,
+        config,
+        false,
+        dirs,
+        &Choice::default(),
     )
 }
 
@@ -617,12 +656,15 @@ fn powershell_session_with_quiet(
     config: Option<(&str, &Path)>,
     quiet: bool,
     dirs: &[PathBuf],
+    choice: &Choice,
 ) -> String {
     let file = powershell_quote(&file.display().to_string());
+    let chosen = choice_args(id, choice, powershell_quote);
     let session = match (id, session_id) {
-        ("claude_cli", Some(s)) => format!("--session-id {} ", powershell_quote(s)),
+        ("claude_cli", Some(s)) => format!("--session-id {} {chosen}", powershell_quote(s)),
+        ("claude_cli", None) => chosen,
         ("codex_cli", _) => format!(
-            "{CODEX_SANDBOX}{}{}",
+            "{CODEX_SANDBOX}{}{}{chosen}",
             add_dirs(dirs, powershell_quote),
             if quiet {
                 codex_quiet_policy()
@@ -631,7 +673,7 @@ fn powershell_session_with_quiet(
             }
         ),
         ("antigravity_cli", _) => format!(
-            "{}{}-i ",
+            "{}{}{chosen}-i ",
             add_dirs(dirs, powershell_quote),
             if quiet {
                 antigravity_quiet_settings_arg(powershell_quote)
@@ -698,6 +740,7 @@ pub fn start_session(
     config: Option<(&str, &Path)>,
     quiet: bool,
     dirs: &[PathBuf],
+    choice: &Choice,
 ) -> Result<Option<crate::session_tab::SessionTab>, Problem> {
     if !cfg!(any(target_os = "macos", windows)) {
         return Err(ask_failed(id, "not available on this system yet"));
@@ -710,7 +753,7 @@ pub fn start_session(
         .map(|d| d.as_nanos())
         .unwrap_or_default();
     let file = std::env::temp_dir().join(format!("allomos-request-{stamp}.txt"));
-    let Some(program) = session_command_with_quiet(id, &file, session_id, quiet, dirs) else {
+    let Some(program) = session_command_with_quiet(id, &file, session_id, quiet, dirs, choice) else {
         return Err(ask_failed(id, "no way to start it"));
     };
     // An extra account's folder variable goes in front of the command, for that command only.
@@ -718,7 +761,7 @@ pub fn start_session(
     std::fs::write(&file, request).map_err(|e| ask_failed(id, e))?;
     if cfg!(windows) {
         let script = powershell_session_with_quiet(
-            id, project, found, &file, session_id, alm_dir, config, quiet, dirs,
+            id, project, found, &file, session_id, alm_dir, config, quiet, dirs, choice,
         );
         return new_console("powershell.exe")
             .args(["-NoExit", "-NoLogo", "-Command", &script])
@@ -823,6 +866,73 @@ mod tests {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, contents).unwrap();
         std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    #[test]
+    fn a_chosen_model_and_effort_are_added_and_the_default_changes_nothing() {
+        let file = Path::new("/tmp/r.txt");
+        let request = "\"$(cat '/tmp/r.txt'; rm -f '/tmp/r.txt')\"";
+        let pick = |m: Option<&str>, e: Option<&str>| Choice {
+            model: m.map(str::to_string),
+            effort: e.map(str::to_string),
+        };
+        let cmd = |id: &str, c: &Choice| {
+            session_command_with_quiet(id, file, Some("s-1"), false, &[], c).unwrap()
+        };
+        // The default: exactly the command without a choice.
+        assert_eq!(
+            cmd("claude_cli", &Choice::default()),
+            format!("claude --session-id 's-1' {request}")
+        );
+        assert_eq!(
+            cmd("claude_cli", &pick(Some("opus"), Some("high"))),
+            format!("claude --session-id 's-1' --model 'opus' --effort 'high' {request}")
+        );
+        assert_eq!(
+            cmd("claude_cli", &pick(None, Some("max"))),
+            format!("claude --session-id 's-1' --effort 'max' {request}")
+        );
+        assert_eq!(
+            cmd("codex_cli", &pick(Some("gpt-6.2-sol"), Some("xhigh"))),
+            format!(
+                "codex --sandbox workspace-write -m 'gpt-6.2-sol' --config 'model_reasoning_effort=xhigh' {request}"
+            )
+        );
+        assert_eq!(
+            cmd("codex_cli", &pick(Some("gpt-6-luna"), None)),
+            format!("codex --sandbox workspace-write -m 'gpt-6-luna' {request}")
+        );
+        assert_eq!(
+            cmd("antigravity_cli", &pick(Some("gemini-4-argon"), Some("low"))),
+            format!("agy --model 'gemini-4-argon' --effort 'low' -i {request}")
+        );
+        let ps = |id: &str, c: &Choice| {
+            powershell_session_with_quiet(
+                id,
+                Path::new(r"C:\p"),
+                r"C:\bin\x.exe",
+                Path::new(r"C:\t\r.txt"),
+                None,
+                None,
+                None,
+                false,
+                &[],
+                c,
+            )
+        };
+        assert!(
+            ps("claude_cli", &pick(Some("sonnet"), Some("low")))
+                .contains("& 'C:\\bin\\x.exe' --model 'sonnet' --effort 'low' $request")
+        );
+        assert!(
+            ps("codex_cli", &pick(None, Some("high")))
+                .contains("--config 'model_reasoning_effort=high' $request")
+        );
+        assert_eq!(
+            ps("claude_cli", &Choice::default()),
+            ps("claude_cli", &pick(None, None))
+        );
+        assert!(ps("claude_cli", &Choice::default()).contains("& 'C:\\bin\\x.exe' $request"));
     }
 
     #[test]
@@ -968,7 +1078,7 @@ mod tests {
         let file = Path::new("/tmp/allomos-request-1.txt");
         let request = "\"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\"";
         let one = [PathBuf::from("/w/my tb/.allomos/taskbag")];
-        let quiet = session_command_with_quiet("antigravity_cli", file, None, true, &one)
+        let quiet = session_command_with_quiet("antigravity_cli", file, None, true, &one, &Choice::default())
             .expect("quiet Antigravity command");
         assert!(quiet.starts_with("agy --add-dir '/w/my tb/.allomos/taskbag' --settings '"));
         assert!(quiet.contains(ANTIGRAVITY_PUSH_RULE));
@@ -1015,7 +1125,8 @@ mod tests {
                     None,
                     None,
                     true,
-                    dirs
+                    dirs,
+                    &Choice::default()
                 ),
                 format!("{start} {args}{settings}-i $request")
             );
@@ -1095,7 +1206,7 @@ mod tests {
             PathBuf::from("/w/O'Neil app"),
         ];
         assert_eq!(
-            session_command_with_quiet("codex_cli", file, None, true, &one).as_deref(),
+            session_command_with_quiet("codex_cli", file, None, true, &one, &Choice::default()).as_deref(),
             Some(
                 format!(
                     "codex --sandbox workspace-write --add-dir '/w/my tb/.allomos/taskbag' {quiet}{request}"
@@ -1104,7 +1215,7 @@ mod tests {
             )
         );
         assert_eq!(
-            session_command_with_quiet("codex_cli", file, None, true, &several).as_deref(),
+            session_command_with_quiet("codex_cli", file, None, true, &several, &Choice::default()).as_deref(),
             Some(
                 format!(
                     "codex --sandbox workspace-write --add-dir '/w/tb/.allomos/taskbag' --add-dir '/w/site' --add-dir '/w/O'\\''Neil app' {quiet}{request}"
@@ -1144,7 +1255,8 @@ mod tests {
                     None,
                     None,
                     true,
-                    dirs
+                    dirs,
+                    &Choice::default()
                 ),
                 format!("{start} {args}{quiet}$request")
             );
@@ -1174,7 +1286,7 @@ mod tests {
             ""
         };
         assert_eq!(
-            session_command_with_quiet("codex_cli", file, None, true, &[]).as_deref(),
+            session_command_with_quiet("codex_cli", file, None, true, &[], &Choice::default()).as_deref(),
             Some(format!(
                 "codex --sandbox workspace-write --ask-for-approval never --config sandbox_workspace_write.network_access=true {app_access}{request}"
             ).as_str())
@@ -1184,11 +1296,11 @@ mod tests {
             Some(format!("codex --sandbox workspace-write {request}").as_str())
         );
         assert_eq!(
-            session_command_with_quiet("claude_cli", file, Some("ab-12"), true, &[]).as_deref(),
+            session_command_with_quiet("claude_cli", file, Some("ab-12"), true, &[], &Choice::default()).as_deref(),
             Some(format!("claude --session-id 'ab-12' {request}").as_str())
         );
         assert_eq!(
-            session_command_with_quiet("antigravity_cli", file, None, true, &[]).as_deref(),
+            session_command_with_quiet("antigravity_cli", file, None, true, &[], &Choice::default()).as_deref(),
             Some(
                 format!(
                     "agy {}-i {request}",
@@ -1208,7 +1320,8 @@ mod tests {
                 None,
                 None,
                 true,
-                &[]
+                &[],
+                &Choice::default()
             ),
             format!(
                 "Set-Location -LiteralPath 'C:\\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\\t\\r.txt'; Remove-Item -LiteralPath 'C:\\t\\r.txt'; & 'C:\\npm\\codex.cmd' --sandbox workspace-write --ask-for-approval never --config sandbox_workspace_write.network_access=true {app_access}$request"
