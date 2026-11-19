@@ -21,16 +21,18 @@ export function AppSharingNotice({ messenger, opened }: { messenger: Messenger; 
     return () => { live = false; };
   }, [messenger, opened]);
   if (!app?.count) return null;
-  return <section className="banner update app-sharing" aria-label={t("sharing.count", { count: app.count })}>
+  const titles = new Map(opened.loaded.taskbag?.tasks.map((task) => [task.id, task.title]));
+  return <><section className="banner update app-sharing" aria-label={t("sharing.count", { count: app.count })}>
     <details>
       <summary>{t("sharing.count", { count: app.count })}</summary>
       <ul>{app.entries.map((e) => <li key={e.event}>
-        {e.id ?? t("sharing.project")} · {e.fields.map((f) => fieldName(f, t)).join(", ")} · <time dateTime={e.at}>{new Date(e.at).toLocaleString()}</time>
+        {e.id ? [e.id, titles.get(e.id)].filter(Boolean).join(" · ") : t("sharing.project")} · {e.fields.map((f) => fieldName(f, t)).join(", ")} · <time dateTime={e.at}>{new Date(e.at).toLocaleString()}</time>
       </li>)}</ul>
     </details>
     <button type="button" onClick={() => setAsking(true)}>{t("sharing.ask")}</button>
+  </section>
     {asking && <SharingDialog messenger={messenger} root={opened.root} onClose={() => setAsking(false)} />}
-  </section>;
+  </>;
 }
 
 function SharingDialog({ messenger, root, onClose }: { messenger: Messenger; root: string; onClose: () => void }) {
