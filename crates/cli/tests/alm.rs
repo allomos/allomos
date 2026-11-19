@@ -6861,6 +6861,81 @@ fn a_task_traces_to_requirements_and_decisions_and_back() {
 }
 
 #[test]
+fn check_results_are_recorded_in_the_history_and_listed_failed_first() {
+    // Task-A01-easel128 (decision 0029 § 5): `alm check-result` records one check's result as a
+    // `check_result` change in the task's history only; the same name again replaces it;
+    // `alm show` lists them, failed and not run first.
+    let repo = filled();
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    let before = task_file(&repo, "A01-01");
+    let events = event_count(&repo);
+    refused(
+        &repo,
+        &["--as", "a", "check-result", "A01-01", "--name", "npm test", "--result", "ok"],
+        1,
+        "check_result_unknown",
+    );
+    refused(
+        &repo,
+        &["--as", "a", "check-result", "A01-01", "--name", "  ", "--result", "pass"],
+        1,
+        "check_name_missing",
+    );
+    refused(
+        &repo,
+        &["--as", "b", "check-result", "A01-01", "--name", "npm test", "--result", "pass"],
+        1,
+        "task_held",
+    );
+    assert_eq!(event_count(&repo), events, "a refusal records nothing");
+
+    let v = ok(
+        &repo,
+        &["--as", "a", "check-result", "A01-01", "--name", "npm test", "--result", "FAIL", "--detail", "2 of 400 failed"],
+    );
+    assert_eq!(v["changed"], true);
+    assert_eq!(v["check_result"]["result"], "fail");
+    assert_eq!(task_file(&repo, "A01-01"), before, "task.json is untouched");
+    let history = ok(&repo, &["history", "A01-01"]);
+    let last = &history["events"][0];
+    assert_eq!(last["command"], "check-result");
+    assert_eq!(last["changes"][0]["field"], "check_result");
+    assert_eq!(
+        last["changes"][0]["to"],
+        json!({ "name": "npm test", "result": "fail", "detail": "2 of 400 failed" })
+    );
+    ok(&repo, &["--as", "a", "check-result", "A01-01", "--name", "cargo test", "--result", "pass"]);
+    ok(&repo, &["--as", "a", "check-result", "A01-01", "--name", "click through", "--result", "not-run", "--detail", "no display"]);
+
+    // The same result again records nothing; a new one for the same name replaces it.
+    let events = event_count(&repo);
+    let v = ok(&repo, &["--as", "a", "check-result", "A01-01", "--name", "cargo test", "--result", "pass"]);
+    assert_eq!(v["changed"], false);
+    assert_eq!(event_count(&repo), events);
+    let v = ok(&repo, &["--as", "a", "check-result", "A01-01", "--name", "npm test", "--result", "pass"]);
+    let history = ok(&repo, &["history", "A01-01"]);
+    assert_eq!(
+        history["events"][0]["changes"][0]["from"],
+        json!({ "name": "npm test", "result": "fail", "detail": "2 of 400 failed" })
+    );
+    let names: Vec<&str> = v["check_results"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, vec!["click through", "npm test", "cargo test"]);
+
+    let v = ok(&repo, &["show", "A01-01"]);
+    assert_eq!(v["check_results"].as_array().unwrap().len(), 3, "{v}");
+    let out = String::from_utf8(alm(&repo, &["show", "A01-01"]).stdout).unwrap();
+    assert!(
+        out.contains("Check results:\n  NOT RUN  click through: no display\n  PASS     npm test\n  PASS     cargo test\n"),
+        "{out}"
+    );
+}
+
+#[test]
 fn an_outside_effect_is_recorded_before_and_after_and_listed() {
     // Task-A01-job650 (decision 0021 § 1.1 "Outside effects"): `alm effect` records target,
     // action, rollback, approval and result as an `effect` change in the task's history only;

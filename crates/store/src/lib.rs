@@ -46,6 +46,7 @@ pub mod exceptions;
 mod file_size;
 pub mod folders;
 mod github_release;
+mod move_cards;
 mod guide;
 pub mod handoff;
 mod holding;
