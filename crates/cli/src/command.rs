@@ -372,7 +372,13 @@ pub(crate) enum Command {
         due: Option<String>,
     },
     /// Show one task in full.
-    Show { id: String },
+    Show {
+        id: String,
+        /// Only its Evidence screen, as the app shows a task to check: every part in the app's
+        /// order, "none" for a part it lacks.
+        #[arg(long)]
+        evidence: bool,
+    },
     /// Fill in or correct the session a task records, afterwards (Task-A03-ham538): each option
     /// given replaces that part, the others stay. Any state, by the holder or after done.
     Session {

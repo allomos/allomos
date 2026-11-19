@@ -7016,6 +7016,11 @@ fn check_results_are_recorded_in_the_history_and_listed_failed_first() {
 
     let v = ok(&repo, &["show", "A01-01"]);
     assert_eq!(v["check_results"].as_array().unwrap().len(), 3, "{v}");
+    let out = String::from_utf8(alm(&repo, &["show", "A01-01", "--evidence"]).stdout).unwrap();
+    assert!(
+        out.contains("Test results:\n    NOT RUN  click through: no display\n"),
+        "{out}"
+    );
     let out = String::from_utf8(alm(&repo, &["show", "A01-01"]).stdout).unwrap();
     assert!(
         out.contains("Check results:\n  NOT RUN  click through: no display\n  PASS     npm test\n  PASS     cargo test\n"),
@@ -10186,7 +10191,10 @@ fn the_risk_limits_refuse_a_high_risk_finish_and_tell_the_quiet_run_not_to_merge
     let guide_off =
         String::from_utf8_lossy(&alm(&repo, &["guide", "run-modes", "--language", "en"]).stdout)
             .to_string();
-    assert!(!guide_off.contains("you merge high-risk tasks"), "{guide_off}");
+    assert!(
+        !guide_off.contains("you merge high-risk tasks"),
+        "{guide_off}"
+    );
     ok(&repo, &["classify", "A01-01", "--risk", "high"]);
     ok(&repo, &["--as", "a", "claim", "A01-01"]);
     ok(&repo, &finish("A01-01"));
@@ -10198,17 +10206,19 @@ fn the_risk_limits_refuse_a_high_risk_finish_and_tell_the_quiet_run_not_to_merge
     fs::write(&project, serde_json::to_string_pretty(&p).unwrap()).unwrap();
 
     // Recording high risk tells the limits.
-    let text = String::from_utf8_lossy(
-        &alm(&repo, &["classify", "A01-02", "--risk", "high"]).stdout,
-    )
-    .to_string();
+    let text =
+        String::from_utf8_lossy(&alm(&repo, &["classify", "A01-02", "--risk", "high"]).stdout)
+            .to_string();
     assert!(text.contains("alm wait <id> --on"), "{text}");
     ok(&repo, &["--as", "a", "claim", "A01-02"]);
     let v = refused(&repo, &finish("A01-02"), 1, "high_risk_needs_human_check");
     assert!(v["error"]["message"].as_str().unwrap().contains("A01-02"));
     assert_eq!(task_file(&repo, "A01-02")["state"], "in_progress");
     // Checked by a person, it finishes.
-    ok(&repo, &["--as", "a", "label", "A01-02", "locally verified by human"]);
+    ok(
+        &repo,
+        &["--as", "a", "label", "A01-02", "locally verified by human"],
+    );
     ok(&repo, &["--as", "a", "done", "A01-02"]);
 
     // Not high (or not recorded): finished as before; the listed rules name the limits.
@@ -10227,5 +10237,118 @@ fn the_risk_limits_refuse_a_high_risk_finish_and_tell_the_quiet_run_not_to_merge
         )
         .to_string();
         assert!(text.contains(words), "{language}: {text}");
+    }
+}
+
+#[test]
+fn show_evidence_lists_every_part_in_the_apps_order() {
+    // Task-A01-inlet632, decision 0029 point 4: `alm show <id> --evidence` lists the parts of the
+    // app's Evidence screen in the core's order; a part the task lacks says "none", nothing is
+    // refused.
+    let repo = filled();
+    let headings = [
+        "Asked of you and risk:",
+        "Human check steps:",
+        "What changed:",
+        "Test results:",
+        "AI decisions to review:",
+        "Handoff note:",
+    ];
+    let order = |text: &str| -> Vec<usize> {
+        headings
+            .iter()
+            .map(|h| text.find(h).unwrap_or_else(|| panic!("{h} in {text}")))
+            .collect()
+    };
+    let bare = alm(&repo, &["show", "A01-01", "--evidence"]);
+    assert!(bare.status.success());
+    let bare = String::from_utf8(bare.stdout).unwrap();
+    let at = order(&bare);
+    assert!(at.windows(2).all(|w| w[0] < w[1]), "{bare}");
+    assert!(bare.contains("risk: none recorded"), "{bare}");
+    assert!(bare.contains("Human check steps:\n    none\n"), "{bare}");
+    assert!(bare.contains("Handoff note:\n    none\n"), "{bare}");
+    let v = ok(&repo, &["show", "A01-01", "--evidence"]);
+    assert_eq!(v["evidence"]["parts"], json!(["ask_risk", "tests"]));
+    assert_eq!(
+        v["order"],
+        json!([
+            "ask_risk",
+            "check_steps",
+            "summary",
+            "tests",
+            "decisions",
+            "handoff"
+        ])
+    );
+
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    ok(
+        &repo,
+        &["--as", "a", "ai-decided", "A01-01", "Title on top"],
+    );
+    ok(&repo, &["--as", "a", "link", "A01-01", "commit", "abcdef1"]);
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "classify",
+            "A01-01",
+            "--risk",
+            "medium",
+            "--touches",
+            "none",
+            "--why",
+            "M3: words users see",
+        ],
+    );
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "handoff",
+            "A01-01",
+            "--text",
+            "The screen is built. Nothing to do.\n\nCommit abcdef1.",
+        ],
+    );
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "only a person can try it",
+        ],
+    );
+    let v = ok(&repo, &["show", "A01-01", "--evidence"]);
+    assert_eq!(
+        v["evidence"]["parts"],
+        json!([
+            "ask_risk",
+            "check_steps",
+            "summary",
+            "tests",
+            "decisions",
+            "handoff"
+        ])
+    );
+    assert_eq!(v["evidence"]["summary"], "The screen is built.");
+    assert_eq!(v["evidence"]["risk_reason"], "M3: words users see");
+    let full = String::from_utf8(alm(&repo, &["show", "A01-01", "--evidence"]).stdout).unwrap();
+    let at = order(&full);
+    assert!(at.windows(2).all(|w| w[0] < w[1]), "{full}");
+    for line in [
+        "asked: check it by hand; review 1 AI decision(s)",
+        "risk: medium — M3: words users see",
+        "finished without the human check: only a person can try it",
+        "What changed:\n    The screen is built.\n    commit: abcdef1\n",
+        "- Title on top",
+    ] {
+        assert!(full.contains(line), "{line} in {full}");
     }
 }

@@ -42,6 +42,7 @@ mod convert;
 mod decisions;
 pub mod effects;
 pub mod events;
+pub mod evidence;
 pub mod exceptions;
 mod file_size;
 pub mod folders;

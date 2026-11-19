@@ -603,6 +603,7 @@ pub(crate) use text::{
 mod check_results;
 mod classify;
 mod effects;
+mod evidence;
 mod exceptions;
 mod folders;
 mod heartbeat;

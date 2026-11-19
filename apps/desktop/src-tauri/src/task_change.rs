@@ -23,6 +23,8 @@ pub(crate) struct TaskChange {
     /// The card file its `Card:` link points to outside the taskbag, if any
     /// (`Opened::cards_outside`, for a task no agent reported; a report stays as it is).
     card_outside: Option<allomos_core::card::Outside>,
+    /// Its Evidence screen (`Opened::evidence`, Task-A01-inlet632).
+    evidence: allomos_core::evidence::Evidence,
     /// The change reached beyond this task (the label table, the outside witness's checkpoint):
     /// the window reads the whole taskbag again, as before.
     whole: bool,
@@ -57,6 +59,7 @@ pub(crate) fn edit(
         version: allomos_core::ops::task_version(&task),
         changed_at: alone.at,
         card_outside: allomos_store::cards::linked_outside(root, &task),
+        evidence: allomos_store::evidence::of(root, &task),
         whole: alone.project_changed || checked,
         stamp_before: alone.stamp_before.to_string(),
         stamp_after: alone.stamp_after.to_string(),
@@ -96,7 +99,7 @@ mod tests {
             .as_array_mut()
             .unwrap()
             .retain(|c| c["task"] != id);
-        for map in ["versions", "last_changed"] {
+        for map in ["versions", "last_changed", "evidence"] {
             v[map].as_object_mut().unwrap().remove(id);
         }
         v
@@ -139,27 +142,67 @@ mod tests {
         // (the task, the edit as the interface sends it, whether more than the task changes)
         let edits = [
             (first, json!({ "field": "state", "state": "ready" }), false),
-            (second, json!({ "field": "blocked_by", "ids": [first] }), false),
-            (first, json!({ "field": "title", "title": "First, renamed" }), false),
+            (
+                second,
+                json!({ "field": "blocked_by", "ids": [first] }),
+                false,
+            ),
+            (
+                first,
+                json!({ "field": "title", "title": "First, renamed" }),
+                false,
+            ),
             (
                 first,
                 json!({ "field": "description", "text": "Card: [card](../../../../docs/first.md)\n\nThe plan." }),
                 false,
             ),
-            (first, json!({ "field": "description", "text": "The plan, with no card." }), false),
-            (first, json!({ "field": "iteration", "iteration": iteration }), false),
-            (first, json!({ "field": "difficulty", "difficulty": 3 }), false),
-            (first, json!({ "field": "handoff_note", "text": "Stopped here." }), false),
-            (first, json!({ "field": "next_dependency", "text": "The review." }), false),
+            (
+                first,
+                json!({ "field": "description", "text": "The plan, with no card." }),
+                false,
+            ),
+            (
+                first,
+                json!({ "field": "iteration", "iteration": iteration }),
+                false,
+            ),
+            (
+                first,
+                json!({ "field": "difficulty", "difficulty": 3 }),
+                false,
+            ),
+            (
+                first,
+                json!({ "field": "handoff_note", "text": "Stopped here." }),
+                false,
+            ),
+            (
+                first,
+                json!({ "field": "next_dependency", "text": "The review." }),
+                false,
+            ),
             (
                 first,
                 json!({ "field": "state", "state": "waiting", "waiting_on": "an answer", "who": null }),
                 false,
             ),
-            (first, json!({ "field": "waiting_on", "text": "another answer" }), false),
-            (first, json!({ "field": "label", "label": "locally verified by agent" }), false),
+            (
+                first,
+                json!({ "field": "waiting_on", "text": "another answer" }),
+                false,
+            ),
+            (
+                first,
+                json!({ "field": "label", "label": "locally verified by agent" }),
+                false,
+            ),
             // The same label again: nothing changes, no event is written.
-            (first, json!({ "field": "label", "label": "locally verified by agent" }), false),
+            (
+                first,
+                json!({ "field": "label", "label": "locally verified by agent" }),
+                false,
+            ),
             (first, json!({ "field": "state", "state": "done" }), false),
             // A label the table does not list yet is added to `project.json` too.
             (
@@ -169,7 +212,11 @@ mod tests {
             ),
             // The person's check may write the outside witness's checkpoint.
             (first, json!({ "field": "checked" }), true),
-            (first, json!({ "field": "reopen", "note": "One more thing." }), false),
+            (
+                first,
+                json!({ "field": "reopen", "note": "One more thing." }),
+                false,
+            ),
         ];
         let mut cards_linked = 0;
         for (id, edit, whole) in edits {
@@ -183,12 +230,20 @@ mod tests {
 
             assert_eq!(change["whole"], whole, "{edit}");
             assert_eq!(change["stamp_before"], stamp_before, "{edit}");
-            assert_eq!(change["stamp_after"], crate::taskbag_commands::taskbag_stamp(root.clone()), "{edit}");
+            assert_eq!(
+                change["stamp_after"],
+                crate::taskbag_commands::taskbag_stamp(root.clone()),
+                "{edit}"
+            );
             // The task, its version and when it last changed, as the whole read has them.
             assert_eq!(&change["task"], task_of(&after, id), "{edit}");
             assert_eq!(change["version"], after["versions"][id], "{edit}");
+            assert_eq!(change["evidence"], after["evidence"][id], "{edit}");
             if change["changed_at"].is_null() {
-                assert_eq!(before["last_changed"][id], after["last_changed"][id], "{edit}");
+                assert_eq!(
+                    before["last_changed"][id], after["last_changed"][id],
+                    "{edit}"
+                );
                 assert_eq!(task_of(&before, id), task_of(&after, id), "{edit}");
             } else {
                 assert_eq!(change["changed_at"], after["last_changed"][id], "{edit}");

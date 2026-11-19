@@ -129,7 +129,35 @@ export interface Task {
   /** Its links to code and releases (Task-A01-mint242). Not a field of task.json: worked out
    * from the history and added when the taskbag is opened. */
   links?: LinkRecord[];
+  /** Its Evidence screen as the core works it out (Task-A01-inlet632). Not a field of task.json:
+   * added when the taskbag is opened. */
+  evidence?: Evidence;
 }
+
+/** A task's Evidence screen (crates/core/src/evidence.rs, decision 0029): the parts it has, in
+ * order, as `alm show --evidence` lists them; the handoff note's first sentence; the reason given
+ * with its risk. */
+export interface Evidence {
+  parts: EvidencePart[];
+  summary: string;
+  risk_reason?: string;
+  /** The test results recorded with `alm check-result` (Task-A01-easel128), failed first, then
+   * not run, then passed; left out when the agent recorded none. */
+  check_results?: CheckResultRecord[];
+}
+
+/** One check's result (crates/core/src/check_result.rs, decision 0029 § 5). */
+export interface CheckResultRecord {
+  name: string;
+  /** `pass`, `fail` or `not-run`. */
+  result: string;
+  detail?: string;
+  at: string;
+  by?: string;
+}
+
+/** The parts, top to bottom (decision 0029 § 2). */
+export type EvidencePart = "ask_risk" | "check_steps" | "summary" | "tests" | "decisions" | "handoff";
 
 /** A link to code or a release as recorded (crates/core/src/link.rs, decision 0021 § 1.1): a
  * commit, branch, merge commit, pull request, CI run or release, and where it opens. */
@@ -350,6 +378,8 @@ export interface Opened {
   effects?: Record<string, EffectRecord[]>;
   /** Each task's links to code and releases, by task ID (Task-A01-mint242). */
   links?: Record<string, LinkRecord[]>;
+  /** Each task's Evidence screen, by task ID (Task-A01-inlet632). */
+  evidence?: Record<string, Evidence>;
   /** Each task's base and working branch, by task ID (Task-A03-22). */
   branches?: Record<string, Branches>;
   /** When each task last changed (UTC), by task ID, from the history (Task-A01-52). */

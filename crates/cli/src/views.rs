@@ -155,7 +155,8 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             done.issues = issues;
             Ok(done)
         }
-        Command::Show { id } => {
+        Command::Show { id, evidence: true } => crate::evidence::show(cli, cwd, id),
+        Command::Show { id, .. } => {
             let root = locate(cli, cwd)?;
             let (bag, issues) = taskbag_of(&root, load(&root))?;
             let task = ops::find_task(&bag, id)?;

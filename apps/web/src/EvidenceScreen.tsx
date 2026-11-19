@@ -2,7 +2,7 @@
 // check, in the task pane and in the For You window, everything a person needs to let the work
 // through or send it back, without scrolling about: what they are asked to do and the risk, the
 // check steps, a summary of the change, the test results, the AI decisions to review, and the
-// handoff note folded. A part with nothing in it is not shown. The order lives in evidenceFlow.
+// handoff note folded. A part with nothing in it is not shown. The order comes from the core.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useI18n } from "./i18n";
@@ -13,23 +13,19 @@ import { decisionsToReview, humanCheckNote, toReview } from "./stopFlow";
 import { riskClass, riskText } from "./taskRiskFlow";
 import {
   changeTotals,
-  checkResults,
   codeLinks,
   commitSubject,
   evidenceParts,
   isEvidenceHeading,
   MOST_FILES,
   resultKey,
-  riskReason,
-  summarySentence,
   type CodeChanges,
   type EvidencePart,
 } from "./evidenceFlow";
-import type { Task, TaskHistory } from "./types";
+import type { Task } from "./types";
 
 export function EvidenceScreen({
   task,
-  history,
   ask,
   onLink,
   decisions,
@@ -37,8 +33,6 @@ export function EvidenceScreen({
   readChanges,
 }: {
   task: Task;
-  /** The task's recorded changes, for the reason given with its risk; null until read. */
-  history: TaskHistory | null;
   /** What the person is asked to do, as the For You window words it; left out, it is worked out
    * from the task (check, and review when it carries AI decisions to review). */
   ask?: ReactNode;
@@ -52,10 +46,10 @@ export function EvidenceScreen({
   readChanges?: (hashes: string[]) => Promise<CodeChanges>;
 }) {
   const { t } = useI18n();
-  const parts = evidenceParts(task, Boolean(decisions));
-  const reason = riskReason(history);
-  const summary = summarySentence(task.handoff_note);
-  const results = checkResults(history);
+  const parts = evidenceParts(task);
+  const reason = task.evidence?.risk_reason;
+  const summary = task.evidence?.summary;
+  const results = task.evidence?.check_results ?? [];
   const refs = codeLinks(task).map((l) => l.ref);
   const changes = useChanges(refs, readChanges);
   const ownAsk = askText({ todo: toReview(task) ? ["check", "review"] : ["check"], decisions: decisionsToReview(task).length }, t);
