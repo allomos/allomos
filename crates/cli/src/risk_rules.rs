@@ -1,10 +1,13 @@
 //! The rules for a task's risk, as `alm classify <id>` (without options) and `alm done` list them
 //! for the agent (Task-A01-steam844, decision 0027 § 3 and 4): the fixed ones (H1 to H7, M1 to
 //! M4, low) and the project's own (`project.json`'s `risk`, `rules`; Task-A01-beetle749), in the
-//! task language. `alm` tells; the agent judges: nothing here checks or refuses anything.
+//! task language. `alm` tells; the agent judges. One check only, approved by decision 0027 § 5:
+//! with the project's limit on, `alm done --without-human-check` refuses a task recorded as high risk
+//! (Task-A01-stable046).
 
 use std::path::Path;
 
+use allomos_core::Problem;
 use allomos_core::risk::Applied;
 use allomos_store::{load, task_language, taskbag_of};
 use serde_json::{Value, json};
@@ -22,6 +25,9 @@ pub(crate) fn of_taskbag(root: &Path) -> (String, Applied) {
         })
         .unwrap_or_else(|_| ("en".to_string(), Applied::default()))
 }
+
+/// The recorded risk the limits apply to (decision 0021's `high`).
+const HIGH: &str = "high";
 
 /// The fixed rules' short names, as the JSON output lists them.
 const FIXED_MEDIUM: [&str; 4] = ["M1", "M2", "M3", "M4"];
@@ -142,6 +148,7 @@ pub(crate) fn text(language: &str, applied: &Applied) -> String {
         }
     }
     out.push_str(&format!("  {}\n", w.highest));
+    out.push_str(&limits_text(language, applied));
     out
 }
 
@@ -163,6 +170,77 @@ pub(crate) fn not_classified(language: &str, id: &str) -> String {
     }
 }
 
+/// Limit 1 (decision 0027 § 5, Task-A01-stable046): refuses `alm done --without-human-check` when
+/// the project has it on and the task's recorded risk is high. A task with no risk recorded is not
+/// refused: `alm done` reminds that it has none (alm does not judge the risk itself, § 3).
+pub(crate) fn refuse_without_human_check(root: &Path, id: &str) -> Result<(), Problem> {
+    let (_, applied) = of_taskbag(root);
+    if !applied.high_needs_human_check {
+        return Ok(());
+    }
+    let id = match taskbag_of(root, load(root)) {
+        Ok((bag, _)) => allomos_core::ops::find_task(&bag, id)?.id,
+        Err(_) => id.to_string(),
+    };
+    let risk = allomos_store::classify::by_task(root)
+        .remove(id.as_str())
+        .and_then(|c| c.risk);
+    if risk.as_deref() == Some(HIGH) {
+        return Err(Problem::HighRiskNeedsHumanCheck { id });
+    }
+    Ok(())
+}
+
+/// The limits the project has on, one line each, in `language`; nothing when both are off.
+pub(crate) fn limits_text(language: &str, applied: &Applied) -> String {
+    let (heading, human, merge) = match language {
+        "zh-CN" => (
+            "这个项目打开的限制（项目设置「风险管理」）：",
+            "高风险任务不能跳过人工检查完成：alm done --without-human-check 会拒绝；做完后用 `alm wait <id> --on \"人工检查：<要试什么>\"` 等人检查。",
+            "安静运行时，高风险任务不由代理自己合并：做完测完的工作推到它的工作分支，用 `alm wait <id> --on \"合并 <工作分支> 到 <基础分支>：高风险，项目设置要批准者合并。提案：合并。\"` 等批准者，然后接着做下一个就绪任务。",
+        ),
+        "ja" => (
+            "このプロジェクトでオンになっている制限（プロジェクト設定「リスク管理」）：",
+            "高リスクのタスクは人による確認なしで完了できない：alm done --without-human-check は拒否されます。作業が終わったら `alm wait <id> --on \"人による確認：<試すこと>\"` で確認を待ちます。",
+            "静かモードでは、高リスクのタスクをエージェント自身がマージしない：終わってテストした作業を作業ブランチにプッシュし、`alm wait <id> --on \"<作業ブランチ> を <ベースブランチ> にマージ：高リスクで、プロジェクト設定により承認者がマージします。提案：マージする。\"` で承認者を待ち、次の準備完了タスクに進みます。",
+        ),
+        _ => (
+            "Limits this project has on (its settings, Risk management):",
+            "a high-risk task cannot be finished without the human check: alm done --without-human-check refuses it; once the work is done, park it for the check with `alm wait <id> --on \"Human check: <what to try>\"`.",
+            "in a quiet run, an agent does not merge a high-risk task itself: push the finished, tested work to its working branch, park it with `alm wait <id> --on \"Merge <working branch> into <base>: high risk, the project's setting has the approver merge it. Proposal: merge it.\"`, and go on with the next ready task.",
+        ),
+    };
+    let mut on = Vec::new();
+    if applied.high_needs_human_check {
+        on.push(human);
+    }
+    if applied.high_needs_approver_merge {
+        on.push(merge);
+    }
+    if on.is_empty() {
+        return String::new();
+    }
+    let mut out = format!("  {heading}\n");
+    for line in on {
+        out.push_str(&format!("    - {line}\n"));
+    }
+    out
+}
+
+/// What `alm guide run-modes` adds, for the person, while the project has limit 2 on (decision
+/// 0027 § 5, Task-A01-stable046); nothing while it is off.
+pub(crate) fn run_modes_addition(language: &str, applied: &Applied) -> String {
+    if !applied.high_needs_approver_merge {
+        return String::new();
+    }
+    match language {
+        "zh-CN" => "\n## 这个项目的限制：高风险任务由你合并\n\n这个项目的设置（「风险管理」）打开了「安静运行时，代理不自己合并高风险任务」。所以在安静模式下，记为高风险的任务做完测完后，我不把它合入：我把工作推到它的工作分支，用 `alm wait` 搁置，写明要合并的分支和我的提案，然后接着做下一个就绪的任务。你在 `alm human` 的 To answer（待回答）里看到它，合并之后把它标为完成。普通模式下，我照常停下来问你。\n",
+        "ja" => "\n## このプロジェクトの制限：高リスクのタスクはあなたがマージします\n\nこのプロジェクトの設定（「リスク管理」）で「静かモードでは、高リスクのタスクをエージェント自身がマージしない」がオンになっています。そのため静かモードでは、高リスクと記録したタスクの作業が終わってテストしても、私はマージしません。作業を作業ブランチにプッシュし、マージするブランチと私の提案を書いて `alm wait` で保留にし、次の準備完了タスクに進みます。あなたは `alm human` の To answer（回答待ち）で見て、マージしたら完了にします。通常モードでは、いつもどおり止まって尋ねます。\n",
+        _ => "\n## This project's limit: you merge high-risk tasks\n\nThis project's settings (Risk management) have \"In a quiet run, an agent does not merge a high-risk task itself\" on. So in quiet mode, when a task I recorded as high risk is done and tested, I do not merge it: I push the work to its working branch, park it with `alm wait`, naming the branch to merge and my proposal, and go on with the next ready task. You see it in `alm human`, under To answer, and finish it once you have merged it. In normal mode I stop and ask you as usual.\n",
+    }
+    .to_string()
+}
+
 /// The rules for the JSON output: the fixed ones by their short names, the project's own as
 /// written.
 pub(crate) fn json(applied: &Applied) -> Value {
@@ -170,6 +248,8 @@ pub(crate) fn json(applied: &Applied) -> Value {
         "fixed_high": allomos_core::risk::FIXED_HIGH,
         "fixed_medium": FIXED_MEDIUM,
         "project_rules": applied.rules,
+        "high_needs_human_check": applied.high_needs_human_check,
+        "high_needs_approver_merge": applied.high_needs_approver_merge,
     })
 }
 

@@ -81,6 +81,11 @@ pub(crate) fn classify(cli: &Cli, cwd: &Path, id: &str, given: &Given) -> Result
         let (language, applied) = crate::risk_rules::of_taskbag(&root);
         out.push_str(&crate::risk_rules::text(&language, &applied));
         fields["risk_rules"] = crate::risk_rules::json(&applied);
+    } else if c.risk.as_deref() == Some("high") {
+        // Decision 0027 § 5 (Task-A01-stable046): recording high risk, the limits the project has
+        // on, so the agent knows before it merges or finishes.
+        let (language, applied) = crate::risk_rules::of_taskbag(&root);
+        out.push_str(&crate::risk_rules::limits_text(&language, &applied));
     }
     let mut done = Done::new(fields, out);
     done.issues = issues;

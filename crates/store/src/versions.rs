@@ -117,7 +117,10 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// 40: before finishing a task the agent records its risk with `alm classify`, with one sentence
 /// of why, by the rules H1–H7 (high), M1–M4 (medium), the rest low, the highest one counting, and
 /// by the rules the project added (decision 0027 § 1, 2, Task-A00-nectar077).
-pub const SECTION_VERSION: u32 = 40;
+/// 41: the project's two risk limits: with the first on, `alm done --without-human-check` refuses
+/// a high-risk task and the agent parks it for the check; with the second on, a quiet run does not
+/// merge a high-risk task but parks it for the approver (decision 0027 § 5, Task-A01-stable046).
+pub const SECTION_VERSION: u32 = 41;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
