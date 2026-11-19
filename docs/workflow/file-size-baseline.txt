@@ -8,6 +8,5 @@
 limit 1000
 apps/web/src/App.tsx 2444
 apps/web/src/TaskPane.tsx 1110
-crates/cli/src/monitor.rs 1060
 crates/core/src/ops.rs 1592
 crates/store/src/guide.rs 1998
