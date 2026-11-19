@@ -472,6 +472,15 @@ fn add_dirs(dirs: &[PathBuf], quote: fn(&str) -> String) -> String {
 /// inspect the repository's actual origin URL.
 const ANTIGRAVITY_PUSH_RULE: &str =
     "command(regex:^git push origin refs/heads/[A-Za-z0-9][A-Za-z0-9._/-]*$)";
+/// The start of a `git` command in a deny rule: alone or after other commands, with or without
+/// Git's own options before the subcommand (`git -C <folder> …`, `git -c <key>=<value> …`), so
+/// those cannot slip a forced push or a reset past the rules (Task-A03-candle790).
+macro_rules! git_start {
+    () => {
+        r#"^(.*(&&|\|\||;|\|) *)?git( +-[^ ]+( +("[^"]*"|'[^']*'|[^- ][^ ]*))?)* +"#
+    };
+}
+
 /// Refused at once in quiet monitored Antigravity sessions, without a prompt (Task-A03-candle790,
 /// approver 2026-11-19; they asked for a confirmation before, A03-fork706): the session is told
 /// and goes on, using the allowed push or parking the task with `alm wait`. Antigravity matches a
@@ -483,20 +492,40 @@ const ANTIGRAVITY_DENY_RULES: &[&str] = &[
     "command(regex:^git push origin$)",
     // A short form (`git push origin main`, `HEAD`, a tag): a source not starting `refs/heads/`.
     "command(regex:^git push origin ([^r-]|r[^e]|re[^f]|ref[^s]|refs[^/]|refs/[^h]|refs/h[^e]|refs/he[^a]|refs/hea[^d]|refs/head[^s]|refs/heads[^/]).*$)",
-    // Force, delete, mirror, prune, tags and other options.
-    "command(regex:^git push( .*)? (--force|--force-with-lease|--force-if-includes|--delete|-f|-d|-D|--mirror|--prune|--tags|--all|--follow-tags|--set-upstream|-u|--atomic|--no-verify|--porcelain|--repo)(=| |$).*$)",
+    // Force, delete, mirror, prune, tags and other options; also after `git -C <folder>`.
+    concat!(
+        "command(regex:",
+        git_start!(),
+        "push( .*)? (--force|--force-with-lease|--force-if-includes|--delete|-f|-d|-D|--mirror|--prune|--tags|--all|--follow-tags|--set-upstream|-u|--atomic|--no-verify|--porcelain|--repo)(=| |$).*$)"
+    ),
     // A forced (`+src`) or deleting / renaming (`src:dst`, `:dst`) refspec.
-    r"command(regex:^git push( .*)? \+[^ ]*( .*)?$)",
-    "command(regex:^git push( .*)? [^ ]*:[^ ]*( .*)?$)",
+    concat!(
+        "command(regex:",
+        git_start!(),
+        r"push( .*)? \+[^ ]*( .*)?$)"
+    ),
+    concat!(
+        "command(regex:",
+        git_start!(),
+        "push( .*)? [^ ]*:[^ ]*( .*)?$)"
+    ),
     // More than one refspec.
     "command(regex:^git push origin refs/heads/[^ ]+ .+$)",
     // A push written together with other commands.
     r"command(regex:^.*(&&|\|\||;|\|).*git push.*$)",
     r"command(regex:^.*git push.*(&&|\|\||;|\|).*$)",
     // Throwing work away, alone or within other commands.
-    r"command(regex:^(.*(&&|\|\||;|\|) *)?git reset( .*)? --hard( .*)?$)",
-    r"command(regex:^(.*(&&|\|\||;|\|) *)?git clean( .*)? (-[A-Za-z]*f[A-Za-z]*|--force)( .*)?$)",
-    r"command(regex:^(.*(&&|\|\||;|\|) *)?git branch( .*)? (-[A-Za-z]*D[A-Za-z]*|--force|-f)( .*)?$)",
+    concat!("command(regex:", git_start!(), "reset( .*)? --hard( .*)?$)"),
+    concat!(
+        "command(regex:",
+        git_start!(),
+        "clean( .*)? (-[A-Za-z]*f[A-Za-z]*|--force)( .*)?$)"
+    ),
+    concat!(
+        "command(regex:",
+        git_start!(),
+        "branch( .*)? (-[A-Za-z]*D[A-Za-z]*|--force|-f)( .*)?$)"
+    ),
     r"command(regex:^(.*(&&|\|\||;|\|) *)?rm( .*)? (-[A-Za-z]*[rR][A-Za-z]*f[A-Za-z]*|-[A-Za-z]*f[A-Za-z]*[rR][A-Za-z]*)( .*)?$)",
     r"command(regex:^(.*(&&|\|\||;|\|) *)?rm( .*)? (-[rR]|--recursive)( .*)? (-f|--force)( .*)?$)",
     r"command(regex:^(.*(&&|\|\||;|\|) *)?rm( .*)? (-f|--force)( .*)? (-[rR]|--recursive)( .*)?$)",
@@ -1170,6 +1199,16 @@ mod tests {
             "rm --recursive --force target",
             "rm -f -r target",
             "cd x && rm -rf build",
+            "git -C /x push --force origin refs/heads/main",
+            "git -C \"my tb\" push -f origin refs/heads/main",
+            "git -c a=b push origin +refs/heads/x",
+            "git --no-pager push origin --delete x",
+            "git -C /x push origin refs/heads/a:refs/heads/main",
+            "echo && git -C y push --mirror origin",
+            "git -C /x reset --hard",
+            "git -C /x clean -fdx",
+            "git -C /x branch -D y",
+            "git push origin refs/heads/main 2>&1",
         ] {
             assert!(denied(c), "not denied: {c}");
         }
@@ -1186,6 +1225,11 @@ mod tests {
             "rm -f file.txt",
             "rm -r emptydir",
             "cargo test -p allomos-monitor",
+            // How alm shares a taskbag in another folder stays a normal confirmation.
+            "git -C /x push",
+            "git -C tb add -A && git -C tb commit -m m && git -C tb push",
+            "git commit -m 'do not push --force'",
+            "git -C /x reset --soft HEAD~1",
         ] {
             assert!(!denied(c), "denied: {c}");
         }
