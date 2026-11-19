@@ -35,3 +35,4 @@ One file per decision: context, options, the decision and its consequences. Stat
 | [0027](./0027-what-counts-as-high-risk.md) | 什么算高风险：H1–H7 高、M1–M4 中、其余低；由代理用 `alm classify` 判断，Allomos 只显示和排序；项目可以加规则、不能去掉 H1–H7；两条限制做成项目设置「风险管理」里的开关，默认关；旧任务只补最近一个月 | 已接受 2026-11-15 |
 | [0028](./0028-one-queue-for-what-needs-a-person.md) | 一个队列装下所有要人做的事：单独的「待你处理」窗口，跟着最后在用的主窗口的前面项目；一个任务一行；先排有代理在等的（挡住的多、等得久的在前），再按风险高→中→低→未分级、同级等得久的在前，最后按迭代先后；`alm human` 同样顺序 | 已接受 2026-11-15 |
 | [0029](./0029-all-evidence-on-one-screen.md) | 审一个任务时一屏看到全部证据：「证据」一屏，按 要你做什么和风险 → 检查步骤 → 改动摘要 → 测试结果 → 待审 AI 决定 → 交接 排；只用代理交来的记录和项目自己的 git（只读）；`alm` 给文字版；测试结果用 `alm check-result` 记下；只有测试没通过时才交截图，一个任务最多 3 张，放进任务袋 | 已接受 2026-11-20 |
+| [0030](./0030-approve-many-or-return-with-reason.md) | 一次批准多条，或附理由退回：「待你处理」里勾选、一次批准，高风险、有代理在等、测试没通过的不能勾；`alm checked`/`alm reviewed` 一次接受几个 ID；退回就是 `alm reopen`，理由在 `alm next`/`show`/`claim` 里先列出；退回的任务在同一迭代里先派 | 提议中 2026-11-20 |
