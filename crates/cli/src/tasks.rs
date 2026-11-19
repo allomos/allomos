@@ -10,9 +10,10 @@ use allomos_store::{Actor, Lock, load, plain_path, read_text, taskbag_of};
 use serde_json::json;
 
 use crate::{
-    CardsWhat, Cli, Command, Done, approve, change, check_results, classify, decision_text, effects, exceptions,
-    folders, for_codex, heartbeat, human, links, locate, lock_wait, non_blank, quoted, redact,
-    save_project, stop_lines, task_json, task_json_in, task_line, traces_text, trail,
+    CardsWhat, Cli, Command, Done, approve, change, check_results, classify, decision_text,
+    effects, exceptions, folders, for_codex, heartbeat, human, links, locate, lock_wait, non_blank,
+    quoted, redact, save_project, stop_lines, task_json, task_json_in, task_line, traces_text,
+    trail,
 };
 
 /// Runs the commands this module holds; `execute` in `lib.rs` sends only those here.

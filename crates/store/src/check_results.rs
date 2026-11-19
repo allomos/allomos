@@ -50,7 +50,12 @@ pub fn record(
     let task = ops::find_task(&bag, id)?;
     let changed = change.is_some();
     if let Some(change) = change {
-        let event = actor.event(check_result::COMMAND, Kind::Task, Some(&task.id), vec![change]);
+        let event = actor.event(
+            check_result::COMMAND,
+            Kind::Task,
+            Some(&task.id),
+            vec![change],
+        );
         lock.record(&event, |_| Ok(()))?;
     }
     let results = check_result::ordered(&by_task(root).remove(&task.id).unwrap_or_default());

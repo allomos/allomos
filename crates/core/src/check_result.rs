@@ -144,7 +144,10 @@ pub fn record(
         .get(&task.id)
         .and_then(|list| list.iter().find(|r| r.check.name == after.name))
         .map(|r| r.check.clone());
-    if before.as_ref().is_some_and(|b| b.result == after.result && b.detail == after.detail) {
+    if before
+        .as_ref()
+        .is_some_and(|b| b.result == after.result && b.detail == after.detail)
+    {
         return Ok((None, after));
     }
     let value = |c: &CheckResult| serde_json::to_value(c).expect("a check result serializes");
@@ -198,10 +201,26 @@ mod tests {
     #[test]
     fn the_last_record_of_each_name_wins_in_first_order() {
         let events = vec![
-            event("A01-1", "2026-11-20T00:00:01.000Z", json!({ "name": "npm test", "result": "fail", "detail": "2 failed" })),
-            event("A01-1", "2026-11-20T00:00:02.000Z", json!({ "name": "cargo test", "result": "pass" })),
-            event("A01-2", "2026-11-20T00:00:03.000Z", json!({ "name": "npm test", "result": "pass" })),
-            event("A01-1", "2026-11-20T00:00:04.000Z", json!({ "name": "npm test", "result": "pass" })),
+            event(
+                "A01-1",
+                "2026-11-20T00:00:01.000Z",
+                json!({ "name": "npm test", "result": "fail", "detail": "2 failed" }),
+            ),
+            event(
+                "A01-1",
+                "2026-11-20T00:00:02.000Z",
+                json!({ "name": "cargo test", "result": "pass" }),
+            ),
+            event(
+                "A01-2",
+                "2026-11-20T00:00:03.000Z",
+                json!({ "name": "npm test", "result": "pass" }),
+            ),
+            event(
+                "A01-1",
+                "2026-11-20T00:00:04.000Z",
+                json!({ "name": "npm test", "result": "pass" }),
+            ),
             event("A01-1", "2026-11-20T00:00:05.000Z", json!("not a record")),
         ];
         let rec = by_task(&events);

@@ -12,9 +12,9 @@ use allomos_store::{events, load, plain_path, taskbag_of};
 use serde_json::{Value, json};
 
 use crate::{
-    Cli, Command, Done, approve, blocked_text, check_results, classify, decision_lines, effects, exceptions,
-    finished_blockers_text, folders, heartbeat, indent, iteration_heading, links, locate,
-    rules_line, stop_lines, task_json_in, task_line, traces_text,
+    Cli, Command, Done, approve, blocked_text, check_results, classify, decision_lines, effects,
+    exceptions, finished_blockers_text, folders, heartbeat, indent, iteration_heading, links,
+    locate, rules_line, stop_lines, task_json_in, task_line, traces_text,
 };
 
 /// Runs the commands this module holds; `execute` in `lib.rs` sends only those here.

@@ -6871,19 +6871,46 @@ fn check_results_are_recorded_in_the_history_and_listed_failed_first() {
     let events = event_count(&repo);
     refused(
         &repo,
-        &["--as", "a", "check-result", "A01-01", "--name", "npm test", "--result", "ok"],
+        &[
+            "--as",
+            "a",
+            "check-result",
+            "A01-01",
+            "--name",
+            "npm test",
+            "--result",
+            "ok",
+        ],
         1,
         "check_result_unknown",
     );
     refused(
         &repo,
-        &["--as", "a", "check-result", "A01-01", "--name", "  ", "--result", "pass"],
+        &[
+            "--as",
+            "a",
+            "check-result",
+            "A01-01",
+            "--name",
+            "  ",
+            "--result",
+            "pass",
+        ],
         1,
         "check_name_missing",
     );
     refused(
         &repo,
-        &["--as", "b", "check-result", "A01-01", "--name", "npm test", "--result", "pass"],
+        &[
+            "--as",
+            "b",
+            "check-result",
+            "A01-01",
+            "--name",
+            "npm test",
+            "--result",
+            "pass",
+        ],
         1,
         "task_held",
     );
@@ -6891,7 +6918,18 @@ fn check_results_are_recorded_in_the_history_and_listed_failed_first() {
 
     let v = ok(
         &repo,
-        &["--as", "a", "check-result", "A01-01", "--name", "npm test", "--result", "FAIL", "--detail", "2 of 400 failed"],
+        &[
+            "--as",
+            "a",
+            "check-result",
+            "A01-01",
+            "--name",
+            "npm test",
+            "--result",
+            "FAIL",
+            "--detail",
+            "2 of 400 failed",
+        ],
     );
     assert_eq!(v["changed"], true);
     assert_eq!(v["check_result"]["result"], "fail");
@@ -6904,15 +6942,65 @@ fn check_results_are_recorded_in_the_history_and_listed_failed_first() {
         last["changes"][0]["to"],
         json!({ "name": "npm test", "result": "fail", "detail": "2 of 400 failed" })
     );
-    ok(&repo, &["--as", "a", "check-result", "A01-01", "--name", "cargo test", "--result", "pass"]);
-    ok(&repo, &["--as", "a", "check-result", "A01-01", "--name", "click through", "--result", "not-run", "--detail", "no display"]);
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "check-result",
+            "A01-01",
+            "--name",
+            "cargo test",
+            "--result",
+            "pass",
+        ],
+    );
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "check-result",
+            "A01-01",
+            "--name",
+            "click through",
+            "--result",
+            "not-run",
+            "--detail",
+            "no display",
+        ],
+    );
 
     // The same result again records nothing; a new one for the same name replaces it.
     let events = event_count(&repo);
-    let v = ok(&repo, &["--as", "a", "check-result", "A01-01", "--name", "cargo test", "--result", "pass"]);
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "check-result",
+            "A01-01",
+            "--name",
+            "cargo test",
+            "--result",
+            "pass",
+        ],
+    );
     assert_eq!(v["changed"], false);
     assert_eq!(event_count(&repo), events);
-    let v = ok(&repo, &["--as", "a", "check-result", "A01-01", "--name", "npm test", "--result", "pass"]);
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "check-result",
+            "A01-01",
+            "--name",
+            "npm test",
+            "--result",
+            "pass",
+        ],
+    );
     let history = ok(&repo, &["history", "A01-01"]);
     assert_eq!(
         history["events"][0]["changes"][0]["from"],
