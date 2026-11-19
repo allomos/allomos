@@ -151,7 +151,10 @@ pub(crate) fn write_new_file(path: &Path, bytes: &[u8]) -> Result<(), Problem> {
     let result = (|| {
         fs::create_dir_all(dir)?;
         if path.exists() {
-            return Err(io::Error::new(io::ErrorKind::AlreadyExists, "already exists"));
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "already exists",
+            ));
         }
         let mut f = fs::File::create(&tmp)?;
         f.write_all(bytes)?;

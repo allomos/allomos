@@ -65,7 +65,6 @@ function useShots(task: string, files: string[], reader?: EvidenceReader): Recor
       made.forEach((u) => URL.revokeObjectURL(u));
     };
     // `files` is read through `key`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, can]);
   return urls;
 }

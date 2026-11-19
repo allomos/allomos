@@ -5,8 +5,8 @@
 
 use std::path::{Path, PathBuf};
 
-use allomos_core::check_result::{self, EVIDENCE_DIR};
 use allomos_core::Problem;
+use allomos_core::check_result::{self, EVIDENCE_DIR};
 
 /// A little more than `alm` takes, so a picture copied by hand at the limit still shows.
 const MOST_READ: u64 = 2 * check_result::MOST_BYTES;
@@ -29,7 +29,11 @@ fn read(taskbag: &Path, task: &str, file: &str) -> Result<Vec<u8>, Problem> {
     if !allomos_core::ops::valid_id(task) || !plain_name(file) {
         return Err(refused());
     }
-    let path: PathBuf = taskbag.join("tasks").join(task).join(EVIDENCE_DIR).join(file);
+    let path: PathBuf = taskbag
+        .join("tasks")
+        .join(task)
+        .join(EVIDENCE_DIR)
+        .join(file);
     let missing = || Problem::LinkNotFound {
         link: format!("tasks/{task}/{EVIDENCE_DIR}/{file}"),
     };
@@ -69,7 +73,10 @@ mod tests {
         std::fs::write(dir.join("b.png"), b"not a picture").unwrap();
         std::fs::write(root.join("tasks").join("A01-01").join("task.json"), "{}").unwrap();
 
-        assert_eq!(read(&root, "A01-01", "a.png").unwrap(), b"\x89PNG\r\n\x1a\nxx");
+        assert_eq!(
+            read(&root, "A01-01", "a.png").unwrap(),
+            b"\x89PNG\r\n\x1a\nxx"
+        );
         let code = |task: &str, file: &str| read(&root, task, file).unwrap_err().code();
         assert_eq!(code("A01-01", "b.png"), "link_refused");
         assert_eq!(code("A01-01", "../task.json"), "link_refused");

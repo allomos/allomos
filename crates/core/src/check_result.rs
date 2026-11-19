@@ -370,8 +370,14 @@ mod tests {
     #[test]
     fn a_screenshot_is_kept_under_a_plain_free_name() {
         let taken = vec!["shot.png".to_string(), "shot-2.png".to_string()];
-        assert_eq!(screenshot_name("/tmp/x/shot.PNG", "png", &taken), "shot-3.png");
-        assert_eq!(screenshot_name("Screen Shot 1.jpeg", "jpeg", &[]), "Screen-Shot-1.jpg");
+        assert_eq!(
+            screenshot_name("/tmp/x/shot.PNG", "png", &taken),
+            "shot-3.png"
+        );
+        assert_eq!(
+            screenshot_name("Screen Shot 1.jpeg", "jpeg", &[]),
+            "Screen-Shot-1.jpg"
+        );
         assert_eq!(screenshot_name("C:\\a\\b.webp", "webp", &[]), "b.webp");
         assert_eq!(screenshot_name("截图.png", "png", &[]), "screenshot.png");
         assert_eq!(screenshot_name(".png", "png", &[]), "png.png");

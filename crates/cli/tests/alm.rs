@@ -7108,7 +7108,10 @@ fn a_failed_check_brings_at_most_three_screenshots_into_the_taskbag() {
 
     // Copied under a plain name, named in the record and in the files to save.
     let v = ok(&repo, &run(&check("npm test", "fail", &[&one])));
-    assert_eq!(v["check_result"]["screenshots"], json!(["login-screen.png"]));
+    assert_eq!(
+        v["check_result"]["screenshots"],
+        json!(["login-screen.png"])
+    );
     assert_eq!(
         fs::read(dir.join("login-screen.png")).unwrap(),
         fs::read(repo.join(&one)).unwrap()
@@ -7160,7 +7163,9 @@ fn a_failed_check_brings_at_most_three_screenshots_into_the_taskbag() {
     );
     let out = String::from_utf8(alm(&repo, &["show", "A01-01", "--evidence"]).stdout).unwrap();
     assert!(
-        out.contains("    FAIL     e2e\n             screenshot: tasks/A01-01/evidence/crash.jpg\n"),
+        out.contains(
+            "    FAIL     e2e\n             screenshot: tasks/A01-01/evidence/crash.jpg\n"
+        ),
         "{out}"
     );
     let v = ok(&repo, &["show", "A01-01"]);

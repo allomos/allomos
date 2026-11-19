@@ -442,8 +442,9 @@ Plan:
   so the app can open it. `alm links <ref>` finds the task of a commit (7 digits of its hash or
   more), branch, PR, run, tag or address; `alm links`, every task's links; `alm show` lists them.
 - `alm check-result <id> --name \"<check>\" --result pass|fail|not-run [--detail \"<one
-  sentence>\"]`: record one check you ran or did not run, in the task's history; the same name
-  again replaces its result. `alm show` and the Evidence screen list them, failed and not run first.
+  sentence>\"] [--screenshot <file>]`: one check you ran or did not run, in the task's history (the same
+  name again replaces it); only a failed one brings screenshots (PNG, JPEG or WebP, at most 2 MB, 3 a
+  task) into `tasks/<id>/evidence/`. `alm show` and the Evidence screen list them, failed first.
 - `alm title <id> \"<title>\"`; `alm describe <id> --text \"<markdown>\"` or
   `alm describe <id> --from <file.md>`: a new title or description (`--text \"\"` removes the
   description). Same holder rule as `alm label`; each is recorded in `alm history`. Add
@@ -745,9 +746,8 @@ const WORKFLOW: &str = "# How to work the tasks
    any reader: you do not know who takes over, an agent or a person. It replaces the task's
    handoff note, so write the whole of it each time. Each operation with an outside effect that
    must not run twice goes in with `--evidence \"<what>\"` (under the description's
-   **Evidence**). Record each check you ran or did not run (tests, builds, a click-through) with
-   `alm check-result <id> --name \"<check>\" --result pass|fail|not-run [--detail \"<why>\"]`;
-   other evidence with `alm describe`.
+   **Evidence**). Record each check you ran or did not run with `alm check-result <id> --name \"<check>\"
+   --result pass|fail|not-run [--detail \"<why>\"] [--screenshot <file>]`; other evidence with `alm describe`.
    **Write for a person first.** A person reads every handoff note, every AI decision and every
    set of check steps, often on the go and without your conversation. Each keeps one order:
    1. One sentence in plain words that a person can act on: where the work stands, or what was
