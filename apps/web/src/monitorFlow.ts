@@ -193,6 +193,9 @@ export interface Current {
   /** The former holder of the lost task this session takes over (A03-husky861); null for a ready
    * task. Until it claims, the task is still that holder's, not this session's. */
   takeoverFrom: string | null;
+  /** Since when (ms) the session shows a confirmation and waits for the person (Task-A03-candle790):
+   * it does not take a slot and is not stalled while it waits; null when it shows none. */
+  awaitingApproval: number | null;
 }
 
 /** Why an agent gets no session for now (A03-otter944): its quota is used up, or its last
@@ -429,6 +432,7 @@ export function readEntry(e: any, active: string | null | undefined): Run | Lost
           // A run file from before A03-otter944 does not say: taken as claimed, as it was shown.
           claimed: w.seen_held !== false,
           takeoverFrom: typeof w.prior === "string" ? w.prior : null,
+          awaitingApproval: typeof w.awaiting_approval === "number" ? w.awaiting_approval : null,
         };
       })
       .filter((w: Current | null): w is Current => w !== null),
@@ -472,7 +476,7 @@ export function levelsOf(run: Run, agent: TerminalAgent): Levels {
  * the sessions at work). Each can be given one task at the next check. */
 export function freeAgents(run: Run): TerminalAgent[] {
   return run.agents.filter((a) => !run.paused.some((p) => p.agent === a)).flatMap((a) => {
-    const atWork = run.working.filter((w) => w.agent === a).length;
+    const atWork = run.working.filter((w) => w.agent === a && w.awaitingApproval === null).length;
     return Array.from({ length: Math.max(0, sessionsOf(run, a) - atWork) }, () => a);
   });
 }
@@ -484,7 +488,7 @@ export function nextCheck(run: Run): number {
 
 /** The sessions that have shown no sign of life for [`STALL_MS`]. */
 export function stalled(run: Run, now: number): Current[] {
-  return run.working.filter((w) => now - w.changed >= STALL_MS);
+  return run.working.filter((w) => w.awaitingApproval === null && now - w.changed >= STALL_MS);
 }
 
 /** What the line beside the button keeps of a finished run. */
@@ -609,7 +613,10 @@ export const RUN_STATES: readonly RunState[] = ["stalled", "need_you", "stopping
 
 /** The tasks of `run` waiting on the person (not on someone named): they need you. */
 export function needYou(run: Run, tasks: Task[]): string[] {
-  return run.taken.filter((id) => tasks.some((t) => t.id === id && t.state === "waiting" && !t.who));
+  const parked = run.taken.filter((id) => tasks.some((t) => t.id === id && t.state === "waiting" && !t.who));
+  // A session at a confirmation waits for the person too (Task-A03-candle790).
+  const approving = run.working.filter((w) => w.awaitingApproval !== null && !parked.includes(w.id)).map((w) => w.id);
+  return [...parked, ...approving];
 }
 
 export function runState(run: Run, tasks: Task[], now: number): RunState {
