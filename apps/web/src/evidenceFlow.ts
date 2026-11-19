@@ -89,3 +89,26 @@ export function checkResults(history: TaskHistory | null): CheckResult[] {
 export function resultKey(result: string): Key | null {
   return result === "fail" ? "evidence.result_fail" : result === "not-run" ? "evidence.result_not_run" : result === "pass" ? "evidence.result_pass" : null;
 }
+
+/** What changed, read from the project's own git (Task-A01-hyena938, decision 0029 point 3), as
+ * the desktop app reads it (`code_changes`): each recorded commit's first line (null: not on this
+ * computer), and the files changed with the lines added and removed (null: a binary file). */
+export interface CodeChanges {
+  commits: { hash: string; subject: string | null; merge: boolean }[];
+  files: { path: string; added: number | null; removed: number | null }[];
+}
+
+/** How many changed files are listed before "and n more". */
+export const MOST_FILES = 30;
+
+/** The changed files together: how many, and the lines added and removed (binary files count as
+ * files only). */
+export function changeTotals(files: CodeChanges["files"]): { files: number; added: number; removed: number } {
+  return files.reduce((s, f) => ({ files: s.files + 1, added: s.added + (f.added ?? 0), removed: s.removed + (f.removed ?? 0) }), { files: 0, added: 0, removed: 0 });
+}
+
+/** The first line read for the recorded commit `ref`: a string when found, null when this
+ * computer does not have it, undefined while not read (or where git cannot be read). */
+export function commitSubject(changes: CodeChanges | null, ref: string): string | null | undefined {
+  return changes?.commits.find((c) => c.hash === ref)?.subject;
+}

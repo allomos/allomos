@@ -308,6 +308,7 @@ function ForYouBody({
               lostAfter={lostAfterMinutes(box?.project)}
               lastChange={opened.last_changed?.[selected.id]}
               ask={ask}
+              readChanges={(hashes) => messenger.codeChanges(root, hashes)}
             />
           </>
         ) : (

@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkResults, codeLinks, evidenceParts, isEvidenceHeading, resultKey, riskReason, summarySentence } from "../src/evidenceFlow.ts";
+import { changeTotals, checkResults, codeLinks, commitSubject, evidenceParts, isEvidenceHeading, resultKey, riskReason, summarySentence } from "../src/evidenceFlow.ts";
 import { changeLine } from "../src/historyFlow.ts";
 import type { Task, TaskEvent, TaskHistory } from "../src/types.ts";
 
@@ -106,4 +106,28 @@ test("the history shows a test result as its check and result in words", () => {
   const t = (key: string) => ({ "pane.check_result": "Test result", "evidence.result_fail": "Failed", "evidence.result_pass": "Passed" })[key] ?? key;
   const line = changeLine({ field: "check_result", from: { name: "npm test", result: "fail" }, to: { name: "npm test", result: "pass" } }, t as never);
   assert.equal(line, "Test result: npm test: Failed → npm test: Passed");
+});
+
+test("what changed: files and lines add up; binary files count as files only (Task-A01-hyena938)", () => {
+  const files = [
+    { path: "a.rs", added: 10, removed: 2 },
+    { path: "logo.png", added: null, removed: null },
+    { path: "b.ts", added: 1, removed: 0 },
+  ];
+  assert.deepEqual(changeTotals(files), { files: 3, added: 11, removed: 2 });
+  assert.deepEqual(changeTotals([]), { files: 0, added: 0, removed: 0 });
+});
+
+test("a recorded commit found in git has its first line; one not on this computer is null; unread is undefined", () => {
+  const changes = {
+    commits: [
+      { hash: "989bed1a", subject: "A01-herb903: Evidence screen", merge: false },
+      { hash: "0123456789abcdef0123456789abcdef01234567", subject: null, merge: false },
+    ],
+    files: [],
+  };
+  assert.equal(commitSubject(changes, "989bed1a"), "A01-herb903: Evidence screen");
+  assert.equal(commitSubject(changes, "0123456789abcdef0123456789abcdef01234567"), null);
+  assert.equal(commitSubject(changes, "fffffff"), undefined);
+  assert.equal(commitSubject(null, "989bed1a"), undefined);
 });
