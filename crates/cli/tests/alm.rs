@@ -9919,3 +9919,72 @@ fn codex_gets_app_changes_and_folder_changes_without_dash_c() {
         "{text}"
     );
 }
+
+/// Task-A01-steam844 (decision 0027 § 3 and 4): `alm classify <id>` without options and `alm done`
+/// list the fixed risk rules and the project's own; `alm done` on a task without a risk says so
+/// with the command, and finishes it all the same.
+#[test]
+fn classify_and_done_list_the_risk_rules_and_done_reminds_when_none_is_recorded() {
+    let repo = filled();
+    let project = repo.join(".allomos/taskbag/project.json");
+    let mut p: Value = serde_json::from_str(&fs::read_to_string(&project).unwrap()).unwrap();
+    p["risk"] = json!({ "rules": ["Changing the price list is high risk."] });
+    fs::write(&project, serde_json::to_string_pretty(&p).unwrap()).unwrap();
+
+    let v = ok(&repo, &["classify", "A01-01"]);
+    assert_eq!(v["risk_rules"]["fixed_high"][6], "H7");
+    assert_eq!(v["risk_rules"]["fixed_medium"][3], "M4");
+    assert_eq!(
+        v["risk_rules"]["project_rules"],
+        json!(["Changing the price list is high risk."])
+    );
+    let text = String::from_utf8_lossy(&alm(&repo, &["classify", "A01-01"]).stdout).to_string();
+    for w in [
+        "    H1 ",
+        "    M4 ",
+        "    - Changing the price list is high risk.",
+    ] {
+        assert!(text.contains(w), "{w}: {text}");
+    }
+    // Setting it does not list them again.
+    let v = ok(&repo, &["classify", "A01-01", "--risk", "low"]);
+    assert!(v.get("risk_rules").is_none());
+
+    // Not classified: alm done finishes it and reminds, with the command.
+    ok(&repo, &["--as", "a", "claim", "A01-02"]);
+    let out = alm(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "done",
+            "A01-02",
+            "--without-human-check",
+            "only a person's check is left",
+        ],
+    );
+    assert_eq!(out.status.code(), Some(0));
+    let text = String::from_utf8_lossy(&out.stdout).to_string();
+    assert!(
+        text.contains("alm classify A01-02 --risk low|medium|high"),
+        "{text}"
+    );
+    assert!(text.contains("    H1 ") && text.contains("    - Changing the price list"));
+    assert_eq!(task_file(&repo, "A01-02")["state"], "done");
+
+    // Classified: the rules, without the reminder.
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "only a person's check is left",
+        ],
+    );
+    assert_eq!(v["risk_recorded"], true);
+    assert_eq!(v["risk_rules"]["fixed_high"][0], "H1");
+}
