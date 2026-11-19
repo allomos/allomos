@@ -113,11 +113,6 @@ pub(crate) struct StartArgs {
     /// codex=1-2. Repeat for several. Default: every level, 1-5 (Task-A03-wave335).
     #[arg(long = "difficulty", value_name = "[AGENT=]RANGE")]
     difficulty: Vec<String>,
-    /// In quiet mode, run Antigravity sessions without their chat screen (`agy -p`): an action
-    /// that needs approval is refused at once and the session is told why, so it can park the
-    /// task with `alm wait` instead of waiting on a prompt nobody sees (Task-A03-candle790).
-    #[arg(long = "antigravity-headless")]
-    antigravity_headless: bool,
 }
 
 /// What `alm monitor set` changes; whatever is not given stays as it is.
@@ -332,7 +327,6 @@ fn new_run(root: &Path, args: &StartArgs, now: i64) -> Result<Run, Problem> {
         })
         .collect();
     let mut run = Run::start(scope, agents, offered, quiet, args.every, now);
-    run.antigravity_headless = args.antigravity_headless;
     for (agent, count) in sessions {
         run.set_sessions(&agent, count);
     }
@@ -443,9 +437,6 @@ fn run_words(id: &str, root: &Path, args: &StartArgs, language: &str, run: &Run)
     for (a, range) in &run.difficulties {
         w.push("--difficulty".to_string());
         w.push(format!("{}={range}", agent_word(a)));
-    }
-    if run.antigravity_headless {
-        w.push("--antigravity-headless".to_string());
     }
     w
 }
@@ -1090,43 +1081,6 @@ mod tests {
         c.sessions = vec!["codex=2".into()];
         assert!(set_requests(&c, &run, &its).is_err());
         assert!(set_requests(&set_args(), &run, &its).unwrap().0.is_empty());
-    }
-
-    /// Task-A03-candle790: the run started with `--antigravity-headless` passes it on to its own
-    /// process and keeps it in its run file; a run file written before it reads as off.
-    #[test]
-    fn the_headless_choice_is_passed_on_and_kept() {
-        let args = StartArgs {
-            iteration: None,
-            agents: vec!["antigravity".into()],
-            sessions: vec![],
-            every: 5,
-            mode: "quiet".into(),
-            difficulty: vec![],
-            antigravity_headless: true,
-        };
-        let mut run = Run::start(
-            Scope::All,
-            vec!["antigravity_cli".to_string()],
-            vec!["antigravity_cli".to_string()],
-            true,
-            5,
-            0,
-        );
-        let off = run_words("r1", Path::new("/tb"), &args, "en", &run);
-        assert!(!off.contains(&"--antigravity-headless".to_string()));
-        run.antigravity_headless = true;
-        let on = run_words("r1", Path::new("/tb"), &args, "en", &run);
-        assert!(on.contains(&"--antigravity-headless".to_string()));
-        let saved = serde_json::to_value(&run).unwrap();
-        assert_eq!(saved["antigravity_headless"], json!(true));
-        let mut older = saved.clone();
-        older
-            .as_object_mut()
-            .unwrap()
-            .remove("antigravity_headless");
-        let read: Run = serde_json::from_value(older).unwrap();
-        assert!(!read.antigravity_headless);
     }
 
     #[test]

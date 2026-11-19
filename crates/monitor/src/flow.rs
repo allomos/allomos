@@ -103,11 +103,6 @@ pub struct Run {
     /// The agents that could be chosen when the run started (the app offers them again).
     pub offered: Vec<String>,
     pub quiet: bool,
-    /// Quiet Antigravity sessions run without their chat screen (`agy -p`), the person's choice
-    /// when the run started (Task-A03-candle790): an action that needs approval is refused at
-    /// once and the session is told why, instead of a prompt nobody sees holding its slot.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub antigravity_headless: bool,
     /// Minutes between checks when no task is ready.
     pub every: u32,
     /// When it started (ms).
@@ -215,7 +210,6 @@ impl Run {
             agents,
             offered,
             quiet,
-            antigravity_headless: false,
             every,
             started: now,
             sessions: BTreeMap::new(),

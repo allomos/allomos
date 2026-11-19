@@ -390,14 +390,6 @@ impl Loop {
                 session_id.as_deref(),
                 self.record.run.quiet,
             );
-            let headless =
-                terminal::Quiet::of(self.record.run.quiet, self.record.run.antigravity_headless)
-                    == terminal::Quiet::Headless;
-            let text = if headless && base == "antigravity_cli" {
-                request::with_antigravity_headless_rule(text, &task.id, &self.record.language)
-            } else {
-                text
-            };
             let found = self
                 .found
                 .iter()
@@ -419,10 +411,7 @@ impl Loop {
                     session_id.as_deref(),
                     self.alm_dir.as_deref(),
                     config.as_ref().map(|(var, dir)| (*var, dir.as_path())),
-                    terminal::Quiet::of(
-                        self.record.run.quiet,
-                        self.record.run.antigravity_headless,
-                    ),
+                    self.record.run.quiet,
                     &dirs,
                 ),
                 (None, _) => Err(terminal::ask_failed(&agent, "not found on this computer")),
