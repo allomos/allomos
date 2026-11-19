@@ -32,10 +32,13 @@ fn test_settings() -> PathBuf {
     std::env::temp_dir().join(format!("alm-test-settings-{}", std::process::id()))
 }
 
-/// `alm`, with the test run's own settings folder.
+/// `alm`, with the test run's own settings folder and no taskbag from the test's own
+/// environment: an `ALLOMOS_TASKBAG` set where `cargo test` runs (pointing at a real taskbag)
+/// never reaches a test's `alm` (Task-A01-sprout119). A test that wants one sets it again.
 fn alm_command() -> Command {
     let mut c = Command::new(ALM);
-    c.env("ALLOMOS_SETTINGS_DIR", test_settings());
+    c.env("ALLOMOS_SETTINGS_DIR", test_settings())
+        .env_remove("ALLOMOS_TASKBAG");
     c
 }
 
@@ -46,7 +49,6 @@ fn alm(dir: &Path, args: &[&str]) -> Output {
     alm_command()
         .current_dir(dir)
         .args(args)
-        .env_remove("ALLOMOS_TASKBAG")
         .env_remove("ALLOMOS_HOLDER")
         .env_remove("ALLOMOS_LOCK_WAIT_MS")
         .env_remove("CLAUDECODE")
@@ -500,6 +502,57 @@ fn taskbag_found_by_option_variable_or_search() {
         &["--taskbag", elsewhere.to_str().unwrap(), "list"],
         1,
         "taskbag_not_found",
+    );
+}
+
+/// Task-A01-sprout119: `cargo test` run with `ALLOMOS_TASKBAG` set to a real taskbag. This test
+/// runs its own test program again with the variable set to a stand-in "real" taskbag; there,
+/// `alm_command()` claims a task in a test taskbag of its own. The stand-in stays byte for byte as
+/// it was, and the claim lands in the test's own taskbag.
+#[test]
+fn a_taskbag_in_the_test_environment_is_never_written() {
+    let real = filled();
+    let own = filled();
+    let before = snapshot(&real);
+    let out = Command::new(std::env::current_exe().unwrap())
+        .args([
+            "set_taskbag_child_claims_in_its_own",
+            "--exact",
+            "--ignored",
+            "--test-threads=1",
+        ])
+        .env("ALLOMOS_TASKBAG", &real)
+        .env("ALM_TEST_OWN_TASKBAG", &own)
+        .output()
+        .unwrap();
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        out.status.success() && text.contains("1 passed"),
+        "{text}{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(before == snapshot(&real), "the real taskbag changed");
+    assert_eq!(ok(&own, &["show", "A01-01"])["task"]["holder"], "child");
+}
+
+/// The child of `a_taskbag_in_the_test_environment_is_never_written`: run only by it, with
+/// `ALLOMOS_TASKBAG` set in its environment.
+#[test]
+#[ignore = "run by a_taskbag_in_the_test_environment_is_never_written"]
+fn set_taskbag_child_claims_in_its_own() {
+    let Some(own) = std::env::var_os("ALM_TEST_OWN_TASKBAG") else {
+        return;
+    };
+    assert!(std::env::var_os("ALLOMOS_TASKBAG").is_some());
+    let out = alm_command()
+        .current_dir(&own)
+        .args(["--json", "--as", "child", "claim", "A01-01"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stdout)
     );
 }
 
@@ -1130,7 +1183,6 @@ fn moving_a_task_on_asks_for_a_missing_or_old_quota_report() {
         c.current_dir(&repo)
             .args(args)
             .env("ALLOMOS_SETTINGS_DIR", &settings)
-            .env_remove("ALLOMOS_TASKBAG")
             .env_remove("ALLOMOS_HOLDER");
         if let Some(now) = now {
             c.env("ALLOMOS_NOW", now);
@@ -1209,7 +1261,6 @@ fn the_quota_ask_never_names_a_plain_session_name_as_the_agent() {
             .current_dir(&repo)
             .args(args)
             .env("ALLOMOS_SETTINGS_DIR", &settings)
-            .env_remove("ALLOMOS_TASKBAG")
             .env_remove("ALLOMOS_HOLDER")
             .output()
             .unwrap();
@@ -1258,7 +1309,6 @@ fn alm_needs_no_git_and_refuses_the_removed_options() {
             .current_dir(&dir)
             .args(&all)
             .env("PATH", &empty)
-            .env_remove("ALLOMOS_TASKBAG")
             .env_remove("ALLOMOS_HOLDER")
             .output()
             .unwrap();
@@ -1830,7 +1880,6 @@ fn confirm_answered(project: &Path, answer: Option<bool>, timeout: &str) -> (i32
             "plan.md",
         ])
         .args(["--timeout", timeout])
-        .env_remove("ALLOMOS_TASKBAG")
         .env_remove("ALLOMOS_HOLDER")
         .env("ALLOMOS_NO_LAUNCH", "1")
         .stdout(std::process::Stdio::piped())
@@ -1882,7 +1931,6 @@ fn a_go_ahead_counts_only_for_the_plan_shown_and_is_recorded() {
             ])
             .args(["--plan", "plan.md", "--evidence", "evidence.md"])
             .args(["--task", "A01-01", "--timeout", "20"])
-            .env_remove("ALLOMOS_TASKBAG")
             .env_remove("ALLOMOS_HOLDER")
             .env("ALLOMOS_NO_LAUNCH", "1")
             .stdout(std::process::Stdio::piped())
@@ -2436,7 +2484,6 @@ fn fj_settings(dir: &Path, settings: &Path, args: &[&str]) -> (i32, Value) {
         .current_dir(dir)
         .arg("--json")
         .args(args)
-        .env_remove("ALLOMOS_TASKBAG")
         .env_remove("ALLOMOS_HOLDER")
         .env("ALLOMOS_SETTINGS_DIR", settings)
         .output()
@@ -3158,7 +3205,6 @@ fn alm_at(dir: &Path, now: &str, args: &[&str]) -> Output {
     alm_command()
         .current_dir(dir)
         .args(args)
-        .env_remove("ALLOMOS_TASKBAG")
         .env_remove("ALLOMOS_HOLDER")
         .env_remove("ALLOMOS_LOCK_WAIT_MS")
         .env("ALLOMOS_NOW", now)
@@ -5300,7 +5346,6 @@ fn events_record_who_ran_them_for_whom_and_under_which_approval() {
         let mut c = alm_command();
         c.current_dir(&repo).arg("--json").args(args);
         for name in [
-            "ALLOMOS_TASKBAG",
             "ALLOMOS_HOLDER",
             "CLAUDECODE",
             "CLAUDE_CODE_ENTRYPOINT",
@@ -5442,7 +5487,6 @@ fn events_record_the_ai_details() {
         let mut c = alm_command();
         c.current_dir(&repo).arg("--json").args(args);
         for name in [
-            "ALLOMOS_TASKBAG",
             "ALLOMOS_HOLDER",
             "CLAUDECODE",
             "CLAUDE_CODE_ENTRYPOINT",
@@ -5604,7 +5648,6 @@ fn events_record_the_agent_alm_runs_under() {
         let mut c = alm_command();
         c.current_dir(&repo).args(args);
         for name in [
-            "ALLOMOS_TASKBAG",
             "ALLOMOS_HOLDER",
             "CLAUDECODE",
             "CLAUDE_CODE_ENTRYPOINT",
@@ -5728,7 +5771,6 @@ fn quota_reports_are_kept_on_this_computer() {
             .current_dir(&dir)
             .arg("--json")
             .args(args)
-            .env_remove("ALLOMOS_TASKBAG")
             .env("ALLOMOS_SETTINGS_DIR", &settings)
             .output()
             .unwrap();
@@ -7900,7 +7942,6 @@ fn witness_at(dir: &Path, now: &str, args: &[&str]) -> Value {
         .current_dir(dir)
         .arg("--json")
         .args(args)
-        .env_remove("ALLOMOS_TASKBAG")
         .env_remove("ALLOMOS_HOLDER")
         .env_remove("ALLOMOS_LOCK_WAIT_MS")
         .env("ALLOMOS_NOW", now)
@@ -9204,11 +9245,10 @@ fn monitor_commands_say_what_runs_and_refuse_what_cannot() {
     let run = |args: &[&str]| -> (i32, Value) {
         let mut all = vec!["--json"];
         all.extend_from_slice(args);
-        let out = Command::new(ALM)
+        let out = alm_command()
             .current_dir(&dir)
             .args(&all)
             .env("ALLOMOS_SETTINGS_DIR", &settings)
-            .env_remove("ALLOMOS_TASKBAG")
             .output()
             .unwrap();
         let v: Value = serde_json::from_str(&String::from_utf8(out.stdout).unwrap()).unwrap();
@@ -9246,7 +9286,7 @@ fn monitor_commands_say_what_runs_and_refuse_what_cannot() {
     let (code, v) = run(&["monitor", "list"]);
     assert_eq!(code, 0, "{v}");
     // Without --mode: the person must choose quiet or normal.
-    let out = Command::new(ALM)
+    let out = alm_command()
         .current_dir(&dir)
         .args(["monitor", "start"])
         .env("ALLOMOS_SETTINGS_DIR", &settings)
