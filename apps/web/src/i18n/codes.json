@@ -183,11 +183,11 @@
     "field",
     "value"
   ],
-  "holder_missing": [],
-  "human_check_label_missing": [
+  "high_risk_needs_human_check": [
     "id"
   ],
-  "high_risk_needs_human_check": [
+  "holder_missing": [],
+  "human_check_label_missing": [
     "id"
   ],
   "human_check_steps_empty": [],
