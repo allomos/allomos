@@ -7,6 +7,6 @@
 # The first line is the project's limit (`alm file-size-settings`); change it here when the setting changes.
 limit 1000
 apps/web/src/App.tsx 2443
-apps/web/src/TaskPane.tsx 1110
+apps/web/src/TaskPane.tsx 1109
 crates/core/src/ops.rs 1592
 crates/store/src/guide.rs 1998
