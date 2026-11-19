@@ -4,7 +4,7 @@
 //! The fixed rules (H1 to H7) are not kept in the taskbag: a project cannot remove them. Its own
 //! rules are sentences written for the agent that classifies a task (`alm classify`), one each;
 //! Allomos never matches them against anything (decision 0027 § 3). The two limits are off by
-//! default; this module only keeps them, what they stop is Task-A01-stable046.
+//! default; this module keeps them, and `alm` applies them (Task-A01-stable046).
 
 use serde::{Deserialize, Serialize};
 

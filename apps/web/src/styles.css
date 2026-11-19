@@ -1226,3 +1226,7 @@ button.tree-fold:focus-visible { outline: 2px solid var(--accent); outline-offse
 @media (max-width: 720px) {
   .for-you-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 40%) minmax(0, 1fr); }
 }
+
+.app-sharing { flex-wrap: wrap; }
+.app-sharing > details { flex: 1; min-width: 240px; overflow-wrap: anywhere; }
+.app-sharing > details ul { max-height: 220px; overflow: auto; padding-left: 22px; }

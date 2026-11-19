@@ -381,7 +381,16 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     false,
                 ),
             };
-            let text = format!("{after}{text}");
+            // Decision 0027 § 5 (Task-A01-stable046): while the project has limit 2 on, the
+            // person reads that a high-risk task waits for them to merge it.
+            let limit = match (name, locate(cli, cwd)) {
+                ("run-modes", Ok(root)) => crate::risk_rules::run_modes_addition(
+                    &language,
+                    &crate::risk_rules::of_taskbag(&root).1,
+                ),
+                _ => String::new(),
+            };
+            let text = format!("{after}{text}{limit}");
             Ok(Done::new(
                 json!({ "topic": topic, "words": rest, "language": language, "written_in_language": written, "guide": text }),
                 text,

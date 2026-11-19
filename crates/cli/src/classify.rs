@@ -73,10 +73,21 @@ pub(crate) fn classify(cli: &Cli, cwd: &Path, id: &str, given: &Given) -> Result
             "Fact: it touches production or other people's data, an outside effect: it needs the approver's exact approval first (AGENTS.md § Always-on boundaries); record it with `alm approve`.\n",
         );
     }
-    let mut done = Done::new(
-        json!({ "taskbag": root, "task": task.id, "classification": c, "changed": changed }),
-        out,
-    );
+    // Decision 0027 § 3 (Task-A01-steam844): without options, the rules to judge by, the fixed
+    // ones and the project's own. alm lists them; the agent judges.
+    let mut fields =
+        json!({ "taskbag": root, "task": task.id, "classification": c, "changed": changed });
+    if nothing_given {
+        let (language, applied) = crate::risk_rules::of_taskbag(&root);
+        out.push_str(&crate::risk_rules::text(&language, &applied));
+        fields["risk_rules"] = crate::risk_rules::json(&applied);
+    } else if c.risk.as_deref() == Some("high") {
+        // Decision 0027 § 5 (Task-A01-stable046): recording high risk, the limits the project has
+        // on, so the agent knows before it merges or finishes.
+        let (language, applied) = crate::risk_rules::of_taskbag(&root);
+        out.push_str(&crate::risk_rules::limits_text(&language, &applied));
+    }
+    let mut done = Done::new(fields, out);
     done.issues = issues;
     Ok(done)
 }

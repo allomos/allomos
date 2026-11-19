@@ -5,13 +5,15 @@
 //! local server from a browser without changes.
 
 mod agent_commands;
+mod agent_models;
 mod agents;
 mod alm_command;
+mod app_sharing;
 mod audit;
 mod codex_rules;
+mod file_size_settings;
 mod for_you;
 mod former_worktree;
-mod file_size_settings;
 mod heartbeat_settings;
 mod lan;
 mod lan_commands;
@@ -194,8 +196,12 @@ pub fn run() {
                     .state::<monitor_loop::MonitorLoop>()
                     .forget(window.label());
                 window_list::refresh(window.app_handle(), Some(window.label()));
+                for_you::closed(window.app_handle(), window.label());
             }
             tauri::WindowEvent::Focused(focused) => {
+                if *focused {
+                    for_you::focused(window.app_handle(), window.label());
+                }
                 window
                     .state::<monitor_loop::MonitorLoop>()
                     .focus(window.label(), *focused);
@@ -302,6 +308,9 @@ pub fn run() {
             agent_commands::manual_request,
             agent_commands::build_app,
             agent_commands::build_app_request,
+            app_sharing::app_changes,
+            app_sharing::share_app_changes,
+            app_sharing::share_app_changes_request,
             agent_commands::move_tasks_in,
             agent_commands::move_tasks_in_request,
             agent_commands::translate_taskbag,
@@ -312,6 +321,9 @@ pub fn run() {
             former_worktree::former_worktree,
             monitor_runs::monitor_runs,
             monitor_runs::monitor_start,
+            agent_models::agent_models,
+            agent_models::models_url,
+            agent_models::set_models_url,
             monitor_runs::monitor_resume,
             monitor_runs::monitor_last,
             monitor_runs::agent_accounts,

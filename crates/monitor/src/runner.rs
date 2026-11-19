@@ -337,6 +337,60 @@ impl Loop {
         }
     }
 
+    /// The sessions found lost while they held their task (A03-husky861): their slots are free
+    /// and their tasks go out again. A tab that says the quota is used up pauses the agent until
+    /// it comes back. The sessions themselves are left as they are.
+    fn lost(&mut self, gone: Vec<Working>, now: i64) {
+        for w in gone {
+            let used = w
+                .tab
+                .as_ref()
+                .and_then(session_tab::text_of)
+                .and_then(|text| quota::from_session_text(&text));
+            log(&format!(
+                "{} lost ({}): no heartbeat past the project's limit; its slot is free{}",
+                w.id,
+                w.agent,
+                if used.is_some() {
+                    "; its quota is used up"
+                } else {
+                    ""
+                }
+            ));
+            let resets = used.as_ref().and_then(|u| u.resets.clone());
+            if let Some(used) = used {
+                self.pause_for_quota(&w.agent, Some(&w.id), used, now);
+            }
+            let quota = self
+                .record
+                .run
+                .paused
+                .get(&w.agent)
+                .is_some_and(|p| p.why == PauseWhy::Quota);
+            self.record.run.went_lost(&w, quota, resets, now);
+        }
+    }
+
+    /// Tell the person once about each task given up since `before` (A03-husky861).
+    fn tell_given_up(&self, before: &[String]) {
+        for id in self
+            .record
+            .run
+            .given_up
+            .iter()
+            .filter(|g| !before.contains(g))
+        {
+            let line = request::given_up(&self.record.language, id, crate::flow::MAX_FAILURES);
+            log(&line);
+            notify::show(
+                &self.dir,
+                &self.id,
+                request::notify_title(&self.record.language),
+                &line,
+            );
+        }
+    }
+
     /// The paused agents whose time has come: an agent out of quota has it read again (and gets
     /// sessions again when there is some); one paused after a session that did not start, for
     /// no reason read, gets sessions again.
@@ -364,6 +418,8 @@ impl Loop {
         // The accounts as they are now: an account added or removed in the app counts from here
         // (Task-A03-oven548).
         let accounts = accounts::load();
+        // The working branches, read once and only when a lost task is given out (A03-husky861).
+        let mut branches = None;
         for (agent, task) in shares {
             // An agent taken off by an earlier failure gets no more sessions this check, nor one
             // paused at this check.
@@ -381,6 +437,14 @@ impl Loop {
             // account's folder).
             let base = accounts::base_agent(&agent).to_string();
             let session_id = (base == "claude_cli").then(new_session_id);
+            // A lost task is taken over on its working branch (A03-husky861).
+            let takeover = task.holder.as_ref().map(|holder| request::Takeover {
+                holder: holder.clone(),
+                branch: branches
+                    .get_or_insert_with(|| allomos_store::branches(&self.record.taskbag))
+                    .get(&task.id)
+                    .and_then(|b| b.working.clone()),
+            });
             let text = request::monitor_request(
                 &task.id,
                 &task.title,
@@ -389,6 +453,7 @@ impl Loop {
                 &base,
                 session_id.as_deref(),
                 self.record.run.quiet,
+                takeover.as_ref(),
             );
             let found = self
                 .found
@@ -413,6 +478,8 @@ impl Loop {
                     config.as_ref().map(|(var, dir)| (*var, dir.as_path())),
                     self.record.run.quiet,
                     &dirs,
+                    // The model and effort chosen for this agent, if any (A03-alto709).
+                    &self.record.run.choice_of(&agent),
                 ),
                 (None, _) => Err(terminal::ask_failed(&agent, "not found on this computer")),
                 (_, Err(why)) => Err(terminal::ask_failed(&agent, why)),
@@ -465,6 +532,11 @@ impl Loop {
         let gone_any = !gone.is_empty();
         self.not_started(gone, now);
         let lost_after = allomos_core::heartbeat::applied(&bag.project).lost_after_secs;
+        // Sessions lost while holding their task free their slots (A03-husky861).
+        let lost = self.record.run.lost_ones(&bag.tasks, lost_after, now);
+        let gone_any = gone_any || !lost.is_empty();
+        self.lost(lost, now);
+        self.tell_given_up(&before.given_up);
         let finished = self.record.run.follow(&bag.tasks, lost_after, now);
         for cur in &finished {
             log(&format!("{} finished ({})", cur.id, cur.agent));

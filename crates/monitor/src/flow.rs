@@ -63,7 +63,40 @@ pub struct Working {
     /// holder of another name is another session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub holder: Option<String>,
+    /// Who held the task when this session was started for it (a lost task's former holder,
+    /// A03-husky861), and that holder's session ID: while they still hold it, the task is not
+    /// this session's claim (see [`prior_holds`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prior: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prior_session: Option<String>,
 }
+
+/// A session the run stopped following because its task went lost while it held it
+/// (A03-husky861): no heartbeat and no busy window for longer than the project's limit, as for
+/// `alm next`. Its slot is free and its task is given out again; Allomos does not end it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LostSession {
+    pub agent: String,
+    pub id: String,
+    /// Its `--as` name.
+    pub holder: String,
+    /// When it was started, and when it was found lost (ms).
+    pub at: i64,
+    pub found: i64,
+    /// Its tab said its quota is used up.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub quota: bool,
+    /// When that quota comes back, as the agent wrote it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resets: Option<String>,
+}
+
+/// How many lost sessions a run keeps to show: the newest.
+pub const LOST_KEPT: usize = 10;
+/// How many times one task's sessions may fail in a run (lost, or did not start) before the run
+/// gives it up and tells the person (A03-husky861).
+pub const MAX_FAILURES: u32 = 3;
 
 /// A task the run stopped following because another session holds it (A03-cart761): its row is
 /// gone and its slot is free; the panel says why.
@@ -92,6 +125,13 @@ pub struct Run {
     /// it). An agent not listed takes every level, 1 to 5 (Task-A03-wave335).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub difficulties: BTreeMap<String, String>,
+    /// The model each agent's sessions start with (agent ID → a value from the online model
+    /// list, A03-alto709). An agent not listed starts with its own setting: no model is given.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub models: BTreeMap<String, String>,
+    /// The reasoning effort each agent's sessions start with, the same way (A03-alto709).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub efforts: BTreeMap<String, String>,
     /// The agents with a free session slot that no ready task in their range fitted at the last
     /// check: the status bar says why they got no session (Task-A03-wave335).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -139,6 +179,33 @@ pub struct Run {
     /// (A03-otter944). Their tasks are given out again.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub not_started: Vec<NotStarted>,
+    /// The sessions found lost, newest last, the latest [`LOST_KEPT`] (A03-husky861).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lost: Vec<LostSession>,
+    /// How many times each task's sessions failed this run (task ID → count).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub failures: BTreeMap<String, u32>,
+    /// The tasks given up after [`MAX_FAILURES`]: no more sessions for them this run.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub given_up: Vec<String>,
+}
+
+/// The model and reasoning effort a session is started with (A03-alto709). None: the agent's own
+/// setting, so its command is the same as without a choice.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Choice {
+    pub model: Option<String>,
+    pub effort: Option<String>,
+}
+
+/// A model or effort value is one plain word (letters, digits, `.`, `-`, `_`, `:`, `/`, `[`, `]`),
+/// at most 80 characters: it goes into the command that starts the agent.
+pub fn plain_choice(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 80
+        && value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || ".-_:/[]".contains(c))
 }
 
 /// Why an agent gets no session for now.
@@ -214,6 +281,8 @@ impl Run {
             started: now,
             sessions: BTreeMap::new(),
             difficulties: BTreeMap::new(),
+            models: BTreeMap::new(),
+            efforts: BTreeMap::new(),
             no_task: Vec::new(),
             taken: Vec::new(),
             taken_by: BTreeMap::new(),
@@ -225,7 +294,58 @@ impl Run {
             let_go: Vec::new(),
             paused: BTreeMap::new(),
             not_started: Vec::new(),
+            lost: Vec::new(),
+            failures: BTreeMap::new(),
+            given_up: Vec::new(),
         }
+    }
+
+    /// One more failure of `id`'s sessions; at [`MAX_FAILURES`] the task is given up.
+    fn failed(&mut self, id: &str) {
+        let n = self.failures.entry(id.to_string()).or_insert(0);
+        *n += 1;
+        if *n >= MAX_FAILURES && !self.given_up.iter().any(|g| g == id) {
+            self.given_up.push(id.to_string());
+        }
+    }
+
+    /// The sessions whose task went lost while they held it (A03-husky861): the same test as
+    /// `alm next` ([`heartbeat::lost`], the project's `lost_after_secs`). They leave the sessions at
+    /// work, which frees their slots, and their tasks leave the taken ones, so the next share
+    /// offers them first; returned in the order started. Nothing is done to the sessions.
+    pub fn lost_ones(&mut self, tasks: &[Task], lost_after_secs: i64, now: i64) -> Vec<Working> {
+        let (gone, kept): (Vec<Working>, Vec<Working>) = self.working.drain(..).partition(|w| {
+            tasks.iter().find(|t| t.id == w.id).is_some_and(|t| {
+                w.seen_held
+                    && !prior_holds(w, t)
+                    && others(w, t).is_none()
+                    && beats_for(t)
+                    && heartbeat::lost(t, now.div_euclid(1000), lost_after_secs, None).is_some()
+            })
+        });
+        self.working = kept;
+        for w in &gone {
+            self.taken.retain(|id| id != &w.id);
+            self.taken_by.remove(&w.id);
+            self.failed(&w.id);
+        }
+        gone
+    }
+
+    /// `w` went lost (its tab said its quota is used up, when `quota`): kept for the panel. Its
+    /// agent is paused by the caller when its quota is used up.
+    pub fn went_lost(&mut self, w: &Working, quota: bool, resets: Option<String>, now: i64) {
+        self.lost.push(LostSession {
+            agent: w.agent.clone(),
+            id: w.id.clone(),
+            holder: w.holder.clone().unwrap_or_default(),
+            at: w.at,
+            found: now,
+            quota,
+            resets,
+        });
+        let over = self.lost.len().saturating_sub(LOST_KEPT);
+        self.lost.drain(..over);
     }
 
     /// When the next check is due (ms).
@@ -260,6 +380,33 @@ impl Run {
     pub fn set_difficulty(&mut self, agent: &str, range: &str) {
         if let Ok(r) = Range::parse(range) {
             self.difficulties.insert(agent.to_string(), r.text());
+        }
+    }
+
+    /// The model and the reasoning effort `agent`'s sessions start with (A03-alto709): none for
+    /// either is the agent's own setting.
+    pub fn choice_of(&self, agent: &str) -> Choice {
+        Choice {
+            model: self.models.get(agent).cloned(),
+            effort: self.efforts.get(agent).cloned(),
+        }
+    }
+
+    /// Start `agent`'s sessions with this model and effort (A03-alto709); none is its own setting.
+    /// A value that is not a plain word ([`plain_choice`]) is left out.
+    pub fn set_choice(&mut self, agent: &str, choice: &Choice) {
+        for (map, value) in [
+            (&mut self.models, &choice.model),
+            (&mut self.efforts, &choice.effort),
+        ] {
+            match value.as_deref().map(str::trim) {
+                Some(v) if plain_choice(v) => {
+                    map.insert(agent.to_string(), v.to_string());
+                }
+                _ => {
+                    map.remove(agent);
+                }
+            }
         }
     }
 
@@ -335,19 +482,23 @@ impl Run {
     }
 
     /// The sessions that did not start (A03-otter944): started [`NOT_STARTED_MS`] ago or more and
-    /// their task still ready and never held. They are taken off the sessions at work, and their
-    /// tasks off the taken ones, so they are given out again; returned in the order started.
+    /// their task never claimed by them: still ready and held by no one, or still held by the
+    /// former holder it had when the session was started (A03-husky861). They are taken off the
+    /// sessions at work, and their tasks off the taken ones, so they are given out again (until
+    /// [`MAX_FAILURES`]); returned in the order started.
     pub fn unclaimed(&mut self, tasks: &[Task], now: i64) -> Vec<Working> {
         let (gone, kept): (Vec<Working>, Vec<Working>) = self.working.drain(..).partition(|w| {
-            let still_ready = tasks
-                .iter()
-                .any(|t| t.id == w.id && t.state == State::Ready && t.holder.is_none());
-            !w.seen_held && still_ready && now - w.at >= NOT_STARTED_MS
+            let unclaimed = tasks.iter().any(|t| {
+                t.id == w.id
+                    && ((t.state == State::Ready && t.holder.is_none()) || prior_holds(w, t))
+            });
+            !w.seen_held && unclaimed && now - w.at >= NOT_STARTED_MS
         });
         self.working = kept;
         for w in &gone {
             self.taken.retain(|id| id != &w.id);
             self.taken_by.remove(&w.id);
+            self.failed(&w.id);
         }
         gone
     }
@@ -401,30 +552,32 @@ impl Run {
         self.paused.remove(agent);
     }
 
-    /// One check's share-out: each free session slot, in the run's order, gets the first ready
-    /// task in the scope this run has not taken yet that is in its agent's difficulty range; a
-    /// slot with no such task gets none (see [`Run::unfilled`]). Every session claims its task
-    /// first, so two sessions never work the same one.
+    /// One check's share-out: each free session slot, in the run's order, gets the first task in
+    /// its agent's difficulty range: first the lost tasks in the scope (A03-husky861: a session
+    /// went quiet holding them, decision 0022), then the ready ones this run has not taken yet; a
+    /// slot with no such task gets none (see [`Run::unfilled`]). A lost task is offered even when
+    /// this run took it before; only one a session of the run works now, or one given up
+    /// ([`MAX_FAILURES`]), is not. Every session claims its task first, so two sessions never work
+    /// the same one.
     pub fn share(&self, bag: &Taskbag, now_secs: i64) -> Vec<(String, Task)> {
         let iteration = match &self.scope {
             Scope::All => None,
             Scope::Iteration { id } => Some(id.as_str()),
         };
-        let mut ready: Vec<&Task> = ops::next(bag, iteration)
-            .unwrap_or_default()
-            .into_iter()
-            .filter(|t| !self.taken.contains(&t.id))
-            .collect();
-        // A task whose session went quiet (its account ran out, or it was switched) is lost
-        // (decision 0022): a new session takes it over, after the ready tasks.
+        let left_out =
+            |t: &Task| self.given_up.contains(&t.id) || self.working.iter().any(|w| w.id == t.id);
         let lost_after = heartbeat::applied(&bag.project).lost_after_secs;
-        for t in &bag.tasks {
-            if self.taken.contains(&t.id)
-                || iteration.is_some_and(|i| t.iteration.as_deref() != Some(i))
-            {
-                continue;
-            }
-            if heartbeat::lost(t, now_secs, lost_after, None).is_some() {
+        let mut ready: Vec<&Task> = bag
+            .tasks
+            .iter()
+            .filter(|t| {
+                !left_out(t)
+                    && iteration.is_none_or(|i| t.iteration.as_deref() == Some(i))
+                    && heartbeat::lost(t, now_secs, lost_after, None).is_some()
+            })
+            .collect();
+        for t in ops::next(bag, iteration).unwrap_or_default() {
+            if !self.taken.contains(&t.id) && !left_out(t) && !ready.iter().any(|r| r.id == t.id) {
                 ready.push(t);
             }
         }
@@ -479,10 +632,16 @@ impl Run {
             session_id,
             tab,
             at: now,
-            seen_held: task.holder.is_some(),
+            // A lost task's former holder is not this session's claim (A03-husky861).
+            seen_held: false,
             seen: seen_of(Some(task)),
             changed: now,
             holder: None,
+            prior: task.holder.clone(),
+            prior_session: task
+                .holder
+                .as_ref()
+                .and_then(|_| present_session(task).and_then(|s| s.id.clone())),
         });
         self.checked = now;
     }
@@ -540,11 +699,7 @@ enum Followed {
 /// that passed nothing to tell by counts as this session.
 fn others(cur: &Working, task: &Task) -> Option<String> {
     let holder = task.holder.as_ref()?;
-    // The recorded session may be a former holder's: only the present holder's counts.
-    let session = task
-        .session
-        .as_ref()
-        .filter(|s| s.by.as_ref().is_none_or(|by| by == holder));
+    let session = present_session(task);
     if let (Some(mine), Some(theirs)) = (&cur.session_id, session.and_then(|s| s.id.as_ref())) {
         return (mine != theirs).then(|| holder.clone());
     }
@@ -554,9 +709,51 @@ fn others(cur: &Working, task: &Task) -> Option<String> {
     other.then(|| holder.clone())
 }
 
+/// The session recorded on `task` when it is its present holder's (a former holder's may be left
+/// there).
+fn present_session(task: &Task) -> Option<&allomos_core::AgentSession> {
+    let holder = task.holder.as_ref()?;
+    task.session
+        .as_ref()
+        .filter(|s| s.by.as_ref().is_none_or(|by| by == holder))
+}
+
+/// Whether `task` is still held by the former holder it had when `cur` was started for it
+/// (A03-husky861), so `cur` has not claimed it yet. A claim by `cur` shows as another holder name,
+/// another session ID (this session's own, when Allomos gave it one), or, when neither tells, a
+/// heartbeat by the holder since `cur` was started.
+fn prior_holds(cur: &Working, task: &Task) -> bool {
+    let (Some(prior), Some(holder)) = (&cur.prior, &task.holder) else {
+        return false;
+    };
+    if prior != holder || task.state != State::InProgress {
+        return false;
+    }
+    let id = present_session(task).and_then(|s| s.id.as_deref());
+    if let (Some(mine), Some(id)) = (cur.session_id.as_deref(), id) {
+        if mine == id {
+            return false;
+        }
+    }
+    if let (Some(before), Some(id)) = (cur.prior_session.as_deref(), id) {
+        return before == id;
+    }
+    let beat = task
+        .heartbeat
+        .as_ref()
+        .filter(|b| &b.by == holder)
+        .and_then(|b| heartbeat::parse_utc(&b.at));
+    beat.is_none_or(|at| at < cur.at.div_euclid(1000))
+}
+
 /// One session's task as it is now (see [`Followed`]).
 fn follow_one(cur: &Working, tasks: &[Task], lost_after_secs: i64, now: i64) -> Followed {
     let task = tasks.iter().find(|t| t.id == cur.id);
+    // Still the former holder's (A03-husky861): not claimed yet, so timed from the start, and
+    // the former holder is neither this session nor another one that took the task.
+    if task.is_some_and(|t| prior_holds(cur, t)) {
+        return Followed::Working(cur.clone());
+    }
     if let Some(holder) = task.and_then(|t| others(cur, t)) {
         return Followed::Others(holder);
     }
@@ -626,6 +823,34 @@ mod tests {
         t.state = state;
         t.holder = holder.map(String::from);
         t
+    }
+
+    #[test]
+    fn a_chosen_model_and_effort_are_kept_and_a_default_or_odd_value_is_left_out() {
+        let mut r = run(&["claude_cli", "codex_cli"]);
+        assert_eq!(r.choice_of("claude_cli"), Choice::default());
+        let pick = |m: Option<&str>, e: Option<&str>| Choice {
+            model: m.map(str::to_string),
+            effort: e.map(str::to_string),
+        };
+        r.set_choice("claude_cli", &pick(Some("opus"), Some("high")));
+        r.set_choice("codex_cli", &pick(None, Some("xhigh")));
+        assert_eq!(r.choice_of("claude_cli"), pick(Some("opus"), Some("high")));
+        assert_eq!(r.choice_of("codex_cli"), pick(None, Some("xhigh")));
+        // Saved with the run, and an older run's file without them reads as the defaults.
+        let text = serde_json::to_string(&r).unwrap();
+        let back: Run = serde_json::from_str(&text).unwrap();
+        assert_eq!(
+            back.choice_of("claude_cli"),
+            pick(Some("opus"), Some("high"))
+        );
+        let plain = serde_json::to_string(&run(&["claude_cli"])).unwrap();
+        assert!(!plain.contains("models") && !plain.contains("efforts"));
+        // Back to the default, and a value that is not one plain word is not kept.
+        r.set_choice("claude_cli", &pick(None, Some("high; rm -rf ~")));
+        assert_eq!(r.choice_of("claude_cli"), Choice::default());
+        assert!(plain_choice("gpt-6.2-astra") && plain_choice("opus[1m]"));
+        assert!(!plain_choice("") && !plain_choice("a b") && !plain_choice("$(x)"));
     }
 
     fn run(agents: &[&str]) -> Run {
@@ -722,7 +947,8 @@ mod tests {
             noted,
             [("A01-1", "codex-a01-1", 30), ("A01-2", "codex-a01-2", 30)]
         );
-        // Still taken: not given to this run again, ready or lost.
+        // Still taken: not given to this run again while ready; once lost, a new session takes
+        // it over (A03-husky861).
         assert!(r.share(&bag_of(ready.to_vec()), 0).is_empty());
         let lost = bag_of(vec![held_since(
             "A01-1",
@@ -730,7 +956,12 @@ mod tests {
             "2026-11-09T10:00:00Z",
         )]);
         let later = heartbeat::parse_utc("2026-11-09T10:00:00Z").unwrap() + 2 * 3600;
-        assert!(r.share(&lost, later).is_empty());
+        let ids: Vec<String> = r
+            .share(&lost, later)
+            .into_iter()
+            .map(|(_, t)| t.id)
+            .collect();
+        assert_eq!(ids, ["A01-1"]);
     }
 
     /// The run's own session's task stays and is timed as before: the same session ID is this
@@ -1300,5 +1531,169 @@ mod tests {
         r.follow(&ready, LOST, T0 + 9 * MIN);
         assert!(r.stalled(T0 + 29 * MIN).is_empty());
         assert_eq!(r.stalled(T0 + 30 * MIN).len(), 1);
+    }
+
+    /// A task held by `holder` (session `sid` of Claude Code) that last beat `beat_min` minutes
+    /// after [`T0`].
+    fn held_by(id: &str, holder: &str, sid: &str, beat_min: i64) -> Task {
+        let mut t = claimed(id, holder, Some("claude-code"), Some(sid));
+        t.heartbeat = Some(
+            serde_json::from_value(serde_json::json!({
+                "at": heartbeat::format_utc(T0 / 1000 + beat_min * 60), "by": holder
+            }))
+            .unwrap(),
+        );
+        t
+    }
+
+    /// A run whose Claude Code session `mine` claimed A01-7 at [`T0`] and beat once.
+    fn holding_a01_7() -> Run {
+        let mut r = run(&["claude_cli"]);
+        r.take(
+            "claude_cli",
+            &task("A01-7", State::Ready, None),
+            Some("mine".into()),
+            None,
+            T0,
+        );
+        let held = held_by("A01-7", "claude-a", "mine", 1);
+        assert!(r.follow(&[held], LOST, T0 + 2 * MIN).is_empty());
+        assert!(r.working[0].seen_held);
+        r
+    }
+
+    #[test]
+    fn a_session_lost_for_any_reason_frees_its_slot_and_its_task_goes_out_first() {
+        let mut r = holding_a01_7();
+        let held = held_by("A01-7", "claude-a", "mine", 1);
+        // Within the limit: kept.
+        assert!(r.lost_ones(&[held.clone()], LOST, T0 + 30 * MIN).is_empty());
+        assert!(r.free_agents().is_empty());
+        // Past it: let go of, its slot free and the task no longer counted as taken.
+        let gone = r.lost_ones(&[held.clone()], LOST, T0 + 32 * MIN);
+        assert_eq!(gone.len(), 1);
+        r.went_lost(&gone[0], false, None, T0 + 32 * MIN);
+        assert!(r.working.is_empty());
+        assert_eq!(r.free_agents(), ["claude_cli"]);
+        assert!(!r.taken.contains(&"A01-7".to_string()));
+        assert_eq!(r.lost[0].holder, "claude-a");
+        assert_eq!(r.failures["A01-7"], 1);
+        // Offered before a ready task, though the run took it before.
+        let bag = bag_of(vec![task("A01-1", State::Ready, None), held]);
+        let shares = r.share(&bag, (T0 + 33 * MIN) / 1000);
+        assert_eq!(shares.len(), 1);
+        assert_eq!(shares[0].1.id, "A01-7");
+    }
+
+    #[test]
+    fn a_session_lost_when_its_quota_ran_out_is_taken_over_only_once_the_quota_is_back() {
+        let mut r = holding_a01_7();
+        let held = held_by("A01-7", "claude-a", "mine", 1);
+        let now = T0 + 40 * MIN;
+        let gone = r.lost_ones(&[held.clone()], LOST, now);
+        // The runner reads "You've hit your limit · resets 7:10pm" in its tab and pauses the agent.
+        r.pause("claude_cli", PauseWhy::Quota, Some("7:10pm".into()), now);
+        r.went_lost(&gone[0], true, Some("7:10pm".into()), now);
+        assert!(r.lost[0].quota);
+        // While paused: no slot, so no new session for it.
+        let bag = bag_of(vec![held.clone()]);
+        assert!(r.free_agents().is_empty());
+        assert!(r.share(&bag, now / 1000).is_empty());
+        assert!(r.pauses_due(now + QUOTA_RECHECK_MS - 1).is_empty());
+        // Its quota read again and back: the lost task goes to a new session.
+        assert_eq!(r.pauses_due(now + QUOTA_RECHECK_MS).len(), 1);
+        r.resume("claude_cli");
+        let shares = r.share(&bag, (now + QUOTA_RECHECK_MS) / 1000);
+        assert_eq!(shares[0].1.id, "A01-7");
+    }
+
+    #[test]
+    fn the_former_holder_is_not_taken_for_the_new_sessions_claim() {
+        let mut r = run(&["claude_cli"]);
+        let old = held_by("A01-7", "claude-old", "old-sid", 0);
+        let start = T0 + 60 * MIN;
+        r.take("claude_cli", &old, Some("new-sid".into()), None, start);
+        let w = &r.working[0];
+        assert!(!w.seen_held, "the former holder's record is not a claim");
+        assert_eq!(w.prior.as_deref(), Some("claude-old"));
+        assert_eq!(w.prior_session.as_deref(), Some("old-sid"));
+        // Not let go as another session's, not finished, not judged by the old heartbeat.
+        assert!(r.follow(&[old.clone()], LOST, start + MIN).is_empty());
+        assert_eq!(r.working.len(), 1);
+        assert!(r.let_go.is_empty());
+        assert!(!r.working[0].seen_held);
+        assert!(r.stalled(start + MIN).is_empty());
+        assert!(r.lost_ones(&[old.clone()], LOST, start + MIN).is_empty());
+        // The new session claims it (its own session ID, under the same name): now it is its.
+        let mut new = held_by("A01-7", "claude-old", "new-sid", 62);
+        new.session.as_mut().unwrap().by = Some("claude-old".into());
+        assert!(r.follow(&[new], LOST, start + 3 * MIN).is_empty());
+        assert!(r.working[0].seen_held);
+    }
+
+    #[test]
+    fn a_claim_by_the_new_session_shows_as_a_new_name_or_session_or_a_later_heartbeat() {
+        let start = T0 + 60 * MIN;
+        let started = |sid: Option<&str>, old: &Task| {
+            let mut r = run(&["codex_cli"]);
+            r.take("codex_cli", old, sid.map(String::from), None, start);
+            r.working.remove(0)
+        };
+        let old = held_by("A01-7", "old", "old-sid", 0);
+        let w = started(None, &old);
+        assert!(prior_holds(&w, &old));
+        assert!(!prior_holds(&w, &held_by("A01-7", "new", "x", 61)));
+        assert!(!prior_holds(&w, &held_by("A01-7", "old", "other-sid", 61)));
+        // No session IDs to tell by: a heartbeat since the start is the new claim.
+        let mut bare = held_since("A01-7", "old", &heartbeat::format_utc(T0 / 1000));
+        let w = started(None, &bare);
+        assert!(prior_holds(&w, &bare));
+        bare.heartbeat.as_mut().unwrap().at = heartbeat::format_utc(start / 1000 + 60);
+        assert!(!prior_holds(&w, &bare));
+    }
+
+    #[test]
+    fn a_new_session_that_never_claims_a_lost_task_is_tried_again_then_given_up() {
+        let mut r = run(&["claude_cli"]);
+        let old = held_by("A01-7", "claude-old", "old-sid", 0);
+        let mut now = T0 + 60 * MIN;
+        for tried in 1..=MAX_FAILURES {
+            let bag = bag_of(vec![old.clone()]);
+            let shares = r.share(&bag, now / 1000);
+            assert_eq!(shares.len(), 1, "try {tried}");
+            r.take(
+                "claude_cli",
+                &shares[0].1,
+                Some(format!("s{tried}")),
+                None,
+                now,
+            );
+            // The old holder still holds it: not claimed yet, the slot is kept for a while.
+            assert!(
+                r.unclaimed(&[old.clone()], now + NOT_STARTED_MS - 1)
+                    .is_empty()
+            );
+            let gone = r.unclaimed(&[old.clone()], now + NOT_STARTED_MS);
+            assert_eq!(gone.len(), 1, "try {tried}");
+            r.did_not_start(&gone[0], PauseWhy::NoClaim, None, now + NOT_STARTED_MS);
+            r.resume("claude_cli");
+            now += NOT_STARTED_MS + MIN;
+        }
+        // Given up: no more sessions for it, and the run says so.
+        assert_eq!(r.given_up, ["A01-7"]);
+        assert!(r.share(&bag_of(vec![old]), now / 1000).is_empty());
+    }
+
+    #[test]
+    fn a_run_file_from_before_lost_sessions_still_reads() {
+        let r = holding_a01_7();
+        let mut v = serde_json::to_value(&r).unwrap();
+        for w in v["working"].as_array_mut().unwrap() {
+            let w = w.as_object_mut().unwrap();
+            w.remove("prior");
+            w.remove("prior_session");
+        }
+        let back: Run = serde_json::from_value(v).unwrap();
+        assert_eq!(back, r);
     }
 }

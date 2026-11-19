@@ -1,0 +1,12 @@
+# File size baseline: the source files over the line limit, each with the most lines it may have
+# (tests not counted). Checked by crates/core/tests/file_size.rs with `cargo test --workspace`;
+# see `alm guide file-size` and docs/workflow/CODING_RULES.md § Writing code.
+# A file got shorter: lower its number in the same commit (under the limit: remove its line).
+# A file truly must grow: raise its number in the same commit and record why with
+# `alm ai-decided <task> "file-size: <file>: <before> → <after> …"`.
+# The first line is the project's limit (`alm file-size-settings`); change it here when the setting changes.
+limit 1000
+apps/web/src/App.tsx 2443
+apps/web/src/TaskPane.tsx 1110
+crates/core/src/ops.rs 1592
+crates/store/src/guide.rs 1998

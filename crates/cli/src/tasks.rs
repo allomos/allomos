@@ -163,6 +163,11 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 }
                 None => None,
             };
+            // Decision 0027 § 5 (Task-A01-stable046): with the project's limit on, a task
+            // recorded as high risk is not finished without the human check.
+            if without_human_check.is_some() {
+                crate::risk_rules::refuse_without_human_check(&locate(cli, cwd)?, id)?;
+            }
             let mut recorded_exception = None;
             change(cli, cwd, |bag| {
                 // Decision 0020: finishing without --without-human-check needs a "by human" label
@@ -203,6 +208,22 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     done.text.push_str(&exceptions::exception_lines(ex, "  "));
                     done.text.push_str(&exceptions::facts(id, ex));
                     done.fields["exception"] = json!(ex);
+                }
+                // Decision 0027 § 3 (Task-A01-steam844): the rules to judge the risk by, and one
+                // sentence with the command when none is recorded. alm tells; it refuses nothing.
+                if let Ok(root) = locate(cli, cwd) {
+                    let (language, applied) = crate::risk_rules::of_taskbag(&root);
+                    let risk = allomos_store::classify::by_task(&root)
+                        .remove(id.as_str())
+                        .and_then(|c| c.risk);
+                    if risk.is_none() {
+                        done.after
+                            .push_str(&crate::risk_rules::not_classified(&language, id));
+                    }
+                    done.after
+                        .push_str(&crate::risk_rules::text(&language, &applied));
+                    done.fields["risk_rules"] = crate::risk_rules::json(&applied);
+                    done.fields["risk_recorded"] = json!(risk.is_some());
                 }
                 done
             })

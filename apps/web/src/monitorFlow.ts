@@ -190,6 +190,9 @@ export interface Current {
   changed: number;
   /** Its session has claimed the task (A03-otter944): until then it is starting, not working. */
   claimed: boolean;
+  /** The former holder of the lost task this session takes over (A03-husky861); null for a ready
+   * task. Until it claims, the task is still that holder's, not this session's. */
+  takeoverFrom: string | null;
 }
 
 /** Why an agent gets no session for now (A03-otter944): its quota is used up, or its last
@@ -213,6 +216,20 @@ export interface NotStarted {
   /** When it was found not to have started (ms). */
   found: number;
   why: PauseWhy;
+  resets: string | null;
+}
+
+/** A session the run let go of because its task went lost while it held it (A03-husky861): no
+ * heartbeat past the project's limit. Its slot is free and its task goes to a new session. */
+export interface LostSession {
+  agent: TerminalAgent;
+  id: string;
+  /** Its `--as` name. */
+  holder: string;
+  /** When it was found lost (ms). */
+  found: number;
+  /** Its tab said its quota is used up, and when it comes back, when it said. */
+  quota: boolean;
   resets: string | null;
 }
 
@@ -259,6 +276,10 @@ export interface Run {
   paused: Pause[];
   /** The sessions that did not start, newest last (A03-otter944). */
   notStarted: NotStarted[];
+  /** The sessions found lost, newest last (A03-husky861). */
+  lost: LostSession[];
+  /** The tasks given up after their sessions failed several times: no more sessions this run. */
+  givenUp: string[];
 }
 
 /** Why a run cannot read its taskbag, as `alm monitor run` keeps it (crates/monitor/src/unreadable.rs). */
@@ -334,6 +355,14 @@ const notStartedList = (list: unknown): NotStarted[] =>
       return { agent, id: n.id, found: num(n.found), why: pauseWhy(n.why), resets: text(n.resets) };
     })
     .filter((n): n is NotStarted => n !== null);
+const lostList = (list: unknown): LostSession[] =>
+  (Array.isArray(list) ? list : [])
+    .map((n: any): LostSession | null => {
+      const agent = asAgent(n?.agent);
+      if (!agent || typeof n.id !== "string") return null;
+      return { agent, id: n.id, holder: typeof n.holder === "string" ? n.holder : "", found: num(n.found), quota: n.quota === true, resets: text(n.resets) };
+    })
+    .filter((n): n is LostSession => n !== null);
 const takenByAgent = (map: unknown): Record<string, TerminalAgent> => {
   const out: Record<string, TerminalAgent> = {};
   if (map && typeof map === "object") {
@@ -399,6 +428,7 @@ export function readEntry(e: any, active: string | null | undefined): Run | Lost
           changed: num(w.changed, num(w.at)),
           // A run file from before A03-otter944 does not say: taken as claimed, as it was shown.
           claimed: w.seen_held !== false,
+          takeoverFrom: typeof w.prior === "string" ? w.prior : null,
         };
       })
       .filter((w: Current | null): w is Current => w !== null),
@@ -410,6 +440,8 @@ export function readEntry(e: any, active: string | null | undefined): Run | Lost
     ...(typeof e.program?.updated_from === "string" && typeof e.program?.version === "string" ? { updatedTo: e.program.version } : {}),
     paused: pauses(r.paused),
     notStarted: notStartedList(r.not_started),
+    lost: lostList(r.lost),
+    givenUp: Array.isArray(r.given_up) ? r.given_up.filter((t: unknown) => typeof t === "string") : [],
   };
 }
 
@@ -625,6 +657,23 @@ export function sessionGroups(run: Run): SessionGroup[] {
  * lists them under the sessions (A03-otter944). */
 export function notStartedShown(run: Run): NotStarted[] {
   return [...run.notStarted].reverse().filter((n, i, all) => !run.working.some((w) => w.id === n.id) && all.findIndex((m) => m.id === n.id) === i);
+}
+
+/** What became of a lost session's task (A03-husky861): a new session of the run works it now,
+ * it waits to be given out again (its agent's quota may first have to come back), or the run gave
+ * it up after several failures. */
+export type LostState = "taken_over" | "waiting" | "given_up";
+
+/** The lost sessions, newest first and each task once, with what became of their tasks: the
+ * panel lists them under the sessions. */
+export function lostShown(run: Run): { lost: LostSession; state: LostState }[] {
+  return [...run.lost]
+    .reverse()
+    .filter((n, i, all) => all.findIndex((m) => m.id === n.id) === i)
+    .map((lost) => ({
+      lost,
+      state: run.givenUp.includes(lost.id) ? "given_up" : run.working.some((w) => w.id === lost.id) ? "taken_over" : "waiting",
+    }));
 }
 
 /** Whether the sessions list is grouped by agent: more than one agent, or one that may have

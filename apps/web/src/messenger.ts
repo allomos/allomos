@@ -34,6 +34,7 @@ import type { AskedNow, QueueRow } from "./queueFlow";
 import type { TaskChange } from "./taskChangeFlow";
 import type { StartWith, WindowStart } from "./tabsFlow";
 import type { AgentAccount, AgentAccounts } from "./monitorFlow";
+import type { ModelsRead } from "./agentModelsFlow";
 import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, AuditSettings, KeyReplaced, RedactDone, ThisComputer, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, IdentityLevel, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck, WitnessWhen } from "./types";
 
 /** A language to translate the taskbag into: its code, and its name as the menu showed it. */
@@ -62,6 +63,9 @@ export interface Messenger {
   openTaskbag(root: string): Promise<Opened>;
   /** A fingerprint of the taskbag's files; it changes whenever a file is written. */
   taskbagStamp(root: string): Promise<string>;
+  appChanges(taskbag: string): Promise<import("./types").AppChanges>;
+  shareAppChanges(agent: string, taskbag: string, language: string): Promise<void>;
+  shareAppChangesRequest(taskbag: string, language: string): Promise<string>;
   /**
    * Opens a link from task `task`'s description: a web page, or a text file inside the project
    * (such as the task's card) in the user's editor. Rejects with a Problem for anything else.
@@ -144,7 +148,20 @@ export interface Messenger {
   monitorRuns(root: string): Promise<unknown[]>;
   /** Starts a run with the app's own `alm monitor start` (a background process that goes on after
    * the app is closed); resolves with its ID. Rejects with a Problem. */
-  monitorStart(root: string, agents: string[], every: number, quiet: boolean, iteration: string | null, sessions: Partial<Record<string, number>>, difficulties: Record<string, string>): Promise<string>;
+  monitorStart(
+    root: string,
+    agents: string[],
+    every: number,
+    quiet: boolean,
+    iteration: string | null,
+    sessions: Partial<Record<string, number>>,
+    difficulties: Record<string, string>,
+    models: Record<string, string>,
+    efforts: Record<string, string>,
+  ): Promise<string>;
+  /** The online model list (A03-alto709), read now from the web; this computer's copy when the web
+   * cannot be read. Never rejects. */
+  agentModels(): Promise<ModelsRead>;
   /** Leaves a request for run `id`: check now, stop, undo the stop, a new frequency, these agents. */
   monitorAsk(id: string, request: MonitorRequest): Promise<void>;
   /** Ends an `alm monitor run` process whose record is missing (it cannot see a request). */
@@ -450,6 +467,10 @@ export interface AppSettingsMessenger {
   setAutoCheck(on: boolean): Promise<void>;
   /** Download updates automatically on or off (Task-A07-trunk220). Rejects with a Problem. */
   setAutoDownload(on: boolean): Promise<void>;
+  /** General → Model list address (A03-alto709): the address in use and Allomos's own. */
+  modelsUrl(): Promise<{ url: string; default: string }>;
+  /** Set the model list address; null goes back to Allomos's own. Rejects with a Problem. */
+  setModelsUrl(url: string | null): Promise<void>;
   /** Settings → This computer (Task-A01-tail719): the signing key and the last checkpoint seen per project, matched to `folders` (the recent folders). */
   thisComputer(folders: string[]): Promise<ThisComputer>;
   /** Export public key…: asks where, then writes the public key file; false when the person cancelled. Rejects with a Problem. */
@@ -479,6 +500,8 @@ export const desktopTabs: TabsMessenger & AppSettingsMessenger = {
   setStartWith: (choice) => invoke<void>("set_start_with", { choice }),
   setAutoCheck: (on) => invoke<void>("set_auto_check", { on }),
   setAutoDownload: (on) => invoke<void>("set_auto_download", { on }),
+  modelsUrl: () => invoke<{ url: string; default: string }>("models_url"),
+  setModelsUrl: (url) => invoke<void>("set_models_url", { url }),
   thisComputer: (folders) => invoke<ThisComputer>("this_computer", { folders }),
   exportPublicKey: async (suggestedName) => {
     const path = await save({ defaultPath: suggestedName, filters: [{ name: "JSON", extensions: ["json"] }] });
@@ -520,6 +543,9 @@ export const desktopMessenger: Messenger = {
   inspectFolder: (path) => invoke<FolderInfo>("inspect_folder", { path }),
   openTaskbag: (root) => invoke<Opened>("open_taskbag", { root }).then(withDecisions),
   taskbagStamp: (root) => invoke<string>("taskbag_stamp", { root }),
+  appChanges: (taskbag) => invoke("app_changes", { taskbag }),
+  shareAppChanges: (agent, taskbag, language) => invoke("share_app_changes", { agent, taskbag, language }),
+  shareAppChangesRequest: (taskbag, language) => invoke<string>("share_app_changes_request", { taskbag, language }),
   showInFileManager: (root) => invoke<void>("show_in_file_manager", { root }),
   openTaskLink: (root, task, link) => invoke<void>("open_task_link", { root, task, link }),
   openAgentSession: (root, task) => invoke<void>("open_agent_session", { root, task }),
@@ -571,7 +597,9 @@ export const desktopMessenger: Messenger = {
   proceedManualRequest: (request) => invoke<string>("proceed_manual_request", { request }),
   formerWorktree: (taskbag, folder, working) => invoke<FormerWorktree | null>("former_worktree", { taskbag, folder, working }),
   monitorRuns: (root) => invoke<unknown[]>("monitor_runs", { root }),
-  monitorStart: (root, agents, every, quiet, iteration, sessions, difficulties) => invoke<string>("monitor_start", { root, agents, every, quiet, iteration, sessions, difficulties }),
+  monitorStart: (root, agents, every, quiet, iteration, sessions, difficulties, models, efforts) =>
+    invoke<string>("monitor_start", { root, agents, every, quiet, iteration, sessions, difficulties, models, efforts }),
+  agentModels: () => invoke<ModelsRead>("agent_models"),
   monitorAsk: (id, request) => invoke<void>("monitor_ask", { id, request }),
   monitorEndProcess: (pid) => invoke<void>("monitor_end_process", { pid }),
   monitorResume: (root) => invoke<string[]>("monitor_resume", { root }),

@@ -39,7 +39,7 @@ Allomos is developed by AI agents (Claude Code, Codex) working for the approver,
 9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
 10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
 
-## Tasks: Allomos (v40)
+## Tasks: Allomos (v41)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -151,7 +151,15 @@ the project notes (below).
   Read the rules this project added too (its settings, Risk management; kept in the
   taskbag's `project.json`, under `risk`, `rules`) and apply them the same way. This is about
   what is reviewed first once the work is done; what needs the approver before the work (below)
-  stays as it is.
+  stays as it is. The project may turn on two limits there (off by default; `alm classify <id>`
+  lists those that are on): "a high-risk task cannot be finished without the human check"
+  (`alm done --without-human-check` refuses a task recorded as high risk: once its work is done,
+  park it for the check with `alm wait <id> --on "Human check: <what to try>"`), and "in a
+  quiet run, an agent does not merge a high-risk task itself" (record the risk before you merge;
+  for a high-risk task, push the finished, tested work to its working branch, do not merge it,
+  park it with `alm wait <id> --on "Merge <working branch> into <base>: high risk, the
+  project's setting has the approver merge it. Proposal: merge it."` and go on with the next
+  ready task).
 - Needs a human: `alm human` lists the tasks to check, to answer and to review. When the person
   says they checked one: `alm checked <id>`. When its work changes after that, you decide: send
   it back to To check with `alm recheck <id> --reason "<what changed>"`.

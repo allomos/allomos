@@ -19,6 +19,7 @@ import {
   newerLast,
   levelsOf,
   levelsText,
+  lostShown,
   nextCheck,
   parseLevels,
   readEntry,
@@ -251,7 +252,7 @@ test("a run is read from its file: scope, agents, sessions at work, next check",
   assert.ok(r && isRun(r));
   assert.deepEqual(r.scope, { kind: "iteration", id: "I-haul", current: true });
   assert.equal(nextCheck(r), 1_900_000);
-  assert.deepEqual(r.working, [{ agent: "claude_cli", id: "A01-02", sessionId: "s-1", tab: { window: 7, tty: "/dev/ttys004" }, at: 10, changed: 20, claimed: true }]);
+  assert.deepEqual(r.working, [{ agent: "claude_cli", id: "A01-02", sessionId: "s-1", tab: { window: 7, tty: "/dev/ttys004" }, at: 10, changed: 20, claimed: true, takeoverFrom: null }]);
   assert.deepEqual(freeAgents(r), ["codex_cli"]);
   assert.deepEqual(readEntry(entry(), "I-knit") && (readEntry(entry(), "I-knit") as { scope: unknown }).scope, { kind: "iteration", id: "I-haul", current: false });
   // An agent alm does not know and a frequency the app does not offer are left out.
@@ -317,4 +318,34 @@ test("a run the app moved to its new alm after an update says which version (A03
   // Started by this version, or from before runs named their alm: nothing to say.
   assert.equal("updatedTo" in (readEntry({ ...base, program: { version: "0.1.64" } }, null) ?? {}), false);
   assert.equal("updatedTo" in (readEntry(base, null) ?? {}), false);
+});
+
+test("lost sessions are read with what became of their tasks (A03-husky861)", () => {
+  const r = readEntry(
+    entry({
+      working: [{ agent: "claude_cli", id: "A01-03", at: 10, seen_held: false, prior: "claude-old", changed: 10 }],
+      lost: [
+        { agent: "claude_cli", id: "A01-03", holder: "claude-old", at: 1, found: 5, quota: true, resets: "7:10pm" },
+        { agent: "codex_cli", id: "A01-04", holder: "codex-a", at: 1, found: 6 },
+        { agent: "codex_cli", id: "A01-05", holder: "codex-b", at: 1, found: 7 },
+        { agent: "gemini", id: "A01-06", holder: "x", at: 1, found: 8 },
+      ],
+      given_up: ["A01-05"],
+    }),
+    null,
+  );
+  assert.ok(r && isRun(r));
+  assert.equal(r.working[0].takeoverFrom, "claude-old");
+  assert.equal(r.working[0].claimed, false);
+  assert.deepEqual(
+    lostShown(r).map(({ lost, state }) => [lost.id, state, lost.quota, lost.resets]),
+    [
+      ["A01-05", "given_up", false, null],
+      ["A01-04", "waiting", false, null],
+      ["A01-03", "taken_over", true, "7:10pm"],
+    ],
+  );
+  const old = readEntry(entry(), null);
+  assert.ok(old && isRun(old));
+  assert.deepEqual([old.lost, old.givenUp], [[], []]);
 });

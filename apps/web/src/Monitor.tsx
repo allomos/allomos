@@ -37,6 +37,7 @@ import {
   stateCounts,
   workedFor,
   notStartedShown,
+  lostShown,
 } from "./monitorFlow";
 import type { Current, Frequency, Pause, LastRun, LostRun, Levels, MonitorFolds, MonitorSettings, Run, RunState, Scope, TerminalAgent } from "./monitorFlow";
 import { useAgentAccounts } from "./useAgentAccounts";
@@ -205,6 +206,8 @@ export function useMonitor({
       every: Frequency,
       sessions: Partial<Record<TerminalAgent, number>>,
       difficulties: Partial<Record<TerminalAgent, Levels>>,
+      models: Record<string, string> = {},
+      efforts: Record<string, string> = {},
     ) => {
       messenger
         .monitorStart(
@@ -215,6 +218,8 @@ export function useMonitor({
           scope.kind === "iteration" ? scope.id : null,
           sessions,
           Object.fromEntries(Object.entries(difficulties).map(([a, l]) => [a, levelsText(l as Levels)])),
+          models,
+          efforts,
         )
         .then(() => read())
         .catch((e) => onError(isProblem(e) ? problem(e) : String(e)));
@@ -585,6 +590,33 @@ function RunPanel({
             <p key={l.id} className="muted small monitor-let-go">{t("monitor.let_go", { id: l.id, holder: l.holder })}</p>
           ))}
           {!grouped(run) && run.paused.map((p) => <PauseNote key={p.agent} pause={p} />)}
+          {run.givenUp.length > 0 && (
+            <p className="monitor-stalled small" role="status">{t("monitor.given_up", { ids: run.givenUp.join(", ") })}</p>
+          )}
+          {lostShown(run).length > 0 && (
+            <>
+              <h4 className="monitor-sessions-title small">{t("monitor.lost_title")}</h4>
+              <ul className="monitor-rows">
+                {lostShown(run).map(({ lost: l, state }) => (
+                  <li key={`${l.id}-${l.found}`} className="monitor-row not-started">
+                    <span className="monitor-row-text">
+                      <strong>{l.id}</strong>
+                      <span className="muted"> · {monitorAgentName(l.agent, t)}</span>
+                      <span className="monitor-stalled small">
+                        {" · "}
+                        {l.quota
+                          ? l.resets
+                            ? t("monitor.lost_quota_at", { resets: l.resets })
+                            : t("monitor.lost_quota")
+                          : t("monitor.lost_no_beat")}
+                      </span>
+                      <span className="muted small"> · {t(`monitor.lost_${state}`, { time: timeOf(l.found) })}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           {notStartedShown(run).length > 0 && (
             <>
               <h4 className="monitor-sessions-title small">{t("monitor.not_started_title")}</h4>
@@ -602,7 +634,7 @@ function RunPanel({
                             : t("monitor.not_started_quota")
                           : t("monitor.not_started_no_claim")}
                       </span>
-                      <span className="muted small"> · {t("monitor.not_started_again", { time: timeOf(n.found) })}</span>
+                      <span className="muted small"> · {t(run.givenUp.includes(n.id) ? "monitor.lost_given_up" : "monitor.not_started_again", { time: timeOf(n.found) })}</span>
                     </span>
                   </li>
                 ))}
@@ -665,7 +697,7 @@ function SessionRow({
       <span className="monitor-row-text">
         <button type="button" className="monitor-task-id" onClick={() => onOpenTask(cur.id)}>{cur.id}</button>
         {!inGroup && <span className="muted"> · {monitorAgentName(cur.agent, t)}</span>}
-        <span className="muted small"> · {t(!cur.claimed ? "monitor.session_starting" : finishing ? "monitor.session_finishing" : "monitor.session_working", { time })}</span>
+        <span className="muted small"> · {!cur.claimed && cur.takeoverFrom ? t("monitor.session_taking_over", { holder: cur.takeoverFrom, time }) : t(!cur.claimed ? "monitor.session_starting" : finishing ? "monitor.session_finishing" : "monitor.session_working", { time })}</span>
         {quiet && <span className="monitor-stalled small"> · {t("monitor.session_stalled")}</span>}
       </span>
       {place && (

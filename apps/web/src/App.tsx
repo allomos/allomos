@@ -9,6 +9,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { ProgressDialog } from "./ProgressDialog";
 import { SetupWizard } from "./SetupWizard";
 import { BuildAppDialog } from "./BuildAppDialog";
+import { AppSharingNotice } from "./AppSharingNotice";
 import { MoveCardsDialog } from "./MoveCardsDialog";
 import { ProceedDialog } from "./ProceedDialog";
 import { HandoverDialog } from "./HandoverDialog";
@@ -703,7 +704,7 @@ export function App({
       </header>
 
       <main className="main">
-        {/* The app's own offers, once per window: in the tab in front (Task-A01-marble320). */}
+        {opened && !companion && <AppSharingNotice key={opened.root} messenger={messenger} opened={opened} />}
         {!companion && active && <UpdateOffer messenger={messenger} onError={(e) => setError(errorNote(e))} />}
         {!companion && active && <AlmOffer messenger={messenger} onError={(e) => setError(errorNote(e))} />}
         {error && (
@@ -716,8 +717,6 @@ export function App({
             {noteText(n)}
           </Banner>
         ))}
-        {/* Every reason the taskbag needs updating, in one banner with one Update the
-            taskbag… button (Task-A03-train969). */}
         {opened && !companion && (
           <UpdateTaskbagNotice
             messenger={messenger}
@@ -2164,9 +2163,9 @@ function TaskbagView({
           iterations={iterations}
           activeIteration={activeIteration}
           from={monitorFrom}
-          onStart={(scope, agents, quiet, every, _offered, sessions, difficulties) => {
+          onStart={(scope, agents, quiet, every, _offered, sessions, difficulties, models, efforts) => {
             setMonitorFrom(null);
-            monitor.start(scope, agents, quiet, every, sessions, difficulties);
+            monitor.start(scope, agents, quiet, every, sessions, difficulties, models, efforts);
           }}
           onClose={() => setMonitorFrom(null)}
         />

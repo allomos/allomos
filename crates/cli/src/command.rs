@@ -48,6 +48,12 @@ pub(crate) enum Command {
     Delete(Delete),
     /// Print Allomos's section for this project's AGENTS.md: the short brief agents read first.
     Brief,
+    /// Confirm app changes were committed, pushed and verified by the agent. Reads no Git.
+    Shared {
+        /// The last app event from app_changes.through, relative to the taskbag.
+        #[arg(long)]
+        through: String,
+    },
     /// Report how much of your account's quota is left, at the handoff gate's quota check, from
     /// the figure you just read (for example Claude Code's get_usage). The Allomos app shows it
     /// beside the agent. Kept on this computer, not in the taskbag: nothing to save or share.
@@ -348,7 +354,8 @@ pub(crate) enum Command {
     /// Record a task's change type and risk (decision 0021): --type standard (pre-approved
     /// routine), normal (approved before) or emergency (made first, approved afterwards by a
     /// deadline, --due, three days by default); --risk low, medium or high; --touches production,
-    /// others-data, or none. Without options, shows what is recorded. `alm human` lists
+    /// others-data, or none. Without options, shows what is recorded and the rules to judge the risk by
+    /// (decision 0027: H1–H7, M1–M4 and the project's own; `alm done` lists them too). `alm human` lists
     /// emergencies not approved afterwards.
     Classify {
         id: String,

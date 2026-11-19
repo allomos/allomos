@@ -226,7 +226,15 @@ pub(crate) fn share(cli: &Cli, cwd: &Path, before: &Before, written: &[PathBuf],
         done.fields["git_commands"] = json!(commands);
         done.fields["git_instruction"] = json!(instruction);
     }
-    if let Some(app) = &before.app {
+    // Read the new boundary after `shared`; the confirmation must not print stale work.
+    let confirmed;
+    let app = if matches!(cli.command, Command::Shared { .. }) {
+        confirmed = events::unshared_app_changes(&root);
+        (confirmed.count > 0).then_some(&confirmed)
+    } else {
+        before.app.as_ref()
+    };
+    if let Some(app) = app {
         // Files this change also wrote are already in its own commit.
         let rest: Vec<String> = app
             .files
@@ -259,7 +267,12 @@ pub(crate) fn share(cli: &Cli, cwd: &Path, before: &Before, written: &[PathBuf],
             for c in &commands {
                 text.push_str(&format!("  {c}\n"));
             }
+            if let Some(through) = &app.through {
+                text.push_str(&format!("After committing, pushing and verifying, confirm with: alm --taskbag {} shared --through {}\n", quoted(&root.display().to_string()), quoted(through)));
+            }
             done.fields["app_changes"] = json!({
+                "through": app.through,
+                "entries": app.entries,
                 "count": app.count,
                 "by": app.by,
                 "files": rest,
