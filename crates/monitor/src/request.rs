@@ -62,9 +62,44 @@ fn with_antigravity_push_rule(mode: String, agent: &str, quiet: bool, language: 
     format!("{mode}\n\n{instruction}")
 }
 
+/// A task a new session takes over from a session that went lost (A03-husky861).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Takeover {
+    /// The former holder's `--as` name.
+    pub holder: String,
+    /// The working branch its history records, when it does: the new session carries on there.
+    pub branch: Option<String>,
+}
+
+/// The paragraph that tells a new session it takes a lost task over, on its working branch.
+fn takeover_paragraph(t: &Takeover, language: &str) -> String {
+    let h = &t.holder;
+    match (lang(language), t.branch.as_deref()) {
+        ("zh-CN", Some(b)) => format!(
+            "这个任务之前的会话（{h}）失联了，没有做完：由你接手。在它原来的工作分支 {b} 上继续：认领时用 --branch {b}，工作树就建在这个分支上（git worktree add <文件夹> {b}，不新建分支，也不从第 3 步说的基础分支切出）；先读交接说明和这个分支上已有的提交。\n\n"
+        ),
+        ("zh-CN", None) => format!(
+            "这个任务之前的会话（{h}）失联了，没有做完：由你接手。它的工作分支没有记录：照交接说明找到它，在它上面继续；找不到时再从基础分支新开一个。\n\n"
+        ),
+        ("ja", Some(b)) => format!(
+            "このタスクを持っていた前のセッション（{h}）は終わる前に連絡が途絶えました：あなたが引き継ぎます。元の作業ブランチ {b} で続けてください：引き受けるときは --branch {b} を付け、ワークツリーはこのブランチで作ります（git worktree add <フォルダー> {b}。新しいブランチは作らず、手順 3 のベースブランチからも作りません）。先に引き継ぎメモとこのブランチにあるコミットを読んでください。\n\n"
+        ),
+        ("ja", None) => format!(
+            "このタスクを持っていた前のセッション（{h}）は終わる前に連絡が途絶えました：あなたが引き継ぎます。作業ブランチは記録されていません：引き継ぎメモから見つけてそこで続け、見つからなければベースブランチから新しく作ってください。\n\n"
+        ),
+        (_, Some(b)) => format!(
+            "The session that held this task before ({h}) was lost before it finished: you take it over. Carry on on its working branch {b}: claim with --branch {b} and make your worktree on that branch (git worktree add <folder> {b}: no new branch, and not from the base branch step 3 names); read the handoff note and the commits already on the branch first.\n\n"
+        ),
+        (_, None) => format!(
+            "The session that held this task before ({h}) was lost before it finished: you take it over. Its working branch is not recorded: find it from the handoff note and carry on there; only when there is none, start a new one from the base branch.\n\n"
+        ),
+    }
+}
+
 /// The request a new session gets for one task. `taskbag` is the taskbag's path as the agent,
 /// working in the project folder, passes it to `--taskbag`; `session_id` the ID Allomos gave
 /// Claude Code (none for the agents that pick their own).
+#[allow(clippy::too_many_arguments)]
 pub fn monitor_request(
     id: &str,
     title: &str,
@@ -73,10 +108,18 @@ pub fn monitor_request(
     agent: &str,
     session_id: Option<&str>,
     quiet: bool,
+    takeover: Option<&Takeover>,
 ) -> String {
     let tb = format!("--taskbag \"{taskbag}\"");
     let sa = session_agent(agent);
-    let usage = usage_paragraph(agent, language);
+    let usage = format!(
+        "{}{}",
+        takeover
+            .map(|t| takeover_paragraph(t, language))
+            .unwrap_or_default(),
+        usage_paragraph(agent, language)
+    );
+    let branch = takeover.and_then(|t| t.branch.as_deref());
     match lang(language) {
         "zh-CN" => {
             let sid = session_id.unwrap_or("<你的会话 ID>");
@@ -95,12 +138,13 @@ pub fn monitor_request(
 {mode}
 
 {usage}1. 阅读：alm show {id}（它的说明和最新的交接）。
-2. 按 AGENTS.md 的说法认领它，带上这个会话的信息：alm claim {id} --as <你的会话名> --branch <你的分支> --session-agent {sa} --session-id {sid} --session-kind terminal，并把认领分享出去。
+2. 按 AGENTS.md 的说法认领它，带上这个会话的信息：alm claim {id} --as <你的会话名> --branch {br} --session-agent {sa} --session-id {sid} --session-kind terminal，并把认领分享出去。
 3. 在它自己的工作树里做，工作树从认领时列出的基础分支切出。
 4. 用 alm label 报告进度；做完用 alm done，中途停下用 alm release --note。
 5. 用 alm handoff {id} 写交接，然后结束这个会话。只做这一个任务，不要去取下一个：「换肩」会为下一个任务另开会话。"#,
                 id = id,
                 mode = mode,
+                br = branch.unwrap_or("<你的分支>"),
                 sa = sa,
                 sid = sid,
                 tb = tb,
@@ -125,12 +169,13 @@ pub fn monitor_request(
 {mode}
 
 {usage}1. 読む：alm show {id}（説明と最新の引き継ぎ）。
-2. AGENTS.md のとおりに、このセッションの情報を付けて引き受け（alm claim {id} --as <あなたのセッション名> --branch <あなたのブランチ> --session-agent {sa} --session-id {sid} --session-kind terminal）、その引き受けを共有してください。
+2. AGENTS.md のとおりに、このセッションの情報を付けて引き受け（alm claim {id} --as <あなたのセッション名> --branch {br} --session-agent {sa} --session-id {sid} --session-kind terminal）、その引き受けを共有してください。
 3. 専用のワークツリーで作業してください。ワークツリーは、引き受けたときに表示されるベースブランチから作ります。
 4. 進み具合は alm label で知らせ、終わったら alm done、途中でやめるなら alm release --note を使ってください。
 5. alm handoff {id} で引き継ぎを書き、このセッションを終えてください。このタスクだけを進め、次のタスクは取らないでください：次のタスクには「肩代」が新しいセッションを開きます。"#,
                 id = id,
                 mode = mode,
+                br = branch.unwrap_or("<あなたのブランチ>"),
                 sa = sa,
                 sid = sid,
                 tb = tb,
@@ -155,12 +200,13 @@ pub fn monitor_request(
 {mode}
 
 {usage}1. Read it: alm show {id} (its description and latest handoff note).
-2. Claim it as AGENTS.md says, with this session's details: alm claim {id} --as <your session name> --branch <your branch> --session-agent {sa} --session-id {sid} --session-kind terminal, and share the claim.
+2. Claim it as AGENTS.md says, with this session's details: alm claim {id} --as <your session name> --branch {br} --session-agent {sa} --session-id {sid} --session-kind terminal, and share the claim.
 3. Work it in a worktree of its own, cut from the base branch the claim prints.
 4. Report progress with alm label; finish with alm done, or stop with alm release --note.
 5. Write a handoff with alm handoff {id}, then end this session. Work only this task; do not take another one: Allomos opens a new session for the next."#,
                 id = id,
                 mode = mode,
+                br = branch.unwrap_or("<your branch>"),
                 sa = sa,
                 sid = sid,
                 tb = tb,
@@ -168,6 +214,22 @@ pub fn monitor_request(
                 usage = usage
             )
         }
+    }
+}
+
+/// What the person is told when the run gives a task up after its sessions failed `times` times
+/// (A03-husky861).
+pub fn given_up(language: &str, id: &str, times: u32) -> String {
+    match lang(language) {
+        "zh-CN" => format!(
+            "{id} 的会话已经 {times} 次没能做下去（失联或没有认领）：这次监测不再为它开会话。请看一下它的交接和会话；要再派发，重新开始监测。"
+        ),
+        "ja" => format!(
+            "{id} のセッションが {times} 回続けられませんでした（連絡が途絶えたか、引き受けませんでした）：今回の監視ではもうセッションを開きません。引き継ぎとセッションを見てください。もう一度任せるには、監視を始め直してください。"
+        ),
+        _ => format!(
+            "{id}'s sessions failed {times} times (lost, or never claimed it): this monitoring run opens no more sessions for it. Look at its handoff and sessions; to give it out again, start the monitoring again."
+        ),
     }
 }
 
@@ -341,6 +403,7 @@ mod tests {
             "claude_cli",
             Some("ab-12"),
             true,
+            None,
         );
         assert!(en.starts_with("Work on task A01-1 (\"Do it\") in this project's taskbag."));
         assert!(en.contains("Run every alm command with --taskbag \"../tb\"."));
@@ -349,25 +412,115 @@ mod tests {
         );
         assert!(en.contains("Run mode: quiet"));
         assert!(en.contains("Quota: this terminal session has no get_usage."));
-        let zh = monitor_request("A01-1", "做", "../tb", "zh-CN", "codex_cli", None, false);
+        let zh = monitor_request(
+            "A01-1",
+            "做",
+            "../tb",
+            "zh-CN",
+            "codex_cli",
+            None,
+            false,
+            None,
+        );
         assert!(zh.starts_with("请做这个项目任务袋里的任务 A01-1（“做”）。"));
         assert!(zh.contains("--session-agent codex --session-id <你的会话 ID>"));
         assert!(zh.contains("运行模式：普通模式"));
         assert!(!zh.contains("配额"));
-        let ja = monitor_request("A01-1", "x", "tb", "ja", "antigravity_cli", None, true);
+        let ja = monitor_request(
+            "A01-1",
+            "x",
+            "tb",
+            "ja",
+            "antigravity_cli",
+            None,
+            true,
+            None,
+        );
         assert!(ja.contains("--session-agent antigravity"));
         assert!(ja.contains("alm wait A01-1 --on"));
         assert!(ja.contains("git push origin refs/heads/<branch>"));
-        let ja_normal = monitor_request("A01-1", "x", "tb", "ja", "antigravity_cli", None, false);
+        let ja_normal = monitor_request(
+            "A01-1",
+            "x",
+            "tb",
+            "ja",
+            "antigravity_cli",
+            None,
+            false,
+            None,
+        );
         assert!(!ja_normal.contains("git push origin refs/heads/<branch>"));
-        let zh_agy = monitor_request("A01-1", "x", "tb", "zh-CN", "antigravity_cli", None, true);
+        let zh_agy = monitor_request(
+            "A01-1",
+            "x",
+            "tb",
+            "zh-CN",
+            "antigravity_cli",
+            None,
+            true,
+            None,
+        );
         assert!(zh_agy.contains("git push origin refs/heads/<branch>"));
         // Another task language: English.
         assert!(
-            monitor_request("A01-1", "x", "tb", "de", "codex_cli", None, true)
+            monitor_request("A01-1", "x", "tb", "de", "codex_cli", None, true, None)
                 .starts_with("Work on task")
         );
-        let en_agy = monitor_request("A01-1", "x", "tb", "en", "antigravity_cli", None, true);
+        let en_agy = monitor_request(
+            "A01-1",
+            "x",
+            "tb",
+            "en",
+            "antigravity_cli",
+            None,
+            true,
+            None,
+        );
         assert!(en_agy.contains("only a standalone ordinary push"));
+    }
+
+    #[test]
+    fn a_takeover_request_carries_on_on_the_former_working_branch() {
+        let t = Takeover {
+            holder: "claude-old".into(),
+            branch: Some("claude/old-work".into()),
+        };
+        for language in ["en", "zh-CN", "ja"] {
+            let text = monitor_request(
+                "A01-1",
+                "x",
+                "tb",
+                language,
+                "claude_cli",
+                Some("s"),
+                true,
+                Some(&t),
+            );
+            assert!(text.contains("claude-old"), "{language}");
+            assert!(text.contains("alm claim A01-1 --as"), "{language}");
+            assert!(
+                text.contains("--branch claude/old-work --session-agent"),
+                "{language}"
+            );
+            assert!(text.contains("git worktree add"), "{language}");
+        }
+        let none = Takeover {
+            holder: "claude-old".into(),
+            branch: None,
+        };
+        let en = monitor_request(
+            "A01-1",
+            "x",
+            "tb",
+            "en",
+            "codex_cli",
+            None,
+            true,
+            Some(&none),
+        );
+        assert!(en.contains("Its working branch is not recorded"));
+        assert!(en.contains("--branch <your branch>"));
+        let plain = monitor_request("A01-1", "x", "tb", "en", "codex_cli", None, true, None);
+        assert!(!plain.contains("take it over"));
     }
 }
