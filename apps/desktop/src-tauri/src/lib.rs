@@ -196,8 +196,12 @@ pub fn run() {
                     .state::<monitor_loop::MonitorLoop>()
                     .forget(window.label());
                 window_list::refresh(window.app_handle(), Some(window.label()));
+                for_you::closed(window.app_handle(), window.label());
             }
             tauri::WindowEvent::Focused(focused) => {
+                if *focused {
+                    for_you::focused(window.app_handle(), window.label());
+                }
                 window
                     .state::<monitor_loop::MonitorLoop>()
                     .focus(window.label(), *focused);

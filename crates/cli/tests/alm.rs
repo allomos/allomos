@@ -32,10 +32,13 @@ fn test_settings() -> PathBuf {
     std::env::temp_dir().join(format!("alm-test-settings-{}", std::process::id()))
 }
 
-/// `alm`, with the test run's own settings folder.
+/// `alm`, with the test run's own settings folder and no taskbag from the test's own
+/// environment: an `ALLOMOS_TASKBAG` set where `cargo test` runs (pointing at a real taskbag)
+/// never reaches a test's `alm` (Task-A01-sprout119). A test that wants one sets it again.
 fn alm_command() -> Command {
     let mut c = Command::new(ALM);
-    c.env("ALLOMOS_SETTINGS_DIR", test_settings());
+    c.env("ALLOMOS_SETTINGS_DIR", test_settings())
+        .env_remove("ALLOMOS_TASKBAG");
     c
 }
 
@@ -46,7 +49,6 @@ fn alm(dir: &Path, args: &[&str]) -> Output {
     alm_command()
         .current_dir(dir)
         .args(args)
-        .env_remove("ALLOMOS_TASKBAG")
         .env_remove("ALLOMOS_HOLDER")
         .env_remove("ALLOMOS_LOCK_WAIT_MS")
         .env_remove("CLAUDECODE")
@@ -500,6 +502,57 @@ fn taskbag_found_by_option_variable_or_search() {
         &["--taskbag", elsewhere.to_str().unwrap(), "list"],
         1,
         "taskbag_not_found",
+    );
+}
+
+/// Task-A01-sprout119: `cargo test` run with `ALLOMOS_TASKBAG` set to a real taskbag. This test
+/// runs its own test program again with the variable set to a stand-in "real" taskbag; there,
+/// `alm_command()` claims a task in a test taskbag of its own. The stand-in stays byte for byte as
+/// it was, and the claim lands in the test's own taskbag.
+#[test]
+fn a_taskbag_in_the_test_environment_is_never_written() {
+    let real = filled();
+    let own = filled();
+    let before = snapshot(&real);
+    let out = Command::new(std::env::current_exe().unwrap())
+        .args([
+            "set_taskbag_child_claims_in_its_own",
+            "--exact",
+            "--ignored",
+            "--test-threads=1",
+        ])
+        .env("ALLOMOS_TASKBAG", &real)
+        .env("ALM_TEST_OWN_TASKBAG", &own)
+        .output()
+        .unwrap();
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        out.status.success() && text.contains("1 passed"),
+        "{text}{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(before == snapshot(&real), "the real taskbag changed");
+    assert_eq!(ok(&own, &["show", "A01-01"])["task"]["holder"], "child");
+}
+
+/// The child of `a_taskbag_in_the_test_environment_is_never_written`: run only by it, with
+/// `ALLOMOS_TASKBAG` set in its environment.
+#[test]
+#[ignore = "run by a_taskbag_in_the_test_environment_is_never_written"]
+fn set_taskbag_child_claims_in_its_own() {
+    let Some(own) = std::env::var_os("ALM_TEST_OWN_TASKBAG") else {
+        return;
+    };
+    assert!(std::env::var_os("ALLOMOS_TASKBAG").is_some());
+    let out = alm_command()
+        .current_dir(&own)
+        .args(["--json", "--as", "child", "claim", "A01-01"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stdout)
     );
 }
 
@@ -1130,7 +1183,6 @@ fn moving_a_task_on_asks_for_a_missing_or_old_quota_report() {
         c.current_dir(&repo)
             .args(args)
             .env("ALLOMOS_SETTINGS_DIR", &settings)
-            .env_remove("ALLOMOS_TASKBAG")
             .env_remove("ALLOMOS_HOLDER");
         if let Some(now) = now {
             c.env("ALLOMOS_NOW", now);
@@ -1209,7 +1261,6 @@ fn the_quota_ask_never_names_a_plain_session_name_as_the_agent() {
             .current_dir(&repo)
             .args(args)
             .env("ALLOMOS_SETTINGS_DIR", &settings)
-            .env_remove("ALLOMOS_TASKBAG")
             .env_remove("ALLOMOS_HOLDER")
             .output()
             .unwrap();
@@ -1258,7 +1309,6 @@ fn alm_needs_no_git_and_refuses_the_removed_options() {
             .current_dir(&dir)
             .args(&all)
             .env("PATH", &empty)
-            .env_remove("ALLOMOS_TASKBAG")
             .env_remove("ALLOMOS_HOLDER")
             .output()
             .unwrap();
@@ -1844,7 +1894,6 @@ fn confirm_answered(project: &Path, answer: Option<bool>, timeout: &str) -> (i32
             "plan.md",
         ])
         .args(["--timeout", timeout])
-        .env_remove("ALLOMOS_TASKBAG")
         .env_remove("ALLOMOS_HOLDER")
         .env("ALLOMOS_NO_LAUNCH", "1")
         .stdout(std::process::Stdio::piped())
@@ -1896,7 +1945,6 @@ fn a_go_ahead_counts_only_for_the_plan_shown_and_is_recorded() {
             ])
             .args(["--plan", "plan.md", "--evidence", "evidence.md"])
             .args(["--task", "A01-01", "--timeout", "20"])
-            .env_remove("ALLOMOS_TASKBAG")
             .env_remove("ALLOMOS_HOLDER")
             .env("ALLOMOS_NO_LAUNCH", "1")
             .stdout(std::process::Stdio::piped())
@@ -2450,7 +2498,6 @@ fn fj_settings(dir: &Path, settings: &Path, args: &[&str]) -> (i32, Value) {
         .current_dir(dir)
         .arg("--json")
         .args(args)
-        .env_remove("ALLOMOS_TASKBAG")
         .env_remove("ALLOMOS_HOLDER")
         .env("ALLOMOS_SETTINGS_DIR", settings)
         .output()
@@ -3172,7 +3219,6 @@ fn alm_at(dir: &Path, now: &str, args: &[&str]) -> Output {
     alm_command()
         .current_dir(dir)
         .args(args)
-        .env_remove("ALLOMOS_TASKBAG")
         .env_remove("ALLOMOS_HOLDER")
         .env_remove("ALLOMOS_LOCK_WAIT_MS")
         .env("ALLOMOS_NOW", now)
@@ -5314,7 +5360,6 @@ fn events_record_who_ran_them_for_whom_and_under_which_approval() {
         let mut c = alm_command();
         c.current_dir(&repo).arg("--json").args(args);
         for name in [
-            "ALLOMOS_TASKBAG",
             "ALLOMOS_HOLDER",
             "CLAUDECODE",
             "CLAUDE_CODE_ENTRYPOINT",
@@ -5456,7 +5501,6 @@ fn events_record_the_ai_details() {
         let mut c = alm_command();
         c.current_dir(&repo).arg("--json").args(args);
         for name in [
-            "ALLOMOS_TASKBAG",
             "ALLOMOS_HOLDER",
             "CLAUDECODE",
             "CLAUDE_CODE_ENTRYPOINT",
@@ -5618,7 +5662,6 @@ fn events_record_the_agent_alm_runs_under() {
         let mut c = alm_command();
         c.current_dir(&repo).args(args);
         for name in [
-            "ALLOMOS_TASKBAG",
             "ALLOMOS_HOLDER",
             "CLAUDECODE",
             "CLAUDE_CODE_ENTRYPOINT",
@@ -5742,7 +5785,6 @@ fn quota_reports_are_kept_on_this_computer() {
             .current_dir(&dir)
             .arg("--json")
             .args(args)
-            .env_remove("ALLOMOS_TASKBAG")
             .env("ALLOMOS_SETTINGS_DIR", &settings)
             .output()
             .unwrap();
@@ -7914,7 +7956,6 @@ fn witness_at(dir: &Path, now: &str, args: &[&str]) -> Value {
         .current_dir(dir)
         .arg("--json")
         .args(args)
-        .env_remove("ALLOMOS_TASKBAG")
         .env_remove("ALLOMOS_HOLDER")
         .env_remove("ALLOMOS_LOCK_WAIT_MS")
         .env("ALLOMOS_NOW", now)
@@ -9218,11 +9259,10 @@ fn monitor_commands_say_what_runs_and_refuse_what_cannot() {
     let run = |args: &[&str]| -> (i32, Value) {
         let mut all = vec!["--json"];
         all.extend_from_slice(args);
-        let out = Command::new(ALM)
+        let out = alm_command()
             .current_dir(&dir)
             .args(&all)
             .env("ALLOMOS_SETTINGS_DIR", &settings)
-            .env_remove("ALLOMOS_TASKBAG")
             .output()
             .unwrap();
         let v: Value = serde_json::from_str(&String::from_utf8(out.stdout).unwrap()).unwrap();
@@ -9260,7 +9300,7 @@ fn monitor_commands_say_what_runs_and_refuse_what_cannot() {
     let (code, v) = run(&["monitor", "list"]);
     assert_eq!(code, 0, "{v}");
     // Without --mode: the person must choose quiet or normal.
-    let out = Command::new(ALM)
+    let out = alm_command()
         .current_dir(&dir)
         .args(["monitor", "start"])
         .env("ALLOMOS_SETTINGS_DIR", &settings)
@@ -9892,4 +9932,73 @@ fn codex_gets_app_changes_and_folder_changes_without_dash_c() {
         text.contains("version control. For Git:\n  git -C ") && !text.contains("For Git, in "),
         "{text}"
     );
+}
+
+/// Task-A01-steam844 (decision 0027 § 3 and 4): `alm classify <id>` without options and `alm done`
+/// list the fixed risk rules and the project's own; `alm done` on a task without a risk says so
+/// with the command, and finishes it all the same.
+#[test]
+fn classify_and_done_list_the_risk_rules_and_done_reminds_when_none_is_recorded() {
+    let repo = filled();
+    let project = repo.join(".allomos/taskbag/project.json");
+    let mut p: Value = serde_json::from_str(&fs::read_to_string(&project).unwrap()).unwrap();
+    p["risk"] = json!({ "rules": ["Changing the price list is high risk."] });
+    fs::write(&project, serde_json::to_string_pretty(&p).unwrap()).unwrap();
+
+    let v = ok(&repo, &["classify", "A01-01"]);
+    assert_eq!(v["risk_rules"]["fixed_high"][6], "H7");
+    assert_eq!(v["risk_rules"]["fixed_medium"][3], "M4");
+    assert_eq!(
+        v["risk_rules"]["project_rules"],
+        json!(["Changing the price list is high risk."])
+    );
+    let text = String::from_utf8_lossy(&alm(&repo, &["classify", "A01-01"]).stdout).to_string();
+    for w in [
+        "    H1 ",
+        "    M4 ",
+        "    - Changing the price list is high risk.",
+    ] {
+        assert!(text.contains(w), "{w}: {text}");
+    }
+    // Setting it does not list them again.
+    let v = ok(&repo, &["classify", "A01-01", "--risk", "low"]);
+    assert!(v.get("risk_rules").is_none());
+
+    // Not classified: alm done finishes it and reminds, with the command.
+    ok(&repo, &["--as", "a", "claim", "A01-02"]);
+    let out = alm(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "done",
+            "A01-02",
+            "--without-human-check",
+            "only a person's check is left",
+        ],
+    );
+    assert_eq!(out.status.code(), Some(0));
+    let text = String::from_utf8_lossy(&out.stdout).to_string();
+    assert!(
+        text.contains("alm classify A01-02 --risk low|medium|high"),
+        "{text}"
+    );
+    assert!(text.contains("    H1 ") && text.contains("    - Changing the price list"));
+    assert_eq!(task_file(&repo, "A01-02")["state"], "done");
+
+    // Classified: the rules, without the reminder.
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "only a person's check is left",
+        ],
+    );
+    assert_eq!(v["risk_recorded"], true);
+    assert_eq!(v["risk_rules"]["fixed_high"][0], "H1");
 }

@@ -610,6 +610,7 @@ mod links;
 mod monitor;
 mod race;
 mod redact;
+mod risk_rules;
 mod takeover;
 mod trail;
 pub(crate) use command::Command;
