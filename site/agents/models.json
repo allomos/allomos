@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "updated": "2026-11-18",
+  "agents": [
+    {
+      "id": "claude_cli",
+      "name": "Claude Code",
+      "models": [
+        {
+          "value": "opus",
+          "label": "Opus（最新）"
+        },
+        {
+          "value": "fable",
+          "label": "Fable（最新）"
+        },
+        {
+          "value": "sonnet",
+          "label": "Sonnet（最新）"
+        },
+        {
+          "value": "haiku",
+          "label": "Haiku（最新）"
+        }
+      ],
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "id": "codex_cli",
+      "name": "Codex",
+      "models": [
+        {
+          "value": "gpt-6.2-astra",
+          "label": "GPT-6.2 Astra"
+        },
+        {
+          "value": "gpt-6.2-sol",
+          "label": "GPT-6.2 Sol"
+        },
+        {
+          "value": "gpt-6-astra",
+          "label": "GPT-6 Astra"
+        },
+        {
+          "value": "gpt-6.1-sol",
+          "label": "GPT-6.1 Sol"
+        },
+        {
+          "value": "gpt-6.1-terra",
+          "label": "GPT-6.1 Terra"
+        },
+        {
+          "value": "gpt-6-luna",
+          "label": "GPT-6 Luna"
+        }
+      ],
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+        "ultra"
+      ]
+    },
+    {
+      "id": "antigravity_cli",
+      "name": "Antigravity CLI (Gemini)",
+      "models": [
+        {
+          "value": "gemini-4-hydrogen",
+          "label": "Gemini 4 Hydrogen"
+        },
+        {
+          "value": "gemini-4-argon",
+          "label": "Gemini 4 Argon"
+        },
+        {
+          "value": "gemini-3.8-flash",
+          "label": "Gemini 3.8 Flash"
+        }
+      ],
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ]
+    },
+    {
+      "id": "grok_cli",
+      "name": "Grok Build",
+      "models": [
+        {
+          "value": "grok-4.6",
+          "label": "Grok 4.6"
+        },
+        {
+          "value": "grok-4.5",
+          "label": "Grok 4.5"
+        }
+      ],
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ]
+    }
+  ]
+}
