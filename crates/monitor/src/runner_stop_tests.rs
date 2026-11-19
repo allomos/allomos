@@ -21,6 +21,8 @@ fn waiting_can_exit_without_touching_agents_tasks_or_other_runs() {
     let dir = std::env::temp_dir().join(format!("allomos-stop-now-{}", new_session_id()));
     fs::create_dir_all(&dir).unwrap();
     let root = allomos_store::init(&dir.join("project"), "test", "Synthetic").unwrap();
+    let work = dir.join("project/unfinished.txt");
+    fs::write(&work, "unfinished agent work").unwrap();
     let task_dir = root.join("tasks/A01-1");
     fs::create_dir_all(&task_dir).unwrap();
     let task = serde_json::json!({
@@ -93,6 +95,7 @@ fn waiting_can_exit_without_touching_agents_tasks_or_other_runs() {
         "agent must keep running"
     );
     assert_eq!(fs::read(&task_path).unwrap(), original, "no task mutation");
+    assert_eq!(fs::read_to_string(&work).unwrap(), "unfinished agent work");
 
     // The other monitor still follows its task and exits normally when it is finished.
     let mut done = task;
