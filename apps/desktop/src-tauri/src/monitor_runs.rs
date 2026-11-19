@@ -65,8 +65,7 @@ pub fn monitor_open(app: AppHandle, root: PathBuf) -> Result<(), Problem> {
 /// Start a run with the app's own `alm` (`monitor start`); resolves with its ID. `sessions`: how
 /// many sessions each chosen agent may have at work at once (Task-A03-weasel276); one not listed
 /// has one. `difficulties`: the difficulty range each chosen agent takes tasks from, as `1-3`
-/// (Task-A03-wave335); one not listed takes every level. `antigravity_headless`: quiet Antigravity
-/// sessions run without their chat screen (Task-A03-candle790); an older page sends none (off).
+/// (Task-A03-wave335); one not listed takes every level.
 #[tauri::command]
 pub async fn monitor_start(
     root: PathBuf,
@@ -76,7 +75,6 @@ pub async fn monitor_start(
     iteration: Option<String>,
     sessions: BTreeMap<String, u32>,
     difficulties: BTreeMap<String, String>,
-    antigravity_headless: Option<bool>,
 ) -> Result<String, Problem> {
     let alm = crate::alm_command::own().ok_or_else(|| Problem::BadUsage {
         detail: "the app's own alm was not found beside it".to_string(),
@@ -110,9 +108,6 @@ pub async fn monitor_start(
     if let Some(i) = iteration {
         args.push("--iteration".into());
         args.push(i);
-    }
-    if quiet && antigravity_headless == Some(true) {
-        args.push("--antigravity-headless".into());
     }
     let out = crate::agents::command(&alm)
         .args(&args)

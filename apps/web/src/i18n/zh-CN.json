@@ -1140,8 +1140,6 @@
   "monitor.later_manual": "不可选：自己粘贴的请求不能无人值守。",
   "monitor.mode": "运行模式",
   "monitor.mode_quiet_effect": "无人值守：会话把真正的问题搁置（alm wait），接着做；监测接着开下一个任务。",
-  "monitor.antigravity_headless": "安静的 Antigravity 会话用无界面模式运行",
-  "monitor.antigravity_headless_note": "勾选后，需要批准的操作不会在终端里弹出确认框干等，而是直接被拒绝；会话用 alm wait 挂起任务并写明要批准什么，监测接着做别的任务。这时终端标签页里没有对话界面，只在结束时显示 Antigravity 的回答。",
   "monitor.mode_normal_effect": "会话遇到问题会停下来问你；那个任务一直在做中，监测等你回答、它做完后才开下一个。",
   "monitor.backlog_note": "新添加的任务会留在待办，等你批准；批准并设为就绪后，下一次检查就会取到它。",
   "monitor.start": "开始",

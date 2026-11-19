@@ -2164,9 +2164,9 @@ function TaskbagView({
           iterations={iterations}
           activeIteration={activeIteration}
           from={monitorFrom}
-          onStart={(scope, agents, quiet, every, _offered, sessions, difficulties, antigravityHeadless) => {
+          onStart={(scope, agents, quiet, every, _offered, sessions, difficulties) => {
             setMonitorFrom(null);
-            monitor.start(scope, agents, quiet, every, sessions, difficulties, antigravityHeadless);
+            monitor.start(scope, agents, quiet, every, sessions, difficulties);
           }}
           onClose={() => setMonitorFrom(null)}
         />

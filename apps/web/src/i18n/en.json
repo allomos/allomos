@@ -1140,8 +1140,6 @@
   "monitor.later_manual": "Not available: a request you paste yourself cannot run unattended.",
   "monitor.mode": "Run mode",
   "monitor.mode_quiet_effect": "Unattended: a session parks a real question (alm wait) and goes on; the monitor goes on to the next task.",
-  "monitor.antigravity_headless": "Run quiet Antigravity sessions without their chat screen",
-  "monitor.antigravity_headless_note": "Ticked: an action that needs approval is refused at once instead of waiting on a prompt in the terminal; the session parks the task (alm wait) naming what to approve, and the monitor goes on to other tasks. The terminal tab then shows no chat, only Antigravity's answer when it has finished.",
   "monitor.mode_normal_effect": "A session with a question stops to ask you; its task stays in progress, and the monitor starts the next only after you answer and it finishes.",
   "monitor.backlog_note": "New tasks stay in backlog until you approve them; once you make one ready, the next check takes it.",
   "monitor.start": "Start",
