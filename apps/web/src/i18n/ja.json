@@ -1442,5 +1442,13 @@
   "for_you.waited_minutes": "{n} 分待ち",
   "for_you.waited_hours": "{n} 時間待ち",
   "for_you.waited_days": "{n} 日待ち",
-  "for_you.blocks": "{n} 件のタスクを止めています"
+  "for_you.blocks": "{n} 件のタスクを止めています",
+  "sharing.count": "{count} 件の変更がまだ共有されていません",
+  "sharing.project": "プロジェクト",
+  "sharing.ask": "エージェントに共有を依頼…",
+  "sharing.explain": "エージェントがアプリでの変更をあなたに代わってコミットし、push します。共有を確認すると、この通知が消えます。",
+  "sharing.request": "アプリの変更を共有する依頼",
+  "sharing.asked": "{agent} を開きました。依頼を読んで送信してください。共有を確認するまで通知は残ります。",
+  "sharing.asked_paste": "{agent} を開きました。{keys} で貼り付け、依頼を読んで送信してください。共有を確認するまで通知は残ります。",
+  "sharing.asked_sent": "{agent} に共有を依頼しました。共有を確認するまで通知は残ります。"
 }

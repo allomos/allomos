@@ -25,6 +25,7 @@ pub(crate) struct Opened {
     pub(crate) loaded: Loaded,
     /// A `README-allomos.md` was just written next to `.allomos/`.
     pub(crate) readme_added: bool,
+    pub(crate) app_changes: allomos_store::events::AppChanges,
     /// Each task's AI decisions not reviewed yet, by task ID (Task-A03-19), from the history.
     pub(crate) ai_decisions:
         std::collections::BTreeMap<String, Vec<allomos_core::decision::Decision>>,
@@ -82,7 +83,9 @@ pub(crate) fn open_taskbag(root: PathBuf) -> Opened {
         .flat_map(|bag| &bag.tasks)
         .map(|t| (t.id.clone(), allomos_core::ops::task_version(t)))
         .collect();
+    let app_changes = allomos_store::events::unshared_app_changes(&root);
     Opened {
+        app_changes,
         loaded,
         versions,
         ai_decisions: allomos_store::ai_decisions(&root),
@@ -130,6 +133,7 @@ pub(crate) fn create_taskbag(
         .map(|f| add_readme_if_empty(f, &language).unwrap_or(false))
         .unwrap_or(false);
     Ok(Opened {
+        app_changes: Default::default(),
         loaded: load(&root),
         ai_decisions: Default::default(),
         approvals: Default::default(),
@@ -232,6 +236,7 @@ pub(crate) fn version_check(root: PathBuf) -> Option<versions::VersionCheck> {
 pub(crate) fn move_taskbag_aside(root: PathBuf) -> Result<Opened, Problem> {
     versions::move_aside(&root)?;
     Ok(Opened {
+        app_changes: Default::default(),
         loaded: load(&root),
         ai_decisions: Default::default(),
         approvals: Default::default(),

@@ -63,6 +63,9 @@ export interface Messenger {
   openTaskbag(root: string): Promise<Opened>;
   /** A fingerprint of the taskbag's files; it changes whenever a file is written. */
   taskbagStamp(root: string): Promise<string>;
+  appChanges(taskbag: string): Promise<import("./types").AppChanges>;
+  shareAppChanges(agent: string, taskbag: string, language: string): Promise<void>;
+  shareAppChangesRequest(taskbag: string, language: string): Promise<string>;
   /**
    * Opens a link from task `task`'s description: a web page, or a text file inside the project
    * (such as the task's card) in the user's editor. Rejects with a Problem for anything else.
@@ -540,6 +543,9 @@ export const desktopMessenger: Messenger = {
   inspectFolder: (path) => invoke<FolderInfo>("inspect_folder", { path }),
   openTaskbag: (root) => invoke<Opened>("open_taskbag", { root }).then(withDecisions),
   taskbagStamp: (root) => invoke<string>("taskbag_stamp", { root }),
+  appChanges: (taskbag) => invoke("app_changes", { taskbag }),
+  shareAppChanges: (agent, taskbag, language) => invoke("share_app_changes", { agent, taskbag, language }),
+  shareAppChangesRequest: (taskbag, language) => invoke<string>("share_app_changes_request", { taskbag, language }),
   showInFileManager: (root) => invoke<void>("show_in_file_manager", { root }),
   openTaskLink: (root, task, link) => invoke<void>("open_task_link", { root, task, link }),
   openAgentSession: (root, task) => invoke<void>("open_agent_session", { root, task }),

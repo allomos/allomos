@@ -1442,5 +1442,13 @@
   "for_you.waited_minutes": "waiting {n} min",
   "for_you.waited_hours": "waiting {n} h",
   "for_you.waited_days": "waiting {n} d",
-  "for_you.blocks": "holds back {n} tasks"
+  "for_you.blocks": "holds back {n} tasks",
+  "sharing.count": "{count} change(s) not shared yet",
+  "sharing.project": "Project",
+  "sharing.ask": "Ask an agent to share…",
+  "sharing.explain": "An agent will commit your app changes on your behalf and push them. This notice stays until the agent confirms they are shared.",
+  "sharing.request": "Request to share app changes",
+  "sharing.asked": "Opened {agent}. Read the request and send it. This notice stays until sharing is confirmed.",
+  "sharing.asked_paste": "Opened {agent}. Paste with {keys}, read the request and send it. This notice stays until sharing is confirmed.",
+  "sharing.asked_sent": "Sent the sharing request to {agent}. This notice stays until sharing is confirmed."
 }

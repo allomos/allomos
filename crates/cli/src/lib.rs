@@ -619,6 +619,21 @@ pub(crate) use command_args::{
 
 fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
     match &cli.command {
+        Command::Shared { through } => {
+            let root = locate(cli, cwd)?;
+            let changed = allomos_store::app_sharing::confirm(
+                &root,
+                Actor::alm(cli.holder.as_deref()),
+                lock_wait(),
+                through,
+            )?;
+            Ok(Done::new(
+                json!({"taskbag": root, "changed": changed, "through": through}),
+                format!(
+                    "App changes shared through {through}. Confirmation recorded; alm did not inspect Git.\n"
+                ),
+            ))
+        }
         Command::Monitor { what } => monitor::execute(cli, cwd, what),
         Command::Init { .. }
         | Command::Confirm { .. }

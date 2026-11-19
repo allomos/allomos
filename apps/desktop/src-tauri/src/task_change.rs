@@ -87,6 +87,7 @@ mod tests {
     /// leave exactly as it was.
     fn without(opened: &Value, id: &str) -> Value {
         let mut v = opened.clone();
+        v.as_object_mut().unwrap().remove("app_changes");
         v["loaded"]["taskbag"]["tasks"]
             .as_array_mut()
             .unwrap()

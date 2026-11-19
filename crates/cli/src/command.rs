@@ -48,6 +48,12 @@ pub(crate) enum Command {
     Delete(Delete),
     /// Print Allomos's section for this project's AGENTS.md: the short brief agents read first.
     Brief,
+    /// Confirm app changes were committed, pushed and verified by the agent. Reads no Git.
+    Shared {
+        /// The last app event from app_changes.through, relative to the taskbag.
+        #[arg(long)]
+        through: String,
+    },
     /// Report how much of your account's quota is left, at the handoff gate's quota check, from
     /// the figure you just read (for example Claude Code's get_usage). The Allomos app shows it
     /// beside the agent. Kept on this computer, not in the taskbag: nothing to save or share.

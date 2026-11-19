@@ -1668,12 +1668,24 @@ fn app_changes_not_shared_yet_come_with_the_next_change() {
             .iter()
             .any(|f| f == "tasks/A01-02/task.json")
     );
-    // Handed over: the next change no longer lists them.
+    // Ordinary agent work never confirms sharing.
     let v = ok(
         &repo,
         &["--as", "a", "label", "A01-01", "locally verified by agent"],
     );
-    assert!(v.get("app_changes").is_none(), "{v}");
+    assert_eq!(v["app_changes"]["count"], 1, "{v}");
+    let through = v["app_changes"]["through"].as_str().unwrap().to_string();
+    let confirmed = ok(&repo, &["--as", "a", "shared", "--through", &through]);
+    assert!(confirmed.get("app_changes").is_none(), "{confirmed}");
+    assert_eq!(confirmed["changed_files"].as_array().unwrap().len(), 1);
+    let again = ok(&repo, &["--as", "a", "shared", "--through", &through]);
+    assert_eq!(again["changed"], false);
+    assert!(ok(&repo, &["next"]).get("app_changes").is_none());
+    allomos_store::change_task(&root, app, Duration::from_secs(5), |bag| {
+        allomos_core::ops::set_title(bag, "A01-02", None, "Another title").map(|o| (o, "title"))
+    })
+    .unwrap();
+    assert_eq!(ok(&repo, &["next"])["app_changes"]["count"], 1);
 }
 
 #[test]
