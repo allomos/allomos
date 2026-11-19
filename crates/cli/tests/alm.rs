@@ -2769,7 +2769,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v40)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v41)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -2779,7 +2779,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v40)", "## Tasks: Allomos (v22)")
+            brief.replace("## Tasks: Allomos (v41)", "## Tasks: Allomos (v22)")
         ),
     )
     .unwrap();
@@ -9987,4 +9987,68 @@ fn classify_and_done_list_the_risk_rules_and_done_reminds_when_none_is_recorded(
     );
     assert_eq!(v["risk_recorded"], true);
     assert_eq!(v["risk_rules"]["fixed_high"][0], "H1");
+}
+
+/// Task-A01-stable046 (decision 0027 § 5): with limit 1 on, `alm done --without-human-check`
+/// refuses a task recorded as high risk, and finishes the others; with limit 2 on, `alm guide
+/// run-modes` says high-risk tasks wait for the approver to merge them. Off, nothing changes.
+#[test]
+fn the_risk_limits_refuse_a_high_risk_finish_and_tell_the_quiet_run_not_to_merge() {
+    let repo = filled();
+    let finish = |id: &'static str| -> Vec<&'static str> {
+        vec![
+            "--as",
+            "a",
+            "done",
+            id,
+            "--without-human-check",
+            "only a person's check is left",
+        ]
+    };
+    // Off (the default): a high-risk task finishes as before, and run-modes says nothing more.
+    let guide_off =
+        String::from_utf8_lossy(&alm(&repo, &["guide", "run-modes", "--language", "en"]).stdout)
+            .to_string();
+    assert!(!guide_off.contains("you merge high-risk tasks"), "{guide_off}");
+    ok(&repo, &["classify", "A01-01", "--risk", "high"]);
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    ok(&repo, &finish("A01-01"));
+
+    // On.
+    let project = repo.join(".allomos/taskbag/project.json");
+    let mut p: Value = serde_json::from_str(&fs::read_to_string(&project).unwrap()).unwrap();
+    p["risk"] = json!({ "high_needs_human_check": true, "high_needs_approver_merge": true });
+    fs::write(&project, serde_json::to_string_pretty(&p).unwrap()).unwrap();
+
+    // Recording high risk tells the limits.
+    let text = String::from_utf8_lossy(
+        &alm(&repo, &["classify", "A01-02", "--risk", "high"]).stdout,
+    )
+    .to_string();
+    assert!(text.contains("alm wait <id> --on"), "{text}");
+    ok(&repo, &["--as", "a", "claim", "A01-02"]);
+    let v = refused(&repo, &finish("A01-02"), 1, "high_risk_needs_human_check");
+    assert!(v["error"]["message"].as_str().unwrap().contains("A01-02"));
+    assert_eq!(task_file(&repo, "A01-02")["state"], "in_progress");
+    // Checked by a person, it finishes.
+    ok(&repo, &["--as", "a", "label", "A01-02", "locally verified by human"]);
+    ok(&repo, &["--as", "a", "done", "A01-02"]);
+
+    // Not high (or not recorded): finished as before; the listed rules name the limits.
+    ok(&repo, &["classify", "A02-01", "--risk", "medium"]);
+    ok(&repo, &["--as", "a", "claim", "A02-01"]);
+    let v = ok(&repo, &finish("A02-01"));
+    assert_eq!(v["risk_rules"]["high_needs_human_check"], true);
+
+    for (language, words) in [
+        ("en", "you merge high-risk tasks"),
+        ("zh-CN", "高风险任务由你合并"),
+        ("ja", "高リスクのタスクはあなたがマージします"),
+    ] {
+        let text = String::from_utf8_lossy(
+            &alm(&repo, &["guide", "run-modes", "--language", language]).stdout,
+        )
+        .to_string();
+        assert!(text.contains(words), "{language}: {text}");
+    }
 }

@@ -86,6 +86,9 @@ problems! {
     LabelNotByHuman { label } => "label_not_by_human", "{label} is not a human-check label: use locally verified by human or deployed and verified by human.";
     /// Decision 0020: `alm done` without `--without-human-check` on a task with no "by human" label.
     HumanCheckLabelMissing { id } => "human_check_label_missing", "{id} has no human-check label yet. If a person checked it, add one first (`alm checked {id}`, or `alm label {id} \"locally verified by human\"` / `\"deployed and verified by human\"`); otherwise finish it with `alm done {id} --without-human-check \"<why>\" --steps <file.md>`.";
+    /// Decision 0027 § 5 (Task-A01-stable046): the project's limit "a high-risk task cannot be
+    /// finished without the human check" is on, and the task's recorded risk is high.
+    HighRiskNeedsHumanCheck { id } => "high_risk_needs_human_check", "{id} is recorded as high risk, and this project's Risk management setting \"a high-risk task cannot be finished without the human check\" is on: it cannot be finished with --without-human-check. A person checks it first (`alm checked {id}`), then `alm done {id}`; until then park it for the check with `alm wait {id} --on \"Human check: <what to try>\"`.";
     /// Decision 0020: an `allomos/5` or `allomos/6` taskbag is read, but not written, until upgraded.
     /// Task-A01-gusto404 (decision 0021 § 3): a checkpoint is signed with this computer's key, and
     /// this computer has none (no key store Allomos can use yet).

@@ -163,6 +163,11 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 }
                 None => None,
             };
+            // Decision 0027 § 5 (Task-A01-stable046): with the project's limit on, a task
+            // recorded as high risk is not finished without the human check.
+            if without_human_check.is_some() {
+                crate::risk_rules::refuse_without_human_check(&locate(cli, cwd)?, id)?;
+            }
             let mut recorded_exception = None;
             change(cli, cwd, |bag| {
                 // Decision 0020: finishing without --without-human-check needs a "by human" label
