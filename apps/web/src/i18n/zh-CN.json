@@ -1037,7 +1037,6 @@
   "tree.collapse": "折叠 {id} 下面的任务",
   "tree.expand": "展开 {id} 下面的任务",
   "tree.more_title": "已折叠：下面藏着 {count} 个任务",
-  "tree.outside": "{id} · 未显示",
   "tree.unknown_title": "被 {id} 阻塞；任务包里没有这个任务。",
   "task.modified": "修改时间 {time}",
   "row.modified": "修改时间",

@@ -1037,7 +1037,6 @@
   "tree.collapse": "Fold the tasks under {id}",
   "tree.expand": "Show the tasks under {id}",
   "tree.more_title": "Folded: {count} tasks under this one are hidden",
-  "tree.outside": "{id} · not shown",
   "tree.unknown_title": "Blocked by {id}, which is not in this taskbag.",
   "task.modified": "Modified {time}",
   "row.modified": "Modified",

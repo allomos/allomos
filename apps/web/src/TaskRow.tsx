@@ -256,11 +256,10 @@ function TreeLead({ tree }: { tree: TreeMark }) {
 function TreeNotes({ tree, onOpenTask }: { tree: TreeMark; onOpenTask: (id: string) => void }) {
   const { t } = useI18n();
   const { row } = tree;
-  if (row.hidden === 0 && row.also.length === 0 && row.outside.length === 0) return null;
+  if (row.hidden === 0 && row.also.length === 0) return null;
   return (
     <span className="tree-notes">
       {row.also.map((id) => <button type="button" key={`also-${id}`} className="tree-note tree-dependency" onKeyDown={ownKeys} onClick={(e) => { e.stopPropagation(); onOpenTask(id); }}>{t("tree.also", { id })}</button>)}
-      {row.outside.map((id) => <button type="button" key={`outside-${id}`} className="tree-note tree-dependency" onKeyDown={ownKeys} onClick={(e) => { e.stopPropagation(); onOpenTask(id); }}>{t("tree.outside", { id })}</button>)}
       {row.hidden > 0 && <span className="tree-note tree-more" title={t("tree.more_title", { count: row.hidden })}>+{row.hidden}</span>}
     </span>
   );
