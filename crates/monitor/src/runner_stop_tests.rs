@@ -28,7 +28,9 @@ fn waiting_can_exit_without_touching_agents_tasks_or_other_runs() {
     let task = serde_json::json!({
         "id": "A01-1", "title": "Synthetic held task", "area": "A01",
         "state": "in_progress", "holder": "synthetic-session",
-        "heartbeat": {"by": "synthetic-session", "at": "2020-01-01T00:00:00Z"}
+        // Still beating: a session at work (a lost one would leave the run, A03-husky861).
+        "heartbeat": {"by": "synthetic-session",
+            "at": allomos_core::heartbeat::format_utc(now_ms() / 1000)}
     });
     let task_path = task_dir.join("task.json");
     let original = serde_json::to_vec_pretty(&task).unwrap();
@@ -50,6 +52,8 @@ fn waiting_can_exit_without_touching_agents_tasks_or_other_runs() {
             seen: String::new(),
             changed: now_ms(),
             holder: Some("synthetic-session".into()),
+            prior: None,
+            prior_session: None,
         });
         let options = Options {
             taskbag: root.clone(),
@@ -64,8 +68,7 @@ fn waiting_can_exit_without_touching_agents_tasks_or_other_runs() {
     let first = launch("first");
     let second = launch("second");
     until(|| {
-        registry::read_resume(&registry_dir, "first")
-            .is_some_and(|r| !r.run.stalled(now_ms()).is_empty())
+        registry::read_resume(&registry_dir, "first").is_some_and(|r| r.run.working.len() == 1)
     });
     until(|| registry::read_resume(&registry_dir, "second").is_some());
     assert!(
@@ -74,7 +77,10 @@ fn waiting_can_exit_without_touching_agents_tasks_or_other_runs() {
             .run
             .stopping
     );
-    assert!(!first.is_finished(), "a lost task must not finish itself");
+    assert!(
+        !first.is_finished(),
+        "a task at work must not finish itself"
+    );
     // The same JSON request is sent by both desktop monitor views.
     let request: Request = serde_json::from_str(r#"{"action":"stop_now"}"#).unwrap();
     registry::ask(&registry_dir, "first", &request).unwrap();
