@@ -5,13 +5,14 @@
 //! local server from a browser without changes.
 
 mod agent_commands;
+mod agent_models;
 mod agents;
 mod alm_command;
 mod audit;
 mod codex_rules;
+mod file_size_settings;
 mod for_you;
 mod former_worktree;
-mod file_size_settings;
 mod heartbeat_settings;
 mod lan;
 mod lan_commands;
@@ -312,6 +313,9 @@ pub fn run() {
             former_worktree::former_worktree,
             monitor_runs::monitor_runs,
             monitor_runs::monitor_start,
+            agent_models::agent_models,
+            agent_models::models_url,
+            agent_models::set_models_url,
             monitor_runs::monitor_resume,
             monitor_runs::monitor_last,
             monitor_runs::agent_accounts,

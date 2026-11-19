@@ -205,6 +205,8 @@ export function useMonitor({
       every: Frequency,
       sessions: Partial<Record<TerminalAgent, number>>,
       difficulties: Partial<Record<TerminalAgent, Levels>>,
+      models: Record<string, string> = {},
+      efforts: Record<string, string> = {},
     ) => {
       messenger
         .monitorStart(
@@ -215,6 +217,8 @@ export function useMonitor({
           scope.kind === "iteration" ? scope.id : null,
           sessions,
           Object.fromEntries(Object.entries(difficulties).map(([a, l]) => [a, levelsText(l as Levels)])),
+          models,
+          efforts,
         )
         .then(() => read())
         .catch((e) => onError(isProblem(e) ? problem(e) : String(e)));

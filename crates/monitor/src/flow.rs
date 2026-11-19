@@ -697,7 +697,10 @@ mod tests {
         // Saved with the run, and an older run's file without them reads as the defaults.
         let text = serde_json::to_string(&r).unwrap();
         let back: Run = serde_json::from_str(&text).unwrap();
-        assert_eq!(back.choice_of("claude_cli"), pick(Some("opus"), Some("high")));
+        assert_eq!(
+            back.choice_of("claude_cli"),
+            pick(Some("opus"), Some("high"))
+        );
         let plain = serde_json::to_string(&run(&["claude_cli"])).unwrap();
         assert!(!plain.contains("models") && !plain.contains("efforts"));
         // Back to the default, and a value that is not one plain word is not kept.

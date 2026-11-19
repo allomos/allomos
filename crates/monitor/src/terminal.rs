@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
-use allomos_core::Problem;
 use crate::flow::Choice;
+use allomos_core::Problem;
 
 /// A program started without a window. On Windows a windowed app's command-line child (`claude
 /// --version`) otherwise gets a console window that flashes on screen (task A07-05).
@@ -753,7 +753,8 @@ pub fn start_session(
         .map(|d| d.as_nanos())
         .unwrap_or_default();
     let file = std::env::temp_dir().join(format!("allomos-request-{stamp}.txt"));
-    let Some(program) = session_command_with_quiet(id, &file, session_id, quiet, dirs, choice) else {
+    let Some(program) = session_command_with_quiet(id, &file, session_id, quiet, dirs, choice)
+    else {
         return Err(ask_failed(id, "no way to start it"));
     };
     // An extra account's folder variable goes in front of the command, for that command only.
@@ -903,7 +904,10 @@ mod tests {
             format!("codex --sandbox workspace-write -m 'gpt-6-luna' {request}")
         );
         assert_eq!(
-            cmd("antigravity_cli", &pick(Some("gemini-4-argon"), Some("low"))),
+            cmd(
+                "antigravity_cli",
+                &pick(Some("gemini-4-argon"), Some("low"))
+            ),
             format!("agy --model 'gemini-4-argon' --effort 'low' -i {request}")
         );
         let ps = |id: &str, c: &Choice| {
@@ -1078,8 +1082,15 @@ mod tests {
         let file = Path::new("/tmp/allomos-request-1.txt");
         let request = "\"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\"";
         let one = [PathBuf::from("/w/my tb/.allomos/taskbag")];
-        let quiet = session_command_with_quiet("antigravity_cli", file, None, true, &one, &Choice::default())
-            .expect("quiet Antigravity command");
+        let quiet = session_command_with_quiet(
+            "antigravity_cli",
+            file,
+            None,
+            true,
+            &one,
+            &Choice::default(),
+        )
+        .expect("quiet Antigravity command");
         assert!(quiet.starts_with("agy --add-dir '/w/my tb/.allomos/taskbag' --settings '"));
         assert!(quiet.contains(ANTIGRAVITY_PUSH_RULE));
         assert!(quiet.ends_with(&format!(" -i {request}")));
@@ -1296,11 +1307,27 @@ mod tests {
             Some(format!("codex --sandbox workspace-write {request}").as_str())
         );
         assert_eq!(
-            session_command_with_quiet("claude_cli", file, Some("ab-12"), true, &[], &Choice::default()).as_deref(),
+            session_command_with_quiet(
+                "claude_cli",
+                file,
+                Some("ab-12"),
+                true,
+                &[],
+                &Choice::default()
+            )
+            .as_deref(),
             Some(format!("claude --session-id 'ab-12' {request}").as_str())
         );
         assert_eq!(
-            session_command_with_quiet("antigravity_cli", file, None, true, &[], &Choice::default()).as_deref(),
+            session_command_with_quiet(
+                "antigravity_cli",
+                file,
+                None,
+                true,
+                &[],
+                &Choice::default()
+            )
+            .as_deref(),
             Some(
                 format!(
                     "agy {}-i {request}",
