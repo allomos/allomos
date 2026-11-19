@@ -144,7 +144,8 @@ export interface Messenger {
   monitorRuns(root: string): Promise<unknown[]>;
   /** Starts a run with the app's own `alm monitor start` (a background process that goes on after
    * the app is closed); resolves with its ID. Rejects with a Problem. */
-  monitorStart(root: string, agents: string[], every: number, quiet: boolean, iteration: string | null, sessions: Partial<Record<string, number>>, difficulties: Record<string, string>): Promise<string>;
+  /** `antigravityHeadless`: quiet Antigravity sessions run without their chat screen (Task-A03-candle790). */
+  monitorStart(root: string, agents: string[], every: number, quiet: boolean, iteration: string | null, sessions: Partial<Record<string, number>>, difficulties: Record<string, string>, antigravityHeadless: boolean): Promise<string>;
   /** Leaves a request for run `id`: check now, stop, undo the stop, a new frequency, these agents. */
   monitorAsk(id: string, request: MonitorRequest): Promise<void>;
   /** Ends an `alm monitor run` process whose record is missing (it cannot see a request). */
@@ -571,7 +572,8 @@ export const desktopMessenger: Messenger = {
   proceedManualRequest: (request) => invoke<string>("proceed_manual_request", { request }),
   formerWorktree: (taskbag, folder, working) => invoke<FormerWorktree | null>("former_worktree", { taskbag, folder, working }),
   monitorRuns: (root) => invoke<unknown[]>("monitor_runs", { root }),
-  monitorStart: (root, agents, every, quiet, iteration, sessions, difficulties) => invoke<string>("monitor_start", { root, agents, every, quiet, iteration, sessions, difficulties }),
+  monitorStart: (root, agents, every, quiet, iteration, sessions, difficulties, antigravityHeadless) =>
+    invoke<string>("monitor_start", { root, agents, every, quiet, iteration, sessions, difficulties, antigravityHeadless }),
   monitorAsk: (id, request) => invoke<void>("monitor_ask", { id, request }),
   monitorEndProcess: (pid) => invoke<void>("monitor_end_process", { pid }),
   monitorResume: (root) => invoke<string[]>("monitor_resume", { root }),

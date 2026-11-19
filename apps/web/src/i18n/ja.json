@@ -1140,6 +1140,8 @@
   "monitor.later_manual": "選べません：自分で貼り付ける依頼は、人の操作なしでは進みません。",
   "monitor.mode": "実行モード",
   "monitor.mode_quiet_effect": "人の操作なし：セッションは本当の質問を保留にして（alm wait）先へ進み、監視は次のタスクへ進みます。",
+  "monitor.antigravity_headless": "静かな Antigravity セッションを画面なしで動かす",
+  "monitor.antigravity_headless_note": "チェックすると、承認が必要な操作はターミナルで確認を待たずにすぐ拒否されます。セッションは承認が必要なことを書いてタスクを保留にし（alm wait）、監視は他のタスクへ進みます。このときターミナルのタブには会話画面がなく、終わったときに Antigravity の答えだけが表示されます。",
   "monitor.mode_normal_effect": "質問があるとセッションは止まってあなたに聞きます。そのタスクは作業中のままで、あなたが答えてそれが終わってから、監視は次を始めます。",
   "monitor.backlog_note": "新しく足したタスクは、あなたが承認するまでバックログに残ります。準備完了にすれば、次の確認で取り上げます。",
   "monitor.start": "開始",

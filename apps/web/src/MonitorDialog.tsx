@@ -76,6 +76,7 @@ export function MonitorDialog({
     offered: TerminalAgent[],
     sessions: Partial<Record<TerminalAgent, number>>,
     difficulties: Partial<Record<TerminalAgent, Levels>>,
+    antigravityHeadless: boolean,
   ) => void;
   onClose: () => void;
 }) {
@@ -139,6 +140,10 @@ export function MonitorDialog({
   const [otherId, setOtherId] = useState<string | null>(() => (scope.kind === "iteration" && !scope.current ? scope.id : (selectable[0]?.id ?? null)));
   const [every, setEvery] = useState<Frequency>(editing?.every ?? FIRST_FREQUENCY);
   const [quiet, setQuiet] = useState(editing?.quiet ?? true);
+  // Quiet Antigravity sessions without their chat screen (Task-A03-candle790): off unless the
+  // person ticks it, offered only when a run starts in quiet mode with Antigravity chosen.
+  const [headless, setHeadless] = useState(false);
+  const headlessOffered = !editing && quiet && picked.some((a) => a.split(":")[0] === "antigravity_cli");
   const [modes, setModes] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
@@ -253,6 +258,7 @@ export function MonitorDialog({
       offered,
       sessions,
       difficulties,
+      headlessOffered && headless,
     );
   };
 
@@ -397,6 +403,15 @@ export function MonitorDialog({
               </li>
             ))}
           </ul>
+          {headlessOffered && (
+            <div className="agent-headless">
+              <label>
+                <input type="checkbox" checked={headless} onChange={(e) => setHeadless(e.target.checked)} />{" "}
+                <strong>{t("monitor.antigravity_headless")}</strong>
+              </label>
+              <p className="muted small">{t("monitor.antigravity_headless_note")}</p>
+            </div>
+          )}
           {modes && (
             <details className="run-modes">
               <summary>{t("build.mode_more")}</summary>
