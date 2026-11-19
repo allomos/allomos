@@ -11,7 +11,7 @@ import { linkText } from "./historyFlow";
 import { askText } from "./queueFlow";
 import { decisionsToReview, humanCheckNote, toReview } from "./stopFlow";
 import { riskClass, riskText } from "./taskRiskFlow";
-import { codeLinks, evidenceParts, isEvidenceHeading, riskReason, summarySentence, type EvidencePart } from "./evidenceFlow";
+import { checkResults, codeLinks, evidenceParts, isEvidenceHeading, resultKey, riskReason, summarySentence, type EvidencePart } from "./evidenceFlow";
 import type { Task, TaskHistory } from "./types";
 
 export function EvidenceScreen({
@@ -38,6 +38,7 @@ export function EvidenceScreen({
   const parts = evidenceParts(task, Boolean(decisions));
   const reason = riskReason(history);
   const summary = summarySentence(task.handoff_note);
+  const results = checkResults(history);
   const ownAsk = askText({ todo: toReview(task) ? ["check", "review"] : ["check"], decisions: decisionsToReview(task).length }, t);
 
   const part = (p: EvidencePart): ReactNode => {
@@ -98,12 +99,24 @@ export function EvidenceScreen({
         return (
           <section key={p} className="evidence-part">
             <h4>{t("evidence.tests")}</h4>
-            <p className="small">
-              {t("evidence.tests_none")}{" "}
-              <button type="button" className="link" onClick={(e) => showEvidence(e.currentTarget)}>
-                {t("evidence.tests_see")}
-              </button>
-            </p>
+            {results.length > 0 ? (
+              <ul className="evidence-tests small">
+                {results.map((r) => (
+                  <li key={r.name} className={`evidence-test result-${r.result}`}>
+                    <span className="evidence-result">{resultKey(r.result) ? t(resultKey(r.result)!) : r.result}</span>
+                    <span className="evidence-test-name">{r.name}</span>
+                    {r.detail && <span className="muted"> — {r.detail}</span>}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="small">
+                {t("evidence.tests_none")}{" "}
+                <button type="button" className="link" onClick={(e) => showEvidence(e.currentTarget)}>
+                  {t("evidence.tests_see")}
+                </button>
+              </p>
+            )}
           </section>
         );
       case "decisions":

@@ -150,8 +150,8 @@ Read this before you add a task, so it fits this project.
    The description is the task's record. A project that keeps a card file per task keeps it
    beside the task, as `tasks/<id>/card.md` (`alm card <id> --from <file>`), linked from the
    description's `Card:` line, never in the project folder (`alm guide move-cards`). As the work
-   goes on, keep it up to date with `alm describe <id> --from <file.md>` (its approvals, and what was
-   checked, with numbers and logs, under an **Evidence** heading).
+   goes on, keep it up to date with `alm describe <id> --from <file.md>` (its approvals and other
+   evidence under an **Evidence** heading); each check's result goes in with `alm check-result`.
 6. **Difficulty.** Say how hard it is, from 1 to 5: `--difficulty <1-5>` (Task-A01-actor813).
    1: one small change in one place, nothing to decide. 2: a small change across a few files, or
    one well-known step. 3: an ordinary task, one feature or fix with its tests and a few routine
@@ -441,6 +441,9 @@ Plan:
   too. alm runs no Git: give what your version control tool and CI show, with the web address
   so the app can open it. `alm links <ref>` finds the task of a commit (7 digits of its hash or
   more), branch, PR, run, tag or address; `alm links`, every task's links; `alm show` lists them.
+- `alm check-result <id> --name \"<check>\" --result pass|fail|not-run [--detail \"<one
+  sentence>\"]`: record one check you ran or did not run, in the task's history; the same name
+  again replaces its result. `alm show` and the Evidence screen list them, failed and not run first.
 - `alm title <id> \"<title>\"`; `alm describe <id> --text \"<markdown>\"` or
   `alm describe <id> --from <file.md>`: a new title or description (`--text \"\"` removes the
   description). Same holder rule as `alm label`; each is recorded in `alm history`. Add
@@ -742,7 +745,9 @@ const WORKFLOW: &str = "# How to work the tasks
    any reader: you do not know who takes over, an agent or a person. It replaces the task's
    handoff note, so write the whole of it each time. Each operation with an outside effect that
    must not run twice goes in with `--evidence \"<what>\"` (under the description's
-   **Evidence**); other evidence with `alm describe`.
+   **Evidence**). Record each check you ran or did not run (tests, builds, a click-through) with
+   `alm check-result <id> --name \"<check>\" --result pass|fail|not-run [--detail \"<why>\"]`;
+   other evidence with `alm describe`.
    **Write for a person first.** A person reads every handoff note, every AI decision and every
    set of check steps, often on the go and without your conversation. Each keeps one order:
    1. One sentence in plain words that a person can act on: where the work stands, or what was

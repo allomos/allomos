@@ -292,5 +292,5 @@ Reuse context you already have; do not re-read unchanged documents. **The measur
 - Status changes: `alm list --json` reports no `issues`.
 - Documentation-only changes: check links and paths, instruction consistency, and `git diff --check`.
 - Test folders for manual checks and agent trials go under `~/allomos-tests/<card>-<name>/` ([CODING_RULES](docs/workflow/CODING_RULES.md#writing-code)).
-- Code changes: run the card's named checks; report PASS / FAIL / NOT RUN separately, and untested gates separately.
+- Code changes: run the card's named checks; record each one, and each untested gate, as pass, fail or not-run with `alm check-result <id> --name "<check>" --result pass|fail|not-run [--detail "<one sentence>"]` (decision 0029 § 5): the Evidence screen lists them, failed and not run first.
 - Report briefly: what changed, what was verified, what remains and who it waits on.

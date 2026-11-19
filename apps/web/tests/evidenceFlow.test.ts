@@ -3,7 +3,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { codeLinks, evidenceParts, isEvidenceHeading, riskReason, summarySentence } from "../src/evidenceFlow.ts";
+import { checkResults, codeLinks, evidenceParts, isEvidenceHeading, resultKey, riskReason, summarySentence } from "../src/evidenceFlow.ts";
+import { changeLine } from "../src/historyFlow.ts";
 import type { Task, TaskEvent, TaskHistory } from "../src/types.ts";
 
 const task = (over: Partial<Task>): Task => ({ id: "A01-x", title: "x", area: "A01", state: "done", description: "", ...over }) as Task;
@@ -32,11 +33,11 @@ test("the change summary shows for commits alone, with no handoff note", () => {
   assert.deepEqual(evidenceParts(t, false), ["ask_risk", "summary", "tests"]);
 });
 
-test("the risk's reason is the newest one recorded with alm classify", () => {
+test("the risk's reason is the newest one recorded with alm classify (the history lists newest first)", () => {
   const h = history([
-    event("classify", [{ field: "risk", to: "low" }, { field: "reason", to: "only tests" }]),
-    event("label", [{ field: "labels", to: ["x"] }]),
     event("classify", [{ field: "risk", to: "medium" }, { field: "reason", to: "M3: words users see" }]),
+    event("label", [{ field: "labels", to: ["x"] }]),
+    event("classify", [{ field: "risk", to: "low" }, { field: "reason", to: "only tests" }]),
   ]);
   assert.equal(riskReason(h), "M3: words users see");
   assert.equal(riskReason(history([event("classify", [{ field: "risk", to: "low" }])])), null);
@@ -67,4 +68,42 @@ test("only commits and merges count as the change's code", () => {
 test("the Evidence section is found as agents write its heading", () => {
   for (const s of ["Evidence", "Evidence.", "**Evidence**", "evidence (A01-x)", "证据", "証拠"]) assert.ok(isEvidenceHeading(s.replace(/\*/g, "")), s);
   for (const s of ["Evidenced elsewhere", "Outcome", "Notes"]) assert.ok(!isEvidenceHeading(s), s);
+});
+
+const result = (to: unknown, from?: unknown) => event("check-result", [{ field: "check_result", from, to }]);
+
+test("test results: the last record of each name, failed and not run first, in the order first recorded", () => {
+  // Newest first, as the app reads the history.
+  const h = history([
+    result({ name: "npm test", result: "pass" }, { name: "npm test", result: "fail", detail: "2 failed" }),
+    result({ name: "click through", result: "not-run", detail: "no display" }),
+    result({ name: "typecheck", result: "fail", detail: "1 error" }),
+    result({ name: "cargo test", result: "pass" }),
+    result({ name: "npm test", result: "fail", detail: "2 failed" }),
+    result("not a record"),
+  ]);
+  assert.deepEqual(checkResults(h), [
+    { name: "typecheck", result: "fail", detail: "1 error" },
+    { name: "click through", result: "not-run", detail: "no display" },
+    { name: "npm test", result: "pass" },
+    { name: "cargo test", result: "pass" },
+  ]);
+});
+
+test("a task with no test results (older tasks) gives none, so the screen points to the description", () => {
+  assert.deepEqual(checkResults(history([event("label", [{ field: "labels", to: ["x"] }])])), []);
+  assert.deepEqual(checkResults(null), []);
+});
+
+test("each result has its words; an unknown one has none", () => {
+  assert.equal(resultKey("fail"), "evidence.result_fail");
+  assert.equal(resultKey("not-run"), "evidence.result_not_run");
+  assert.equal(resultKey("pass"), "evidence.result_pass");
+  assert.equal(resultKey("skipped"), null);
+});
+
+test("the history shows a test result as its check and result in words", () => {
+  const t = (key: string) => ({ "pane.check_result": "Test result", "evidence.result_fail": "Failed", "evidence.result_pass": "Passed" })[key] ?? key;
+  const line = changeLine({ field: "check_result", from: { name: "npm test", result: "fail" }, to: { name: "npm test", result: "pass" } }, t as never);
+  assert.equal(line, "Test result: npm test: Failed → npm test: Passed");
 });

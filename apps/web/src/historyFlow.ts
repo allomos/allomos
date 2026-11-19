@@ -1,5 +1,6 @@
 // A task's history in the task pane (Task-A01-17): how each recorded change is worded.
 
+import { resultKey } from "./evidenceFlow.ts";
 import type { Key } from "./i18n";
 import type { EffectRecord, FieldChange, LinkRecord } from "./types";
 
@@ -43,6 +44,7 @@ const FIELD_KEYS: Record<string, Key> = {
   exception: "pane.exception",
   redaction: "pane.redaction",
   link: "pane.link",
+  check_result: "pane.check_result",
   card: "pane.card",
   card_outside: "pane.card_outside",
   description: "pane.description",
@@ -76,6 +78,12 @@ export function valueText(field: string, value: unknown, t: T, taskT: T = t): st
   if (field === "effect" && typeof value === "object") return effectText(value as Pick<EffectRecord, "target" | "action" | "result">, t);
   // A link to code or a release (Task-A01-mint242): its kind and reference.
   if (field === "link" && typeof value === "object") return linkText(value as Pick<LinkRecord, "kind" | "ref">, t);
+  // A test result (Task-A01-easel128): the check's name and its result in words.
+  if (field === "check_result" && typeof value === "object" && "name" in value) {
+    const r = value as { name: unknown; result?: unknown };
+    const key = resultKey(String(r.result ?? ""));
+    return `${String(r.name)}: ${key ? t(key) : String(r.result ?? "")}`;
+  }
   // A human check (Task-A01-table778): its result, where, who and the person's words.
   if (field === "human_check" && typeof value === "object") return humanCheckText(value as HumanCheck, t);
   // An exception (Task-A01-seed343): its kind, the check not run, why, and who accepted the risk.

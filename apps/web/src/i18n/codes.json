@@ -87,6 +87,10 @@
   "card_path_invalid": [
     "path"
   ],
+  "check_name_missing": [],
+  "check_result_unknown": [
+    "result"
+  ],
   "checker_unknown": [
     "id"
   ],
