@@ -23,7 +23,7 @@ impl Command {
             | Command::Change(ChangeWhat::Iteration { id, .. })
             | Command::Move(MoveWhat::Iteration { id, .. })
             | Command::Delete(Delete::Area { id } | Delete::Iteration { id }) => Some(id),
-            Command::Show { id }
+            Command::Show { id, .. }
             | Command::History { id }
             | Command::Claim { id, .. }
             | Command::Session { id, .. }

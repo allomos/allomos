@@ -40,6 +40,9 @@ pub(crate) struct Opened {
     pub(crate) effects: std::collections::BTreeMap<String, Vec<allomos_core::effect::Recorded>>,
     /// Each task's links to code and releases, by task ID (Task-A01-mint242), from the history.
     pub(crate) links: std::collections::BTreeMap<String, Vec<allomos_core::link::Recorded>>,
+    /// Each task's Evidence screen, by task ID (Task-A01-inlet632, decision 0029): its parts in
+    /// order, the summary sentence and the risk's reason, from the core as `alm show --evidence`.
+    pub(crate) evidence: std::collections::BTreeMap<String, allomos_core::evidence::Evidence>,
     /// Each task's base and working branch, by task ID (Task-A03-22), from the history: the New
     /// task form chooses the new task's base from the open tasks' bases.
     pub(crate) branches: std::collections::BTreeMap<String, allomos_core::branch::Branches>,
@@ -84,6 +87,10 @@ pub(crate) fn open_taskbag(root: PathBuf) -> Opened {
         .map(|t| (t.id.clone(), allomos_core::ops::task_version(t)))
         .collect();
     let app_changes = allomos_store::events::unshared_app_changes(&root);
+    let evidence = match &loaded.taskbag {
+        Some(bag) => allomos_store::evidence::by_task(&root, bag),
+        None => Default::default(),
+    };
     Opened {
         app_changes,
         loaded,
@@ -93,6 +100,7 @@ pub(crate) fn open_taskbag(root: PathBuf) -> Opened {
         classifications: allomos_store::classify::by_task(&root),
         effects: allomos_store::effects::by_task(&root),
         links: allomos_store::links::by_task(&root),
+        evidence,
         branches: allomos_store::branches(&root),
         last_changed: allomos_store::last_changed(&root),
         created: allomos_store::created(&root),
@@ -140,6 +148,7 @@ pub(crate) fn create_taskbag(
         classifications: Default::default(),
         effects: Default::default(),
         links: Default::default(),
+        evidence: Default::default(),
         branches: Default::default(),
         last_changed: Default::default(),
         created: Default::default(),
@@ -243,6 +252,7 @@ pub(crate) fn move_taskbag_aside(root: PathBuf) -> Result<Opened, Problem> {
         classifications: Default::default(),
         effects: Default::default(),
         links: Default::default(),
+        evidence: Default::default(),
         branches: Default::default(),
         last_changed: Default::default(),
         created: Default::default(),

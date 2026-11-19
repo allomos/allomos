@@ -2,7 +2,7 @@
 // check, in the task pane and in the For You window, everything a person needs to let the work
 // through or send it back, without scrolling about: what they are asked to do and the risk, the
 // check steps, a summary of the change, the test results, the AI decisions to review, and the
-// handoff note folded. A part with nothing in it is not shown. The order lives in evidenceFlow.
+// handoff note folded. A part with nothing in it is not shown. The order comes from the core.
 
 import type { ReactNode } from "react";
 import { useI18n } from "./i18n";
@@ -11,20 +11,17 @@ import { linkText } from "./historyFlow";
 import { askText } from "./queueFlow";
 import { decisionsToReview, humanCheckNote, toReview } from "./stopFlow";
 import { riskClass, riskText } from "./taskRiskFlow";
-import { codeLinks, evidenceParts, isEvidenceHeading, riskReason, summarySentence, type EvidencePart } from "./evidenceFlow";
-import type { Task, TaskHistory } from "./types";
+import { codeLinks, evidenceParts, isEvidenceHeading, type EvidencePart } from "./evidenceFlow";
+import type { Task } from "./types";
 
 export function EvidenceScreen({
   task,
-  history,
   ask,
   onLink,
   decisions,
   actions,
 }: {
   task: Task;
-  /** The task's recorded changes, for the reason given with its risk; null until read. */
-  history: TaskHistory | null;
   /** What the person is asked to do, as the For You window words it; left out, it is worked out
    * from the task (check, and review when it carries AI decisions to review). */
   ask?: ReactNode;
@@ -35,9 +32,9 @@ export function EvidenceScreen({
   actions: ReactNode;
 }) {
   const { t } = useI18n();
-  const parts = evidenceParts(task, Boolean(decisions));
-  const reason = riskReason(history);
-  const summary = summarySentence(task.handoff_note);
+  const parts = evidenceParts(task);
+  const reason = task.evidence?.risk_reason;
+  const summary = task.evidence?.summary;
   const ownAsk = askText({ todo: toReview(task) ? ["check", "review"] : ["check"], decisions: decisionsToReview(task).length }, t);
 
   const part = (p: EvidencePart): ReactNode => {

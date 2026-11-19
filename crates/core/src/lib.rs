@@ -16,6 +16,7 @@ pub mod difficulty;
 pub mod duties;
 pub mod effect;
 pub mod event;
+pub mod evidence;
 pub mod exception;
 pub mod file_size;
 pub mod folders;

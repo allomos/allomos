@@ -259,6 +259,7 @@ export function decorated(task: Task, opened: Opened): Task {
   if (opened.approvals?.[task.id]) out = { ...out, approvals: opened.approvals[task.id] };
   if (opened.effects?.[task.id]) out = { ...out, effects: opened.effects[task.id] };
   if (opened.links?.[task.id]) out = { ...out, links: opened.links[task.id] };
+  if (opened.evidence?.[task.id]) out = { ...out, evidence: opened.evidence[task.id] };
   const risk = opened.classifications?.[task.id]?.risk;
   if (risk) out = { ...out, risk };
   return out;

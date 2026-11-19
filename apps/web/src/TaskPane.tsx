@@ -795,7 +795,7 @@ export function TaskPane({
         </button>
       </header>
       {toCheck(task) ? (
-        <EvidenceScreen task={task} history={history} ask={ask} onLink={onLink} decisions={(reviewBox || detailsBox) && <>{reviewBox}{detailsBox}</>} actions={checkBox} />
+        <EvidenceScreen task={task} ask={ask} onLink={onLink} decisions={(reviewBox || detailsBox) && <>{reviewBox}{detailsBox}</>} actions={checkBox} />
       ) : (
         <>{reviewBox}{detailsBox}</>
       )}

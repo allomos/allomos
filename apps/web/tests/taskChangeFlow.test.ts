@@ -134,3 +134,11 @@ test("the card file a description links to outside the taskbag follows the chang
   const kept = withTaskChange(reported, change(task({ ...one, description: "Card: docs/a.md" }), { card_outside: link("A01-01", "docs/a.md") }), "1", decorated)!;
   assert.deepEqual(kept.cards_outside, [report]);
 });
+
+test("the changed task's Evidence screen comes with the change, as a whole read has it (Task-A01-inlet632)", () => {
+  const evidence = { parts: ["ask_risk", "summary", "tests", "handoff"] as const, summary: "Built." };
+  const shown = withDecisions(read([one, two]));
+  const next = withTaskChange(shown, change(one, { evidence: { ...evidence, parts: [...evidence.parts] } }), "1", decorated)!;
+  assert.deepEqual(next.loaded.taskbag!.tasks[0].evidence?.parts, evidence.parts);
+  assert.deepEqual(next.evidence?.["A01-01"]?.summary, "Built.");
+});

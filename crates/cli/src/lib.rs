@@ -602,6 +602,7 @@ pub(crate) use text::{
 };
 mod classify;
 mod effects;
+mod evidence;
 mod exceptions;
 mod folders;
 mod heartbeat;

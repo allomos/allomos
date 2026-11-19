@@ -16,7 +16,7 @@
 //   plan in it, renaming or deleting a group, Approve, Withdraw, AI decisions reviewed.
 
 // Only type imports here, so Node can test it.
-import type { CardOutside, Opened, Task } from "./types";
+import type { CardOutside, Evidence, Opened, Task } from "./types";
 
 /** What `edit_task` answers (apps/desktop/src-tauri/src/task_change.rs). */
 export interface TaskChange {
@@ -27,6 +27,8 @@ export interface TaskChange {
   changed_at: string | null;
   /** The card file its `Card:` link points to outside the taskbag, if any. */
   card_outside: CardOutside | null;
+  /** Its Evidence screen, as the core works it out (Task-A01-inlet632). */
+  evidence?: Evidence;
   /** The change reached beyond this task: read the whole taskbag again. */
   whole: boolean;
   /** The taskbag's fingerprint just before the change was written, and just after. */
@@ -67,10 +69,11 @@ export function withTaskChange(
     );
   }
 
+  const fresh = change.evidence ? { ...opened, evidence: { ...opened.evidence, [id]: change.evidence } } : opened;
   const tasks = box.tasks.slice();
-  tasks[at] = decorated(change.task, opened);
+  tasks[at] = decorated(change.task, fresh);
   return {
-    ...opened,
+    ...fresh,
     loaded: { ...opened.loaded, taskbag: { ...box, tasks } },
     versions: { ...opened.versions, [id]: change.version },
     last_changed: change.changed_at ? { ...opened.last_changed, [id]: change.changed_at } : opened.last_changed,

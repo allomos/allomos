@@ -250,7 +250,7 @@ See:
   `--json`: `queue` (one task each, in order, with `todo`, `risk`, `waiting_since`, `blocks`,
   `agent_waiting`, `ai_decisions`), and the same tasks by kind: `to_check`, `to_answer`,
   `to_review`, `to_approve_afterwards`.
-- `alm show <id>`: one task in full, with its description.
+- `alm show <id> [--evidence]`: the task in full; `--evidence`: its Evidence screen, app's order.
 - `alm history <id>`: every recorded change to the task, newest first: when, who, what changed.
 
 Work a task:
