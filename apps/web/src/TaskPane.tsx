@@ -85,6 +85,7 @@ export function TaskPane({
   lostAfter,
   lastChange,
   ask,
+  readChanges,
 }: {
   task: Task;
   /** Every task of the taskbag: a blocked task's blockers, and the "Blocked by" picker (decision 0016). */
@@ -105,8 +106,7 @@ export function TaskPane({
   onSaveName: (name: string) => Promise<void>;
   /** Makes one change. Rejects with the Problem that refused it; then nothing changed. */
   onEdit: (edit: Edit) => Promise<void>;
-  /** The task's version now (Task-A01-57); a title or description is saved against the version
-   * shown when the change began. */
+  /** The task's version now (Task-A01-57); a title or description is saved against the version shown when the change began. */
   version: string | null;
   /** Marks the task's AI decisions reviewed. Rejects with the Problem that refused it. */
   onReview: () => Promise<void>;
@@ -124,9 +124,8 @@ export function TaskPane({
   onTakeOver?: () => void;
   /** Hand over to another agent… (Task-A01-minnow200); left out where agents cannot be opened. */
   onHandOver?: () => void;
-  /** Approves the task's plan, as `alm approve` (channel app): `shown` is the description the
-   * person read; `ready` also makes a backlog task ready (Task-A01-baker800). Desktop only.
-   * Rejects with a Problem. */
+  /** Approves the task's plan, as `alm approve` (channel app): `shown` is the description the person read;
+   * `ready` also makes a backlog task ready (Task-A01-baker800). Desktop only. Rejects with a Problem. */
   onApprove?: (shown: string, expires: string | null, ready: boolean) => Promise<void>;
   /** Withdraws approval `id`, with why (Task-A01-baker800). Desktop only. Rejects with a Problem. */
   onWithdraw?: (id: string, reason: string) => Promise<void>;
@@ -138,6 +137,7 @@ export function TaskPane({
   lastChange?: string;
   /** What the person is asked to do, for the Evidence screen of a task to check (decision 0029). */
   ask?: ReactNode;
+  readChanges?: (hashes: string[]) => Promise<import("./evidenceFlow").CodeChanges>; // the Evidence screen's What changed, from git (desktop only)
 }) {
   const { t, problem } = useI18n();
   const taskT = useTaskT();
@@ -795,7 +795,7 @@ export function TaskPane({
         </button>
       </header>
       {toCheck(task) ? (
-        <EvidenceScreen task={task} ask={ask} onLink={onLink} decisions={(reviewBox || detailsBox) && <>{reviewBox}{detailsBox}</>} actions={checkBox} />
+        <EvidenceScreen task={task} ask={ask} onLink={onLink} decisions={(reviewBox || detailsBox) && <>{reviewBox}{detailsBox}</>} actions={checkBox} readChanges={readChanges} />
       ) : (
         <>{reviewBox}{detailsBox}</>
       )}

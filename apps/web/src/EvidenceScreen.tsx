@@ -4,14 +4,23 @@
 // check steps, a summary of the change, the test results, the AI decisions to review, and the
 // handoff note folded. A part with nothing in it is not shown. The order comes from the core.
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useI18n } from "./i18n";
 import { Markdown } from "./Markdown";
 import { linkText } from "./historyFlow";
 import { askText } from "./queueFlow";
 import { decisionsToReview, humanCheckNote, toReview } from "./stopFlow";
 import { riskClass, riskText } from "./taskRiskFlow";
-import { codeLinks, evidenceParts, isEvidenceHeading, type EvidencePart } from "./evidenceFlow";
+import {
+  changeTotals,
+  codeLinks,
+  commitSubject,
+  evidenceParts,
+  isEvidenceHeading,
+  MOST_FILES,
+  type CodeChanges,
+  type EvidencePart,
+} from "./evidenceFlow";
 import type { Task } from "./types";
 
 export function EvidenceScreen({
@@ -20,6 +29,7 @@ export function EvidenceScreen({
   onLink,
   decisions,
   actions,
+  readChanges,
 }: {
   task: Task;
   /** What the person is asked to do, as the For You window words it; left out, it is worked out
@@ -30,11 +40,16 @@ export function EvidenceScreen({
   decisions: ReactNode;
   /** The pane's Checked button, drawn under the screen. */
   actions: ReactNode;
+  /** Reads the recorded commits' first lines and changed files from the project's own git (only
+   * reads); left out where git cannot be read (the companions): the commits show as links only. */
+  readChanges?: (hashes: string[]) => Promise<CodeChanges>;
 }) {
   const { t } = useI18n();
   const parts = evidenceParts(task);
   const reason = task.evidence?.risk_reason;
   const summary = task.evidence?.summary;
+  const refs = codeLinks(task).map((l) => l.ref);
+  const changes = useChanges(refs, readChanges);
   const ownAsk = askText({ todo: toReview(task) ? ["check", "review"] : ["check"], decisions: decisionsToReview(task).length }, t);
 
   const part = (p: EvidencePart): ReactNode => {
@@ -85,10 +100,12 @@ export function EvidenceScreen({
                     ) : (
                       <span title={t("pane.link_no_url")}>{linkText(l, t)}</span>
                     )}
+                    <CommitSubject subject={commitSubject(changes, l.ref)} />
                   </li>
                 ))}
               </ul>
             )}
+            {changes && changes.files.length > 0 && <ChangedFiles files={changes.files} />}
           </section>
         );
       case "tests":
@@ -125,6 +142,62 @@ export function EvidenceScreen({
       {parts.map(part)}
       {actions && <div className="evidence-actions">{actions}</div>}
     </section>
+  );
+}
+
+/** The recorded commits read from git; null while read, or when they cannot be. */
+function useChanges(refs: string[], read?: (hashes: string[]) => Promise<CodeChanges>): CodeChanges | null {
+  const key = refs.join(" ");
+  const [got, setGot] = useState<{ key: string; changes: CodeChanges } | null>(null);
+  // The reader is made anew at every render; only a change of the commits reads git again.
+  const reader = useRef(read);
+  reader.current = read;
+  const can = Boolean(read);
+  useEffect(() => {
+    const read = reader.current;
+    if (!read || !key) return;
+    let live = true;
+    read(key.split(" ")).then(
+      (changes) => live && setGot({ key, changes }),
+      () => live && setGot(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [key, can]);
+  return got?.key === key ? got.changes : null;
+}
+
+/** A commit's first line after its link; this computer not having it is said so. */
+function CommitSubject({ subject }: { subject: string | null | undefined }) {
+  const { t } = useI18n();
+  if (subject === undefined) return null;
+  return subject === null ? <span className="muted"> — {t("evidence.not_here")}</span> : <> {subject}</>;
+}
+
+/** The files the commits changed together, each with the lines added and removed. */
+function ChangedFiles({ files }: { files: CodeChanges["files"] }) {
+  const { t } = useI18n();
+  const total = changeTotals(files);
+  return (
+    <div className="evidence-files small">
+      <p>{t("evidence.files", { files: String(total.files), added: String(total.added), removed: String(total.removed) })}</p>
+      <ul>
+        {files.slice(0, MOST_FILES).map((f) => (
+          <li key={f.path}>
+            <code>{f.path}</code>{" "}
+            {f.added === null ? (
+              <span className="muted">{t("evidence.binary")}</span>
+            ) : (
+              <>
+                <span className="lines-added">+{f.added}</span> <span className="lines-removed">−{f.removed}</span>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+      {files.length > MOST_FILES && <p className="muted">{t("evidence.more_files", { n: String(files.length - MOST_FILES) })}</p>}
+    </div>
   );
 }
 

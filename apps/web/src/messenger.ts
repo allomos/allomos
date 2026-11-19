@@ -14,6 +14,7 @@ import type { RiskSettings } from "./riskFlow";
 import type { CodexRules } from "./codexRulesFlow";
 import type { LadderStep } from "./ladderFlow";
 import type { FormerWorktree } from "./proceedFlow";
+import type { CodeChanges } from "./evidenceFlow";
 /** What a running monitor can be asked (Task-A03-cow112), as `alm monitor` leaves it. */
 export type MonitorRequest =
   | { action: "check" }
@@ -143,6 +144,9 @@ export interface Messenger {
    * when it is on this computer, with what it has not committed or pushed; null when it is not.
    * `folder`: where its claim ran (the task's session). Only reads. */
   formerWorktree(taskbag: string, folder: string | null, working: string): Promise<FormerWorktree | null>;
+  /** The Evidence screen's What changed (Task-A01-hyena938): the recorded commits' first lines and
+   * the files they changed, read from the project's own git. Only reads (no fetch). */
+  codeChanges(taskbag: string, hashes: string[]): Promise<CodeChanges>;
   /** Monitor ready tasks (Task-A03-cow112): the runs of the taskbag at `root` (several may run at
    * once), as `alm monitor status --json` lists them; read again when `onMonitorsChanged` says. */
   monitorRuns(root: string): Promise<unknown[]>;
@@ -596,6 +600,7 @@ export const desktopMessenger: Messenger = {
   proceedWithAgent: (agent, taskbag, request) => invoke<void>("proceed_with_agent", { agent, taskbag, request }),
   proceedManualRequest: (request) => invoke<string>("proceed_manual_request", { request }),
   formerWorktree: (taskbag, folder, working) => invoke<FormerWorktree | null>("former_worktree", { taskbag, folder, working }),
+  codeChanges: (taskbag, hashes) => invoke<CodeChanges>("code_changes", { taskbag, hashes }),
   monitorRuns: (root) => invoke<unknown[]>("monitor_runs", { root }),
   monitorStart: (root, agents, every, quiet, iteration, sessions, difficulties, models, efforts) =>
     invoke<string>("monitor_start", { root, agents, every, quiet, iteration, sessions, difficulties, models, efforts }),

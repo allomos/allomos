@@ -1328,9 +1328,8 @@ function HopFigure() {
   );
 }
 
-/** How the task list is grouped; remembered in the window's storage (Task-A01-15). The Handoffs
- * tab after Iterations (Task-A03-06) is gone (Task-A03-polar770): a remembered "handoffs" reads
- * as by area. */
+/** How the task list is grouped; remembered in the window's storage (Task-A01-15). The Handoffs tab after
+ * Iterations (Task-A03-06) is gone (Task-A03-polar770): a remembered "handoffs" reads as by area. */
 type GroupBy = "area" | "iteration";
 const GROUP_BY_KEY = "allomos.groupBy";
 /** The Show filter's unticked cells (Task-A01-lens781, Task-A01-rock075). */
@@ -2139,6 +2138,7 @@ function TaskbagView({
                 onHandOver={canOpenSessions ? () => setHandingOver(selected.id) : undefined}
                 lostAfter={lostAfter}
                 lastChange={opened.last_changed?.[selected.id]}
+                readChanges={canOpenSessions ? (hashes) => messenger.codeChanges(opened.root, hashes) : undefined}
               />
             )}
           </div>

@@ -626,6 +626,11 @@ button.primary.danger { background: var(--err); border-color: var(--err); color:
 .evidence-part > p { margin: 4px 0 0; }
 .evidence-ask > p:first-child { margin: 0; }
 .evidence-commits { margin: 4px 0 0; padding-left: 20px; }
+.evidence-files > p { margin: 6px 0 0; }
+.evidence-files > ul { margin: 2px 0 0; padding-left: 20px; }
+.evidence-files code { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
+.lines-added { color: var(--ok); }
+.lines-removed { color: var(--err); }
 .evidence-decisions > .pane-check { margin-top: 0; }
 .evidence-handoff > summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .evidence-actions { border-top: 1px solid var(--line); padding-top: 8px; }

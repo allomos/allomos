@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { codeLinks, evidenceParts, isEvidenceHeading } from "../src/evidenceFlow.ts";
+import { changeTotals, codeLinks, commitSubject, evidenceParts, isEvidenceHeading } from "../src/evidenceFlow.ts";
 import { decorated } from "../src/stopFlow.ts";
 import type { Opened, Task } from "../src/types.ts";
 
@@ -39,4 +39,28 @@ test("only commits and merges count as the change's code", () => {
 test("the Evidence section is found as agents write its heading", () => {
   for (const s of ["Evidence", "Evidence.", "**Evidence**", "evidence (A01-x)", "证据", "証拠"]) assert.ok(isEvidenceHeading(s.replace(/\*/g, "")), s);
   for (const s of ["Evidenced elsewhere", "Outcome", "Notes"]) assert.ok(!isEvidenceHeading(s), s);
+});
+
+test("what changed: files and lines add up; binary files count as files only (Task-A01-hyena938)", () => {
+  const files = [
+    { path: "a.rs", added: 10, removed: 2 },
+    { path: "logo.png", added: null, removed: null },
+    { path: "b.ts", added: 1, removed: 0 },
+  ];
+  assert.deepEqual(changeTotals(files), { files: 3, added: 11, removed: 2 });
+  assert.deepEqual(changeTotals([]), { files: 0, added: 0, removed: 0 });
+});
+
+test("a recorded commit found in git has its first line; one not on this computer is null; unread is undefined", () => {
+  const changes = {
+    commits: [
+      { hash: "989bed1a", subject: "A01-herb903: Evidence screen", merge: false },
+      { hash: "0123456789abcdef0123456789abcdef01234567", subject: null, merge: false },
+    ],
+    files: [],
+  };
+  assert.equal(commitSubject(changes, "989bed1a"), "A01-herb903: Evidence screen");
+  assert.equal(commitSubject(changes, "0123456789abcdef0123456789abcdef01234567"), null);
+  assert.equal(commitSubject(changes, "fffffff"), undefined);
+  assert.equal(commitSubject(null, "989bed1a"), undefined);
 });
