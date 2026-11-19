@@ -11,6 +11,7 @@ mod alm_command;
 mod app_sharing;
 mod audit;
 mod code_changes;
+mod evidence_screenshot;
 mod codex_rules;
 mod file_size_settings;
 mod for_you;
@@ -321,6 +322,7 @@ pub fn run() {
             agent_commands::proceed_manual_request,
             former_worktree::former_worktree,
             code_changes::code_changes,
+            evidence_screenshot::evidence_screenshot,
             monitor_runs::monitor_runs,
             monitor_runs::monitor_start,
             agent_models::agent_models,

@@ -8,6 +8,12 @@
 //! task's results are the last record of each name, in the order first recorded; the Evidence
 //! screen and `alm show` list failed and not run first ([`ordered`]).
 //!
+//! A failed check may bring screenshots (`--screenshot <file>`, decision 0029 § 6,
+//! Task-A01-fondue470): `alm` copies each into `tasks/<id>/evidence/` and the record names them
+//! (`screenshots`), so another computer sees them after it gets the taskbag. A task keeps at most
+//! three; only PNG, JPEG and WebP pictures of at most 2 MB are taken (checks the approver
+//! approved in that decision).
+//!
 //! `alm` refuses only what it cannot record: an unknown task, one someone else holds, a check
 //! without a name, and a result that is none of the three. Whether a task has enough results, or
 //! the right ones, it does not judge ("`alm` tells; the agent checks").
@@ -342,6 +348,33 @@ mod tests {
         assert_eq!(one[0].at, "2026-11-20T00:00:04.000Z");
         assert_eq!(one[1].check.name, "cargo test");
         assert_eq!(rec["A01-2"].len(), 1);
+    }
+
+    #[test]
+    fn screenshots_are_pictures_of_at_most_2_mb() {
+        assert_eq!(image_kind(b"\x89PNG\r\n\x1a\n..."), Some("png"));
+        assert_eq!(image_kind(&[0xFF, 0xD8, 0xFF, 0xE1]), Some("jpeg"));
+        assert_eq!(image_kind(b"RIFF\0\0\0\0WEBPVP8 "), Some("webp"));
+        assert_eq!(image_kind(b"GIF89a"), None);
+        assert!(screenshot_problem("a.png", MOST_BYTES, b"\x89PNG\r\n\x1a\n").is_none());
+        assert!(matches!(
+            screenshot_problem("a.png", MOST_BYTES + 1, b"\x89PNG\r\n\x1a\n"),
+            Some(Problem::ScreenshotTooLarge { .. })
+        ));
+        assert!(matches!(
+            screenshot_problem("a.txt", 10, b"hello"),
+            Some(Problem::ScreenshotNotImage { .. })
+        ));
+    }
+
+    #[test]
+    fn a_screenshot_is_kept_under_a_plain_free_name() {
+        let taken = vec!["shot.png".to_string(), "shot-2.png".to_string()];
+        assert_eq!(screenshot_name("/tmp/x/shot.PNG", "png", &taken), "shot-3.png");
+        assert_eq!(screenshot_name("Screen Shot 1.jpeg", "jpeg", &[]), "Screen-Shot-1.jpg");
+        assert_eq!(screenshot_name("C:\\a\\b.webp", "webp", &[]), "b.webp");
+        assert_eq!(screenshot_name("截图.png", "png", &[]), "screenshot.png");
+        assert_eq!(screenshot_name(".png", "png", &[]), "png.png");
     }
 
     #[test]
