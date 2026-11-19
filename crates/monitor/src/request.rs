@@ -62,6 +62,25 @@ fn with_antigravity_push_rule(mode: String, agent: &str, quiet: bool, language: 
     format!("{mode}\n\n{instruction}")
 }
 
+/// What a quiet Antigravity session started without its chat screen (`agy -p`,
+/// Task-A03-candle790) is told about refused actions: there an action that needs approval is
+/// refused at once instead of asking, so the session must park the task rather than work around
+/// the refusal. Added to the end of its request.
+pub fn with_antigravity_headless_rule(request: String, id: &str, language: &str) -> String {
+    let instruction = match lang(language) {
+        "zh-CN" => format!(
+            r#"本会话在无界面模式下运行：需要批准的操作不会弹出确认，而是直接被拒绝，你会收到 “user denied permission …”。被拒后不要换写法、换工具或用脚本绕过。没有这个操作就无法继续时，用 alm wait {id} --on "需要批准：<被拒操作的原文>。原因：<为什么需要它> 提案：<你的提案>" 搁置，写好交接（alm handoff {id}）后结束这个会话；不依赖它的、已做完测完的工作先合入。"#
+        ),
+        "ja" => format!(
+            r#"このセッションは画面なしのモードで動いています：承認が必要な操作は確認を出さずにすぐ拒否され、“user denied permission …” が返ります。拒否されたら、書き方や道具を変えたりスクリプトで回避したりしないでください。その操作なしでは進めないときは、alm wait {id} --on "承認が必要：<拒否された操作そのまま>。理由：<なぜ必要か> 案：<あなたの案>" で保留にし、引き継ぎ（alm handoff {id}）を書いてからこのセッションを終えてください。それによらない、作業済みでテスト済みの部分は先にマージします。"#
+        ),
+        _ => format!(
+            r#"This session runs without its chat screen: an action that needs approval is not asked about but refused at once, and you get "user denied permission …". When refused, do not work around it with other wording, tools or scripts. When you cannot go on without that action, park it with alm wait {id} --on "Needs approval: <the refused action, as it was>. Why: <why it is needed> Proposal: <yours>", write the handoff (alm handoff {id}) and end this session; merge first the work that is done and tested and does not depend on it."#
+        ),
+    };
+    format!("{request}\n\n{instruction}")
+}
+
 /// The request a new session gets for one task. `taskbag` is the taskbag's path as the agent,
 /// working in the project folder, passes it to `--taskbag`; `session_id` the ID Allomos gave
 /// Claude Code (none for the agents that pick their own).
@@ -369,5 +388,22 @@ mod tests {
         );
         let en_agy = monitor_request("A01-1", "x", "tb", "en", "antigravity_cli", None, true);
         assert!(en_agy.contains("only a standalone ordinary push"));
+    }
+
+    /// Task-A03-candle790: a headless quiet Antigravity session is told not to work around a
+    /// refused action and to park the task with `alm wait`, naming the action, in the task language.
+    #[test]
+    fn the_headless_rule_says_to_park_a_refused_action() {
+        for (language, word) in [
+            ("zh-CN", "无界面"),
+            ("ja", "画面なし"),
+            ("en", "without its chat screen"),
+        ] {
+            let text = with_antigravity_headless_rule("REQUEST".to_string(), "A01-1", language);
+            assert!(text.starts_with("REQUEST\n\n"));
+            assert!(text.contains(word), "{language}");
+            assert!(text.contains("alm wait A01-1 --on"), "{language}");
+            assert!(text.contains("alm handoff A01-1"), "{language}");
+        }
     }
 }

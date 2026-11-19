@@ -555,13 +555,50 @@ pub fn session_command(
     session_command_with_quiet(id, file, session_id, false, dirs)
 }
 
+/// How a monitored session runs: in normal mode, in quiet mode, or quiet with Antigravity
+/// started without its chat screen (`agy -p`, Task-A03-candle790): there an action that needs
+/// approval is refused at once and the session is told why, instead of waiting on a prompt nobody
+/// sees. The other agents run the same in both quiet kinds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Quiet {
+    No,
+    Yes,
+    Headless,
+}
+
+impl Quiet {
+    pub fn of(quiet: bool, antigravity_headless: bool) -> Quiet {
+        match (quiet, antigravity_headless) {
+            (false, _) => Quiet::No,
+            (true, false) => Quiet::Yes,
+            (true, true) => Quiet::Headless,
+        }
+    }
+    fn on(self) -> bool {
+        self != Quiet::No
+    }
+}
+
+impl From<bool> for Quiet {
+    fn from(quiet: bool) -> Quiet {
+        Quiet::of(quiet, false)
+    }
+}
+
+/// `-i <request>` starts agy's chat screen with the request; `-p <request>` runs it without one
+/// (headless): agy prints its answer when it has finished.
+fn antigravity_prompt_flag(quiet: Quiet) -> &'static str {
+    if quiet == Quiet::Headless { "-p" } else { "-i" }
+}
+
 fn session_command_with_quiet(
     id: &str,
     file: &Path,
     session_id: Option<&str>,
-    quiet: bool,
+    quiet: impl Into<Quiet>,
     dirs: &[PathBuf],
 ) -> Option<String> {
+    let quiet: Quiet = quiet.into();
     let file = shell_quote(&file.display().to_string());
     let request = format!("\"$(cat {file}; rm -f {file})\"");
     match (id, session_id) {
@@ -572,20 +609,21 @@ fn session_command_with_quiet(
         ("codex_cli", _) => Some(format!(
             "codex {CODEX_SANDBOX}{}{}{request}",
             add_dirs(dirs, shell_quote),
-            if quiet {
+            if quiet.on() {
                 codex_quiet_policy()
             } else {
                 String::new()
             }
         )),
         ("antigravity_cli", _) => Some(format!(
-            "agy {}{}-i {request}",
+            "agy {}{}{} {request}",
             add_dirs(dirs, shell_quote),
-            if quiet {
+            if quiet.on() {
                 antigravity_quiet_settings_arg(shell_quote)
             } else {
                 String::new()
-            }
+            },
+            antigravity_prompt_flag(quiet)
         )),
         _ => None,
     }
@@ -615,29 +653,31 @@ fn powershell_session_with_quiet(
     session_id: Option<&str>,
     alm_dir: Option<&Path>,
     config: Option<(&str, &Path)>,
-    quiet: bool,
+    quiet: impl Into<Quiet>,
     dirs: &[PathBuf],
 ) -> String {
+    let quiet: Quiet = quiet.into();
     let file = powershell_quote(&file.display().to_string());
     let session = match (id, session_id) {
         ("claude_cli", Some(s)) => format!("--session-id {} ", powershell_quote(s)),
         ("codex_cli", _) => format!(
             "{CODEX_SANDBOX}{}{}",
             add_dirs(dirs, powershell_quote),
-            if quiet {
+            if quiet.on() {
                 codex_quiet_policy()
             } else {
                 String::new()
             }
         ),
         ("antigravity_cli", _) => format!(
-            "{}{}-i ",
+            "{}{}{} ",
             add_dirs(dirs, powershell_quote),
-            if quiet {
+            if quiet.on() {
                 antigravity_quiet_settings_arg(powershell_quote)
             } else {
                 String::new()
-            }
+            },
+            antigravity_prompt_flag(quiet)
         ),
         _ => String::new(),
     };
@@ -696,7 +736,7 @@ pub fn start_session(
     session_id: Option<&str>,
     alm_dir: Option<&Path>,
     config: Option<(&str, &Path)>,
-    quiet: bool,
+    quiet: Quiet,
     dirs: &[PathBuf],
 ) -> Result<Option<crate::session_tab::SessionTab>, Problem> {
     if !cfg!(any(target_os = "macos", windows)) {
@@ -959,6 +999,49 @@ mod tests {
             )))
             .is_some()
         );
+    }
+
+    /// Task-A03-candle790: a quiet run whose person chose it starts Antigravity without its chat
+    /// screen (`-p`), with the same quiet settings; normal mode and a plain quiet run keep `-i`,
+    /// and the other agents start the same whichever quiet kind it is.
+    #[test]
+    fn a_headless_quiet_antigravity_session_starts_with_p() {
+        let file = Path::new("/tmp/allomos-request-1.txt");
+        let request = "\"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\"";
+        let headless =
+            session_command_with_quiet("antigravity_cli", file, None, Quiet::Headless, &[])
+                .expect("headless Antigravity command");
+        assert!(headless.starts_with("agy --settings '"));
+        assert!(headless.contains(ANTIGRAVITY_PUSH_RULE));
+        assert!(headless.ends_with(&format!(" -p {request}")));
+        let quiet = session_command_with_quiet("antigravity_cli", file, None, Quiet::Yes, &[])
+            .expect("quiet Antigravity command");
+        assert!(quiet.ends_with(&format!(" -i {request}")));
+        assert_eq!(
+            session_command("antigravity_cli", file, None, &[]).as_deref(),
+            Some(format!("agy -i {request}").as_str())
+        );
+        for agent in ["claude_cli", "codex_cli"] {
+            assert_eq!(
+                session_command_with_quiet(agent, file, None, Quiet::Headless, &[]),
+                session_command_with_quiet(agent, file, None, Quiet::Yes, &[])
+            );
+        }
+        let windows = powershell_session_with_quiet(
+            "antigravity_cli",
+            Path::new(r"C:\p"),
+            r"C:\agy\bin\agy.exe",
+            Path::new(r"C:\t\r.txt"),
+            None,
+            None,
+            None,
+            Quiet::Headless,
+            &[],
+        );
+        assert!(windows.ends_with(" -p $request"));
+        assert_eq!(Quiet::of(false, true), Quiet::No);
+        assert_eq!(Quiet::of(true, false), Quiet::Yes);
+        assert_eq!(Quiet::of(true, true), Quiet::Headless);
     }
 
     /// Task-A03-latch882: an Antigravity session adds the taskbag and the taskbag's other project
