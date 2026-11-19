@@ -68,6 +68,8 @@ pub fn monitor_open(app: AppHandle, root: PathBuf) -> Result<(), Problem> {
 /// (Task-A03-wave335); one not listed takes every level. `models` and `efforts`: the model and
 /// reasoning effort each chosen agent's sessions start with (A03-alto709); one not listed starts
 /// with its own setting.
+// A Tauri command: the window passes each argument by name.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn monitor_start(
     root: PathBuf,
