@@ -8,8 +8,8 @@ import type { Task } from "../src/types.ts";
 
 const task = (over: Partial<Task>): Task => ({ id: "A01-x", title: "x", area: "A01", state: "ready", description: "", ...over }) as Task;
 
-test("a done task to check shows its check steps first", () => {
-  assert.deepEqual(paneFocus(task({ state: "done" }), true, false), ["check_steps"]);
+test("a done task to check opens nothing more: its Evidence screen shows the check steps (decision 0029)", () => {
+  assert.deepEqual(paneFocus(task({ state: "done" }), true, false), []);
 });
 
 test("a checked done task shows its description first", () => {

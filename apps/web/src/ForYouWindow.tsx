@@ -11,7 +11,7 @@ import { TaskLanguageProvider, useI18n } from "./i18n";
 import type { ForYouProject, Messenger } from "./messenger";
 import { projectFolder } from "./paths";
 import { askText, askedNow, forYouTitle, nextChoice, riskWord, splitQueue, todoText, waitedText, type QueueRow } from "./queueFlow";
-import { labelNames, withBlocked } from "./stopFlow";
+import { labelNames, toCheck, withBlocked } from "./stopFlow";
 import { lostAfterMinutes } from "./heartbeatFlow";
 import { TaskPane } from "./TaskPane";
 import { isProblem, type NextIds, type Opened, type Task, type TaskHistory } from "./types";
@@ -236,6 +236,13 @@ function ForYouBody({
   const finishedRows = shown.filter((r) => !r.agent_waiting);
   const chosenRow = rows.find((r) => r.task === chosen) ?? null;
   const selected: Task | null = chosen ? (byId.get(chosen) ?? null) : null;
+  const ask = chosenRow && (
+    <>
+      {askText(chosenRow, t)}
+      {chosenRow.todo.includes("approve") && <span className="muted small"> {t("for_you.approve_where")}</span>}
+      {chosenRow.todo.includes("approve_afterwards") && <span className="muted small"> {t("for_you.afterwards_where")}</span>}
+    </>
+  );
 
   return (
     <div className="for-you-layout">
@@ -266,12 +273,11 @@ function ForYouBody({
       <div className="for-you-pane">
         {selected ? (
           <>
-            {chosenRow && (
-            <p className="for-you-ask" role="status">
-              {askText(chosenRow, t)}
-              {chosenRow.todo.includes("approve") && <span className="muted small"> {t("for_you.approve_where")}</span>}
-              {chosenRow.todo.includes("approve_afterwards") && <span className="muted small"> {t("for_you.afterwards_where")}</span>}
-            </p>
+            {/* A task to check says it inside its Evidence screen (decision 0029); others above the pane. */}
+            {ask && !toCheck(selected) && (
+              <p className="for-you-ask" role="status">
+                {ask}
+              </p>
             )}
             <TaskPane
               task={selected}
@@ -301,6 +307,7 @@ function ForYouBody({
               onOpenSession={() => messenger.openAgentSession(root, selected.id)}
               lostAfter={lostAfterMinutes(box?.project)}
               lastChange={opened.last_changed?.[selected.id]}
+              ask={ask}
             />
           </>
         ) : (

@@ -2,11 +2,12 @@
 // The parts named here open at the top of the pane, in this order; everything else (the field
 // table, the description, the handoff note and the history, when not named) stays folded.
 // The check box and the AI decisions box keep their own places at the top: they show whenever the
-// task is to check or to review, so they are not parts here.
+// task is to check (inside the Evidence screen, Task-A01-herb903) or to review, so they are not
+// parts here.
 
 import type { Task } from "./types";
 
-export type FocusPart = "check_steps" | "question" | "blockers" | "handoff" | "description";
+export type FocusPart = "question" | "blockers" | "handoff" | "description";
 
 /** The parts to show first, in order. `toCheck`: a done task waiting for the human check (stopFlow's
  * toCheck); `lost`: the holder of an in-progress task is lost. */
@@ -19,8 +20,9 @@ export function paneFocus(task: Task, toCheck: boolean, lost: boolean): FocusPar
   }
   switch (task.state) {
     case "done":
-      // To check: the steps a person follows. Otherwise the outcome, as the description says it.
-      return toCheck ? ["check_steps"] : ["description"];
+      // To check: the Evidence screen shows everything, the check steps among it (decision 0029),
+      // so nothing more opens. Otherwise the outcome, as the description says it.
+      return toCheck ? [] : ["description"];
     case "waiting":
       // The question the task waits on, then where the work stopped.
       return ["question", ...handoff];
