@@ -12,7 +12,7 @@ use allomos_store::{events, load, plain_path, taskbag_of};
 use serde_json::{Value, json};
 
 use crate::{
-    Cli, Command, Done, approve, blocked_text, classify, decision_lines, effects, exceptions,
+    Cli, Command, Done, approve, blocked_text, check_results, classify, decision_lines, effects, exceptions,
     finished_blockers_text, folders, heartbeat, indent, iteration_heading, links, locate,
     rules_line, stop_lines, task_json_in, task_line, traces_text,
 };
@@ -260,6 +260,10 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 .remove(&task.id)
                 .unwrap_or_default();
             text.push_str(&links::lines(&task_links));
+            let check_results = allomos_store::check_results::by_task(&root)
+                .remove(&task.id)
+                .unwrap_or_default();
+            text.push_str(&check_results::lines(&check_results));
             let withdrawn = allomos_core::approval::withdrawn_notice(&task, &approvals);
             if let Some(r) = withdrawn {
                 text.push_str(&approve::withdrawn_line(
@@ -282,7 +286,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text.push_str(&task.description);
             }
             let mut done = Done::new(
-                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "traces": traces, "ai_decisions": decisions, "approvals": approvals, "classification": classification, "effects": outside_effects, "exceptions": task_exceptions, "links": task_links, "approval_withdrawn": withdrawn.map(|r| &r.approval.id), "taking_over": taking_over }),
+                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "traces": traces, "ai_decisions": decisions, "approvals": approvals, "classification": classification, "effects": outside_effects, "exceptions": task_exceptions, "links": task_links, "check_results": check_results, "approval_withdrawn": withdrawn.map(|r| &r.approval.id), "taking_over": taking_over }),
                 text,
             );
             done.issues = issues;

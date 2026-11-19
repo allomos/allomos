@@ -30,6 +30,7 @@ impl Command {
             | Command::Base { id, .. }
             | Command::Trace { id, .. }
             | Command::Link { id, .. }
+            | Command::CheckResult { id, .. }
             | Command::Label { id, .. }
             | Command::Wait { id, .. }
             | Command::Block { id, .. }
@@ -226,6 +227,7 @@ impl Command {
             Command::Trace { .. } => "trace",
             Command::Traces { .. } => "traces",
             Command::Link { .. } => "link",
+            Command::CheckResult { .. } => "check-result",
             Command::Links { .. } => "links",
             Command::Label { .. } => "label",
             Command::Wait { .. } => "wait",

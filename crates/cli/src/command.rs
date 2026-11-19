@@ -465,6 +465,22 @@ pub(crate) enum Command {
         #[arg(long)]
         remove: bool,
     },
+    /// Record one check's result on a task (decision 0029 § 5): its name as you call it (for
+    /// example "npm test"), pass, fail or not-run, and with --detail one sentence (what ran, why it
+    /// failed or did not run). Record each check you ran or did not run; the same name again
+    /// replaces its result. alm runs no check: it records what you report.
+    CheckResult {
+        id: String,
+        /// The check, as you call it (for example "npm test" or "click through in the app").
+        #[arg(long, value_name = "CHECK")]
+        name: String,
+        /// pass, fail or not-run.
+        #[arg(long, value_name = "RESULT")]
+        result: String,
+        /// One sentence: what ran, or why it failed or did not run.
+        #[arg(long, value_name = "TEXT")]
+        detail: Option<String>,
+    },
     /// The tasks a commit (by its hash, 7 digits or more), branch, PR, run, tag or web address
     /// goes with; with none given, every task's links.
     Links {

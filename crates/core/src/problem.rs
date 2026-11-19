@@ -199,6 +199,10 @@ problems! {
     /// `alm trace` with something that is neither a requirement ID nor a decision number
     /// (Task-A01-fennel617).
     TraceInvalid { reference } => "trace_invalid", "\"{reference}\" is neither a requirement ID nor a decision number. Give a requirement as REQUIREMENTS.md numbers it (for example R77) or a decision by its number (for example 0021).";
+    /// `alm check-result` without the check's name (Task-A01-easel128).
+    CheckNameMissing => "check_name_missing", "Name the check whose result you record: `alm check-result <id> --name \"<check>\" --result pass|fail|not-run`.";
+    /// `alm check-result` with a result that is none of the three (Task-A01-easel128).
+    CheckResultUnknown { result } => "check_result_unknown", "\"{result}\" is not a result. Give one of: pass, fail, not-run.";
     /// A branch name that is not one: empty, with a space, or starting with `-` (Task-A03-22).
     BranchInvalid { name } => "branch_invalid", "\"{name}\" is not a branch name. Give the branch's real name, as your version control tool shows it (in Git: `git branch --show-current`, for example main).";
     /// A warning: `alm add task` or `alm claim` was not told which branch the agent is on, so the
