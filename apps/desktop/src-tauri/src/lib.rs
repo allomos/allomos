@@ -8,6 +8,7 @@ mod agent_commands;
 mod agent_models;
 mod agents;
 mod alm_command;
+mod app_sharing;
 mod audit;
 mod codex_rules;
 mod file_size_settings;
@@ -307,6 +308,9 @@ pub fn run() {
             agent_commands::manual_request,
             agent_commands::build_app,
             agent_commands::build_app_request,
+            app_sharing::app_changes,
+            app_sharing::share_app_changes,
+            app_sharing::share_app_changes_request,
             agent_commands::move_tasks_in,
             agent_commands::move_tasks_in_request,
             agent_commands::translate_taskbag,

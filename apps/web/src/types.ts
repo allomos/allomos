@@ -325,7 +325,16 @@ export interface FolderInfo {
   inspection: Inspection;
 }
 
+export interface AppChanges {
+  count: number;
+  through: string | null;
+  files: string[];
+  by: string[];
+  entries: { event: string; at: string; id: string | null; command: string; fields: string[] }[];
+}
+
 export interface Opened {
+  app_changes?: AppChanges;
   root: string;
   loaded: Loaded;
   /** README-allomos.md was just written next to .allomos/ (only when creating). */

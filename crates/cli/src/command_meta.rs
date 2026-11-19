@@ -63,7 +63,8 @@ impl Command {
             Command::Exceptions { .. } => None,
             Command::Redact { id, .. } => Some(id),
             Command::Classify { id, .. } => Some(id),
-            Command::Init { .. }
+            Command::Shared { .. }
+            | Command::Init { .. }
             | Command::Labels { .. }
             | Command::Project { .. }
             | Command::TaskLanguage { .. }
@@ -185,6 +186,7 @@ impl Command {
 
     pub(super) fn name(&self) -> &'static str {
         match self {
+            Command::Shared { .. } => "shared",
             Command::Init { .. } => "init",
             Command::Confirm { .. } => "confirm",
             Command::Progress { .. } => "progress",

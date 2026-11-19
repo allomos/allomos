@@ -1451,5 +1451,13 @@
   "for_you.waited_minutes": "等了 {n} 分钟",
   "for_you.waited_hours": "等了 {n} 小时",
   "for_you.waited_days": "等了 {n} 天",
-  "for_you.blocks": "挡住 {n} 个任务"
+  "for_you.blocks": "挡住 {n} 个任务",
+  "sharing.count": "{count} 处改动还没共享",
+  "sharing.project": "项目",
+  "sharing.ask": "请代理共享…",
+  "sharing.explain": "代理会以你的名义提交应用里的改动并推送。代理确认已共享之后，这条提示才会消失。",
+  "sharing.request": "共享应用改动的请求",
+  "sharing.asked": "已打开 {agent}。请阅读并发送请求；确认共享之后提示才会消失。",
+  "sharing.asked_paste": "已打开 {agent}。用 {keys} 粘贴、阅读并发送请求；确认共享之后提示才会消失。",
+  "sharing.asked_sent": "已把共享请求发送给 {agent}；确认共享之后提示才会消失。"
 }
