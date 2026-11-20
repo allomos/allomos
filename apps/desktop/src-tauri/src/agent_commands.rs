@@ -535,7 +535,7 @@ pub(crate) async fn proceed_with_agent(
     agent: String,
     taskbag: PathBuf,
     request: String,
-) -> Result<(), Problem> {
+) -> Result<Option<allomos_monitor::session_tab::SessionTab>, Problem> {
     let project = allomos_store::versions::project_folder(&taskbag);
     if !project.is_dir() {
         return Err(Problem::StartupNotAFolder {
@@ -546,7 +546,19 @@ pub(crate) async fn proceed_with_agent(
     let Some(chosen) = found.iter().find(|a| a.id == agent) else {
         return Err(Problem::AgentNotFound { agent });
     };
-    agents::ask(chosen, &project, &taskbag, &request)
+    agents::ask_with_terminal(chosen, &project, &taskbag, &request, true)
+}
+
+/// Return to the exact tab opened by Work on it…, even before the task is claimed.
+#[tauri::command(async)]
+pub(crate) fn focus_launched_terminal(tab: allomos_monitor::session_tab::SessionTab) -> bool {
+    #[cfg(target_os = "macos")]
+    return allomos_monitor::session_tab::focus(&tab);
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = tab;
+        false
+    }
 }
 
 /// **Work on it…** with Manual: `request` as the person copies it (with this Allomos's own `alm`, as

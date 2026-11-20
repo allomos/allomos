@@ -51,6 +51,11 @@ test("choosing a group keeps the tool last chosen in it", () => {
 test("the request is sent at once for Antigravity, pasted for other terminals, typed in for apps", () => {
   assert.equal(requestWay({ id: "antigravity_cli", how: "paste" }), "sent");
   assert.equal(requestWay(agent("codex_cli")), "paste");
+  // Task-A03-marina834: on macOS the app reports the terminal agents as `sent`; Windows still pastes.
+  assert.equal(requestWay({ id: "claude_cli", how: "sent" }), "sent");
+  assert.equal(requestWay({ id: "codex_cli", how: "sent" }), "sent");
+  assert.equal(requestWay({ id: "claude_cli", how: "paste" }), "paste");
+  assert.equal(requestWay({ id: "codex_cli", how: "paste" }), "paste");
   assert.equal(requestWay(agent("claude_cli")), "paste");
   assert.equal(requestWay(agent("claude_app")), "typed");
   assert.equal(requestWay(undefined), "typed");

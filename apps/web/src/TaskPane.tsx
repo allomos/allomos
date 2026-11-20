@@ -85,7 +85,7 @@ export function TaskPane({
   lostAfter,
   lastChange,
   ask,
-  readChanges,
+  reader,
 }: {
   task: Task;
   /** Every task of the taskbag: a blocked task's blockers, and the "Blocked by" picker (decision 0016). */
@@ -137,7 +137,7 @@ export function TaskPane({
   lastChange?: string;
   /** What the person is asked to do, for the Evidence screen of a task to check (decision 0029). */
   ask?: ReactNode;
-  readChanges?: (hashes: string[]) => Promise<import("./evidenceFlow").CodeChanges>; // the Evidence screen's What changed, from git (desktop only)
+  reader?: import("./evidenceFlow").EvidenceReader; // the Evidence screen's What changed (git) and screenshots (desktop only)
 }) {
   const { t, problem } = useI18n();
   const taskT = useTaskT();
@@ -795,7 +795,7 @@ export function TaskPane({
         </button>
       </header>
       {toCheck(task) ? (
-        <EvidenceScreen task={task} ask={ask} onLink={onLink} decisions={(reviewBox || detailsBox) && <>{reviewBox}{detailsBox}</>} actions={checkBox} readChanges={readChanges} />
+        <EvidenceScreen task={task} ask={ask} onLink={onLink} decisions={(reviewBox || detailsBox) && <>{reviewBox}{detailsBox}</>} actions={checkBox} reader={reader} />
       ) : (
         <>{reviewBox}{detailsBox}</>
       )}

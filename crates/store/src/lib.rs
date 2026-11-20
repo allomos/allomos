@@ -61,6 +61,7 @@ pub mod queue;
 mod quota;
 mod readme;
 pub mod redact;
+pub mod reopen;
 mod settings;
 mod setup;
 mod signing;

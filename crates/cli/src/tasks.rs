@@ -230,7 +230,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             })
         }
         Command::Checked {
-            id,
+            ids,
             deployed,
             locally,
             result,
@@ -253,9 +253,30 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             } else {
                 None
             };
-            change(cli, cwd, |bag| {
-                allomos_core::labels::checked(bag, id, which, &given)
-            })
+            let root = locate(cli, cwd)?;
+            let command = cli.command.name();
+            let changed = allomos_store::change_tasks(
+                &root,
+                Actor::alm(cli.holder.as_deref()),
+                lock_wait(),
+                |bag| {
+                    allomos_core::labels::checked_many(bag, ids, which, &given)
+                        .map(|o| (o, command))
+                },
+            )?;
+            let mut text = String::new();
+            for t in &changed.tasks {
+                text.push_str(&format!("{}\n", task_line(t)));
+            }
+            let tasks_json: Vec<_> = changed.tasks.iter().map(task_json).collect();
+            let mut fields = json!({ "taskbag": root, "tasks": tasks_json });
+            if let [one] = changed.tasks.as_slice() {
+                fields["task"] = task_json(one);
+            }
+            let mut done = Done::new(fields, text);
+            done.warnings = changed.warnings;
+            done.issues = changed.issues;
+            Ok(done)
         }
         Command::Recheck { id, reason, steps } => {
             let steps = match steps {
@@ -416,26 +437,37 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             name,
             result,
             detail,
-        } => check_results::record(cli, cwd, id, name, result, detail.as_deref()),
+            screenshot,
+        } => check_results::record(cli, cwd, id, name, result, detail.as_deref(), screenshot),
         Command::Links { reference } => links::list(cli, cwd, reference.as_deref()),
-        Command::Reviewed { id } => {
+        Command::Reviewed { ids } => {
             let root = locate(cli, cwd)?;
-            let d = allomos_store::review_ai_decisions(
+            let many = allomos_store::review_ai_decisions_many(
                 &root,
                 Actor::alm(cli.holder.as_deref()),
                 lock_wait(),
-                id,
+                ids,
             )?;
-            let mut out = format!("{}\n", task_line(&d.task));
-            out.push_str(&format!("Reviewed {} AI decision(s):\n", d.decisions.len()));
-            for x in &d.decisions {
-                out.push_str(&format!("  {}\n", x.text));
+            let mut out = String::new();
+            for d in &many.reviewed {
+                out.push_str(&format!("{}\n", task_line(&d.task)));
+                out.push_str(&format!("Reviewed {} AI decision(s):\n", d.decisions.len()));
+                for x in &d.decisions {
+                    out.push_str(&format!("  {}\n", x.text));
+                }
             }
-            let mut done = Done::new(
-                json!({ "taskbag": root, "task": task_json(&d.task), "reviewed": d.decisions }),
-                out,
-            );
-            done.issues = d.issues;
+            let items: Vec<_> = many
+                .reviewed
+                .iter()
+                .map(|d| json!({ "task": task_json(&d.task), "reviewed": d.decisions }))
+                .collect();
+            let mut fields = json!({ "taskbag": root, "tasks": items });
+            if let [one] = many.reviewed.as_slice() {
+                fields["task"] = task_json(&one.task);
+                fields["reviewed"] = json!(one.decisions);
+            }
+            let mut done = Done::new(fields, out);
+            done.issues = many.issues;
             Ok(done)
         }
         Command::Human {

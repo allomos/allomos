@@ -89,6 +89,14 @@ pub fn record_approval(
     )
 }
 
+/// What [`review_ai_decisions_many`] did (decision 0030 § 3).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ReviewedMany {
+    pub reviewed: Vec<Decided>,
+    /// Problems found in the taskbag's files while loading it.
+    pub issues: Vec<Issue>,
+}
+
 /// Mark task `id`'s AI decisions reviewed (`alm reviewed`, the app's Reviewed button,
 /// Task-A03-19): one `reviewed` event listing each, under the lock. Refused with
 /// `nothing_to_review` when it has none. Overturning one is done by changing the task as usual.
@@ -98,34 +106,77 @@ pub fn review_ai_decisions(
     wait: Duration,
     id: &str,
 ) -> Result<Decided, Problem> {
-    let (lock, bag, issues) = lock_for_change(root, wait)?;
-    let before = ops::find_task(&bag, id)?;
-    let decisions = ai_decisions(root).remove(&before.id).unwrap_or_default();
-    let mut task = before.clone();
-    let had_label = task.remove_label(allomos_core::labels::AI_DECISIONS);
-    heartbeat::along(&mut task, actor.by, now_secs());
-    // A task carrying the label with nothing left in its history is cleared too (decision 0020).
-    // Details alone are nothing to review (decision 0025 § 3); a review lists them with the rest.
-    if !had_label && !decisions.iter().any(|d| d.to_review()) {
-        return Err(Problem::NothingToReview { id: before.id });
-    }
-    let mut changes = if decisions.is_empty() {
-        Vec::new()
-    } else {
-        decision::review(&bag, id, &decisions)?
-    };
-    changes.extend(event::changes(Some(&before), &task, event::TASK_FIELDS));
-    let event = actor.event(decision::REVIEWED, Kind::Task, Some(&task.id), changes);
-    lock.record(&event, |l| {
-        if task != before {
-            l.save_task(&task)?;
-        }
-        Ok(())
+    let mut many = review_ai_decisions_many(root, actor, wait, &[id.to_string()])?;
+    let mut one = many.reviewed.pop().ok_or_else(|| Problem::TaskNotFound {
+        id: id.to_string(),
     })?;
-    Ok(Decided {
-        task,
-        decisions,
-        pending: Vec::new(),
-        issues,
-    })
+    one.issues = many.issues;
+    Ok(one)
+}
+
+/// Mark one or more tasks' AI decisions reviewed atomically (`alm reviewed <id>…`, decision 0030
+/// § 3): every task must exist and have decisions waiting for review, or none is recorded. Each
+/// task gets its own `reviewed` event, the same as reviewing them one by one. Duplicate IDs are
+/// collapsed while keeping order.
+pub fn review_ai_decisions_many(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    ids: &[String],
+) -> Result<ReviewedMany, Problem> {
+    if ids.is_empty() {
+        return Err(Problem::BadUsage {
+            detail: "name at least one task".into(),
+        });
+    }
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
+    let mut unique_ids = Vec::with_capacity(ids.len());
+    for id in ids {
+        let canonical = ops::find_task(&bag, id)?.id;
+        if !unique_ids.contains(&canonical) {
+            unique_ids.push(canonical);
+        }
+    }
+    let mut pending_map = ai_decisions(root);
+    let now = now_secs();
+    let mut prepared = Vec::with_capacity(unique_ids.len());
+    for id in &unique_ids {
+        let before = ops::find_task(&bag, id)?;
+        let decisions = pending_map.remove(&before.id).unwrap_or_default();
+        let mut task = before.clone();
+        let had_label = task.remove_label(allomos_core::labels::AI_DECISIONS);
+        heartbeat::along(&mut task, actor.by, now);
+        // A task carrying the label with nothing left in its history is cleared too (decision 0020).
+        // Details alone are nothing to review (decision 0025 § 3); a review lists them with the rest.
+        if !had_label && !decisions.iter().any(|d| d.to_review()) {
+            return Err(Problem::NothingToReview { id: before.id });
+        }
+        let mut changes = if decisions.is_empty() {
+            Vec::new()
+        } else {
+            decision::review(&bag, &before.id, &decisions)?
+        };
+        changes.extend(event::changes(Some(&before), &task, event::TASK_FIELDS));
+        let event = actor.event(decision::REVIEWED, Kind::Task, Some(&task.id), changes);
+        prepared.push((before, task, decisions, event));
+    }
+    for (_, _, _, event) in &prepared {
+        events::separate_duties(root, &events::as_written(root, event))?;
+    }
+    let mut reviewed = Vec::with_capacity(prepared.len());
+    for (before, task, decisions, event) in prepared {
+        lock.record(&event, |l| {
+            if task != before {
+                l.save_task(&task)?;
+            }
+            Ok(())
+        })?;
+        reviewed.push(Decided {
+            task,
+            decisions,
+            pending: Vec::new(),
+            issues: Vec::new(),
+        });
+    }
+    Ok(ReviewedMany { reviewed, issues })
 }

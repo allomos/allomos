@@ -19,9 +19,11 @@
 // forcing the takeover, with a red warning and a red confirm button.
 
 import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useI18n, useTaskT } from "./i18n";
 import type { Messenger } from "./messenger";
+import type { SessionTab } from "./monitorFlow";
 import { AGENT_KEY, AgentPicker, PASTE_KEYS, useAgents } from "./AgentPicker";
 import { MANUAL, requestWay } from "./agentPickerFlow";
 import { canTakeOver, edited, hasUnpushed, proceedRequest, stopped, takeOverRequest } from "./proceedFlow";
@@ -43,6 +45,7 @@ export function ProceedDialog({
   lastChange,
   working,
   onHandOver,
+  onOpenTask,
   onClose,
 }: {
   messenger: Messenger;
@@ -59,8 +62,9 @@ export function ProceedDialog({
   working: string | null;
   /** Prepare a handoff… instead of taking over (Task-A01-flag101): this dialog closes and that one opens. */
   onHandOver?: () => void;
+  onOpenTask: (id: string) => void;
   /** The dialog closes; `message` says what happened (null: Cancel or Done). */
-  onClose: (message: string | null) => void;
+  onClose: (message: ReactNode) => void;
 }) {
   const { t, rich, problem, language } = useI18n();
   // Take over… (Task-A01-voyage603): a held task, lost or not, worked out when the dialog opens.
@@ -75,7 +79,26 @@ export function ProceedDialog({
   const force = held && way === "force";
   /** The simple form: a held task whose session is asked for a handoff first. */
   const simple = held && !force && !!onHandOver;
-  /** The former worktree on this computer (undefined while it is read, null when it is not here). */
+  /** The tab belongs to this launch, independently of which session the task records later. */
+function TerminalLaunchNotice({ messenger, tab, children }: { messenger: Messenger; tab: SessionTab; children: ReactNode }) {
+  const { t } = useI18n();
+  const [unavailable, setUnavailable] = useState(false);
+
+  const open = async () => {
+    const focused = await messenger.focusLaunchedTerminal(tab).catch(() => false);
+    setUnavailable(!focused);
+  };
+
+  return (
+    <>
+      {children}{" "}
+      <button type="button" onClick={() => void open()}>{t("proceed.open_terminal")}</button>
+      {unavailable && <span className="banner-line" role="alert">{t("proceed.terminal_unavailable")}</span>}
+    </>
+  );
+}
+
+/** The former worktree on this computer (undefined while it is read, null when it is not here). */
   const [former, setFormer] = useState<FormerWorktree | null | undefined>(takeOver && working ? undefined : null);
   useEffect(() => {
     if (!takeOver || !working) return;
@@ -133,14 +156,22 @@ export function ProceedDialog({
         setManual(await messenger.proceedManualRequest(request));
         return;
       }
-      await messenger.proceedWithAgent(agent, root, request);
+      const tab = await messenger.proceedWithAgent(agent, root, request);
       const name = t(AGENT_KEY[agent]);
-      const way = requestWay(tool);
-      if (way === "typed") {
-        onClose(t(takeOver ? "takeover.asked" : ask ? "proceed.asked_stopped" : "proceed.asked", { agent: name, id: task.id }));
-      } else {
-        onClose(t(takeOver ? `takeover.asked_${way}` : ask ? `proceed.asked_stopped_${way}` : `proceed.asked_${way}`, { agent: name, keys: PASTE_KEYS, id: task.id }));
-      }
+      const way = requestWay(agents?.find((a) => a.id === agent) ?? tool);
+      const prefix = takeOver ? "takeover.asked" : ask ? "proceed.asked_stopped" : "proceed.asked";
+      const key = way === "typed" ? prefix : (`${prefix}_${way}` as const);
+      const taskName = (
+        <button type="button" className="link proceed-task-link" onClick={() => onOpenTask(task.id)}>
+          {task.id} {task.title}
+        </button>
+      );
+      const message = rich(key, { agent: name, keys: PASTE_KEYS, id: agent === "claude_cli" ? taskName : task.id });
+      onClose(tab ? (
+        <TerminalLaunchNotice key={`${tab.window}:${tab.tty}`} messenger={messenger} tab={tab}>
+          {message}
+        </TerminalLaunchNotice>
+      ) : message);
     } catch (e) {
       fail(e);
     } finally {

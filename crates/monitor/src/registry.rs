@@ -205,6 +205,8 @@ pub fn held(path: &Path) -> bool {
 pub enum Request {
     /// Check now: let finished blockers' tasks go on, then give free agents the ready tasks.
     Check,
+    /// Retry one task this run gave up; normal dispatch rules still apply.
+    Requeue { id: String },
     /// Start no new session; the run ends once the sessions at work have finished.
     Stop,
     /// Take back a stop while sessions are still at work.

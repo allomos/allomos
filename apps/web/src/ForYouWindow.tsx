@@ -9,11 +9,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TaskLanguageProvider, useI18n } from "./i18n";
 import type { ForYouProject, Messenger } from "./messenger";
+import { evidenceReader } from "./evidenceFlow";
 import { projectFolder } from "./paths";
-import { askText, askedNow, forYouTitle, nextChoice, riskWord, splitQueue, todoText, waitedText, type QueueRow } from "./queueFlow";
+import {
+  askText,
+  askedNow,
+  batchApprovePartition,
+  cannotBatchApproveReason,
+  cannotBatchApproveText,
+  forYouTitle,
+  nextChoice,
+  riskWord,
+  splitQueue,
+  todoText,
+  waitedText,
+  type QueueRow,
+} from "./queueFlow";
 import { labelNames, toCheck, withBlocked } from "./stopFlow";
 import { lostAfterMinutes } from "./heartbeatFlow";
 import { TaskPane } from "./TaskPane";
+import { WhoForm } from "./WhoForm";
 import { isProblem, type NextIds, type Opened, type Task, type TaskHistory } from "./types";
 import type { FolderInfo } from "./folderFlow";
 
@@ -158,7 +173,7 @@ function ForYouBody({
   onChanged: () => Promise<void>;
   onError: (e: unknown) => void;
 }) {
-  const { t } = useI18n();
+  const { t, problem } = useI18n();
   const root = opened.root;
   const box = opened.loaded.taskbag;
   const tasks = box?.tasks ?? [];
@@ -166,6 +181,50 @@ function ForYouBody({
   const { shown, unclassified } = splitQueue(rows);
   const [unfolded, setUnfolded] = useState(false);
   const now = new Date();
+
+  // Selection for batch approval (decision 0030 § 1, 2).
+  const [ticked, setTicked] = useState<Set<string>>(new Set());
+  const [showBatchConfirm, setShowBatchConfirm] = useState(false);
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [batchError, setBatchError] = useState<string | null>(null);
+  const [ownerNameInput, setOwnerNameInput] = useState("");
+
+  // Remove ticked IDs that left the queue.
+  useEffect(() => {
+    setTicked((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (rows.some((r) => r.task === id)) next.add(id);
+      }
+      return next.size === prev.size ? prev : next;
+    });
+  }, [rows]);
+
+  const eligibleRows = rows.filter((r) => cannotBatchApproveReason(r, byId.get(r.task)) === null);
+  const allEligibleTicked = eligibleRows.length > 0 && eligibleRows.every((r) => ticked.has(r.task));
+  const toggleAll = () => {
+    if (allEligibleTicked) setTicked(new Set());
+    else setTicked(new Set(eligibleRows.map((r) => r.task)));
+  };
+
+  const { checkIds, reviewIds, unclassifiedCount } = batchApprovePartition([...ticked], rows);
+  const tickedRows = rows.filter((r) => ticked.has(r.task));
+
+  const handleBatchApprove = async () => {
+    setBatchBusy(true);
+    setBatchError(null);
+    try {
+      await messenger.approveSelected(root, checkIds, reviewIds);
+      setTicked(new Set());
+      setShowBatchConfirm(false);
+      await onChanged();
+    } catch (e) {
+      setBatchError(isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }));
+    } finally {
+      setBatchBusy(false);
+    }
+  };
 
   // What the pane needs besides the task: read once, or again for each task.
   const [ownerName, setOwnerName] = useState<string | null>(null);
@@ -210,8 +269,25 @@ function ForYouBody({
   const row = (r: QueueRow) => {
     const task = byId.get(r.task);
     const waited = waitedText(r.waiting_since, now, t);
+    const cannotReason = cannotBatchApproveReason(r, task);
+    const canBatch = cannotReason === null;
     return (
-      <li key={r.task}>
+      <li key={r.task} className="for-you-item">
+        {canBatch && (
+          <input
+            type="checkbox"
+            className="for-you-checkbox"
+            aria-label={t("for_you.batch.select_row", { id: r.task })}
+            checked={ticked.has(r.task)}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              const next = new Set(ticked);
+              if (e.target.checked) next.add(r.task);
+              else next.delete(r.task);
+              setTicked(next);
+            }}
+          />
+        )}
         <button
           type="button"
           className={`for-you-row${r.task === chosen ? " selected" : ""}`}
@@ -224,6 +300,9 @@ function ForYouBody({
           <span className="for-you-todo">{todoText(r, t)}</span>
           <span className="for-you-facts small">
             <span className={`risk risk-${["high", "medium", "low"].includes(r.risk ?? "") ? r.risk : "none"}`}>{riskWord(r.risk, t)}</span>
+            {cannotReason && (
+              <span className="for-you-cannot-reason muted"> · {cannotBatchApproveText(cannotReason, t)}</span>
+            )}
             {waited && <span className="muted"> · {waited}</span>}
             {r.blocks > 0 && <span className="muted"> · {t("for_you.blocks", { n: r.blocks })}</span>}
           </span>
@@ -247,7 +326,14 @@ function ForYouBody({
   return (
     <div className="for-you-layout">
       <nav className="for-you-list" aria-label={t("for_you.list_aria")}>
-        <p className="for-you-count muted small">{t("for_you.count", { n: rows.length })}</p>
+        <div className="for-you-header">
+          <p className="for-you-count muted small">{t("for_you.count", { n: rows.length })}</p>
+          {eligibleRows.length > 0 && (
+            <button type="button" className="link small for-you-select-all" onClick={toggleAll}>
+              {allEligibleTicked ? t("for_you.batch.clear_selection") : t("for_you.batch.select_all")}
+            </button>
+          )}
+        </div>
         {rows.length === 0 && <p className="muted for-you-none">{t("for_you.nothing")}</p>}
         {waitingRows.length > 0 && (
           <section>
@@ -268,6 +354,27 @@ function ForYouBody({
               </>
             )}
           </section>
+        )}
+        {ticked.size > 0 && (
+          <div className="for-you-batch-bar">
+            <button
+              type="button"
+              className="primary for-you-approve-btn"
+              onClick={() => {
+                setBatchError(null);
+                setShowBatchConfirm(true);
+              }}
+            >
+              {t("for_you.approve_selected", { n: ticked.size })}
+            </button>
+            <button
+              type="button"
+              className="link small"
+              onClick={() => setTicked(new Set())}
+            >
+              {t("for_you.batch.clear_selection")}
+            </button>
+          </div>
         )}
       </nav>
       <div className="for-you-pane">
@@ -308,13 +415,84 @@ function ForYouBody({
               lostAfter={lostAfterMinutes(box?.project)}
               lastChange={opened.last_changed?.[selected.id]}
               ask={ask}
-              readChanges={(hashes) => messenger.codeChanges(root, hashes)}
+              reader={evidenceReader(messenger, root)}
             />
           </>
         ) : (
           <p className="muted for-you-none">{rows.length > 0 ? t("for_you.choose") : ""}</p>
         )}
       </div>
+      {showBatchConfirm && (
+        <div className="overlay" role="presentation">
+          <section className="dialog for-you-batch-dialog" role="dialog" aria-modal="true" aria-labelledby="batch-dialog-title">
+            <h2 id="batch-dialog-title">{t("for_you.batch.dialog_title")}</h2>
+            {!ownerName ? (
+              <div className="for-you-batch-name">
+                <p className="muted small">{t("edit.name_explain")}</p>
+                <WhoForm
+                  name={ownerNameInput}
+                  onName={setOwnerNameInput}
+                  explain="edit.name_explain"
+                  label="who.label_task"
+                  busy={batchBusy}
+                  error={batchError}
+                  onSave={async () => {
+                    if (!ownerNameInput.trim()) return;
+                    await messenger.saveOwnerName(ownerNameInput.trim());
+                    setOwnerName(ownerNameInput.trim());
+                    await handleBatchApprove();
+                  }}
+                  onCancel={() => setShowBatchConfirm(false)}
+                />
+              </div>
+            ) : (
+              <>
+                <p className="muted small">{t("for_you.batch.dialog_intro", { n: ticked.size })}</p>
+                {unclassifiedCount > 0 && (
+                  <p className="banner warn small">{t("for_you.batch.unclassified_note", { n: unclassifiedCount })}</p>
+                )}
+                <div className="dialog-body">
+                  <ul className="for-you-batch-list">
+                    {tickedRows.map((r) => {
+                      const task = byId.get(r.task);
+                      return (
+                        <li key={r.task} className="for-you-batch-item">
+                          <span className="for-you-title">
+                            <span className="id">{r.task}</span> {task?.title ?? ""}
+                          </span>
+                          <span className="for-you-batch-action muted small">{todoText(r, t)}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+                <p className="muted small">{t("for_you.batch.dialog_note")}</p>
+                {batchError && <p className="banner error small">{batchError}</p>}
+                <div className="row">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowBatchConfirm(false);
+                      setBatchError(null);
+                    }}
+                    disabled={batchBusy}
+                  >
+                    {t("for_you.batch.cancel")}
+                  </button>
+                  <button
+                    type="button"
+                    className="primary"
+                    onClick={() => void handleBatchApprove()}
+                    disabled={batchBusy}
+                  >
+                    {batchBusy ? t("for_you.batch.approving") : t("for_you.batch.confirm")}
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+      )}
     </div>
   );
 }

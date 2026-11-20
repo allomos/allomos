@@ -384,6 +384,8 @@ export interface LetGo {
   agent: TerminalAgent;
   /** Who holds it now (the other session's name). */
   holder: string;
+  /** When the run stopped following this session (ms). */
+  at: number;
 }
 
 /** One entry of `monitor_runs` (as `alm monitor status --json` lists it): a run, or a process
@@ -409,7 +411,7 @@ export function readEntry(e: any, active: string | null | undefined): Run | Lost
     letGo: (Array.isArray(r.let_go) ? r.let_go : [])
       .map((l: any): LetGo | null => {
         const agent = asAgent(l?.agent);
-        return agent && typeof l.id === "string" && typeof l.holder === "string" ? { id: l.id, agent, holder: l.holder } : null;
+        return agent && typeof l.id === "string" && typeof l.holder === "string" ? { id: l.id, agent, holder: l.holder, at: num(l.at) } : null;
       })
       .filter((l: LetGo | null): l is LetGo => l !== null),
     offered: agents(r.offered),
@@ -536,7 +538,7 @@ export function lastRunCounts(
   const done = mine.filter((t) => t.state === "done");
   // The done tasks per agent that gave them out (Task-A03-weasel276), in the order they were taken.
   const byAgent = new Map<TerminalAgent, number>();
-  for (const id of last.taken) {
+  for (const id of new Set(last.taken)) {
     const agent = last.takenBy?.[id];
     if (agent && done.some((t) => t.id === id)) byAgent.set(agent, (byAgent.get(agent) ?? 0) + 1);
   }
@@ -613,7 +615,7 @@ export const RUN_STATES: readonly RunState[] = ["stalled", "need_you", "stopping
 
 /** The tasks of `run` waiting on the person (not on someone named): they need you. */
 export function needYou(run: Run, tasks: Task[]): string[] {
-  const parked = run.taken.filter((id) => tasks.some((t) => t.id === id && t.state === "waiting" && !t.who));
+  const parked = [...new Set(run.taken)].filter((id) => tasks.some((t) => t.id === id && t.state === "waiting" && !t.who));
   // A session at a confirmation waits for the person too (Task-A03-candle790).
   const approving = run.working.filter((w) => w.awaitingApproval !== null && !parked.includes(w.id)).map((w) => w.id);
   return [...parked, ...approving];
@@ -660,10 +662,77 @@ export function sessionGroups(run: Run): SessionGroup[] {
   }));
 }
 
-/** The sessions that did not start whose task no session works now, newest first: the panel
- * lists them under the sessions (A03-otter944). */
-export function notStartedShown(run: Run): NotStarted[] {
-  return [...run.notStarted].reverse().filter((n, i, all) => !run.working.some((w) => w.id === n.id) && all.findIndex((m) => m.id === n.id) === i);
+/** What became of a not-started session's task (A03-throne493): this run will give it out again,
+ * gave it up after several failures, or will not give it out again (stopping, blocked, or outside
+ * the run's scope or difficulty range). */
+export type NotStartedState = "again" | "given_up" | "not_again";
+
+const parseUtc = (stamp: string | null | undefined): number | null => {
+  if (!stamp) return null;
+  const ms = new Date(stamp.replace(/T(\d\d:\d\d)Z$/, "T$1:00Z")).getTime();
+  return Number.isNaN(ms) ? null : ms;
+};
+
+/** Whether `task` is in progress with a holder whose heartbeat has passed the lost limit and has
+ * no busy window running (mirrors `heartbeatFlow.ts` and `crates/core/src/heartbeat.rs`). */
+function isLostTask(task: Task, now: number, lostAfterMinutes = 30): boolean {
+  if (task.state !== "in_progress" || !task.holder) return false;
+  const mine = task.heartbeat && task.heartbeat.by === task.holder ? task.heartbeat : null;
+  const at = parseUtc(mine?.at);
+  const until = parseUtc(mine?.busy_until);
+  if (until !== null && until > now) return false;
+  const since = at !== null || until !== null ? Math.max(at ?? -Infinity, until ?? -Infinity) : null;
+  return since !== null && now - since > lostAfterMinutes * 60_000;
+}
+
+function isDispatchable(task: Task, now: number, lostAfterMinutes = 30): boolean {
+  return (task.state === "ready" && !task.holder) || isLostTask(task, now, lostAfterMinutes);
+}
+
+function willDispatchAgain(run: Run, task: Task): boolean {
+  if (run.stopping) return false;
+  if (run.scope.kind === "iteration" && task.iteration !== run.scope.id) return false;
+  if ((task.open_blockers?.length ?? 0) > 0) return false;
+  const d = task.difficulty ?? 3;
+  return run.agents.some((a) => {
+    const l = levelsOf(run, a);
+    return d >= l.low && d <= l.high;
+  });
+}
+
+/** The sessions that did not start whose task is still open to be given out (ready and unheld, or
+ * lost) and not worked by a session of this run now, newest first, each task once (A03-otter944,
+ * A03-throne493). */
+export function notStartedShown(
+  run: Run,
+  tasks: Task[],
+  now: number,
+  lostAfterMinutes = 30,
+): { item: NotStarted; state: NotStartedState }[] {
+  return [...run.notStarted]
+    .reverse()
+    .filter((n, i, all) => !run.working.some((w) => w.id === n.id) && all.findIndex((m) => m.id === n.id) === i)
+    .flatMap((item) => {
+      const task = tasks.find((t) => t.id === item.id);
+      if (!task || !isDispatchable(task, now, lostAfterMinutes)) return [];
+      const state: NotStartedState = run.givenUp.includes(item.id)
+        ? "given_up"
+        : willDispatchAgain(run, task)
+          ? "again"
+          : "not_again";
+      return [{ item, state }];
+    });
+}
+
+/** A local time as the panel shows it: `HH:MM` on the same local day as `now`, otherwise
+ * `YYYY-MM-DD HH:MM` so records from an earlier day are never mistaken for today (A03-throne493). */
+export function dayTimeText(ms: number, now: number): string {
+  const d = new Date(ms);
+  const cur = new Date(now);
+  const p = (n: number) => String(n).padStart(2, "0");
+  const clock = `${p(d.getHours())}:${p(d.getMinutes())}`;
+  const sameDay = d.getFullYear() === cur.getFullYear() && d.getMonth() === cur.getMonth() && d.getDate() === cur.getDate();
+  return sameDay ? clock : `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${clock}`;
 }
 
 /** What became of a lost session's task (A03-husky861): a new session of the run works it now,
@@ -681,6 +750,22 @@ export function lostShown(run: Run): { lost: LostSession; state: LostState }[] {
       lost,
       state: run.givenUp.includes(lost.id) ? "given_up" : run.working.some((w) => w.id === lost.id) ? "taken_over" : "waiting",
     }));
+}
+
+/** Where a stopped task's one Requeue button goes (A03-gadget373): on its row under Lost
+ * sessions, else on its row under Did not start, else (no row lists it) on a line of its own. */
+export type RequeuePlace = "lost" | "not_started" | "own";
+
+export function requeuePlace(
+  run: Run,
+  id: string,
+  tasks: Task[],
+  now: number,
+  lostAfterMinutes = 30,
+): RequeuePlace {
+  if (run.lost.some((l) => l.id === id)) return "lost";
+  if (notStartedShown(run, tasks, now, lostAfterMinutes).some(({ item }) => item.id === id)) return "not_started";
+  return "own";
 }
 
 /** Whether the sessions list is grouped by agent: more than one agent, or one that may have

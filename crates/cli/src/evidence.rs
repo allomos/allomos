@@ -103,7 +103,7 @@ pub(crate) fn show(cli: &Cli, cwd: &Path, id: &str) -> Result<Done, Problem> {
                     "    none recorded by the agent: see the Evidence section of the description (`alm show <id>`)\n"
                         .replace("<id>", &task.id)
                 } else {
-                    crate::check_results::lines(&ev.check_results)
+                    crate::check_results::lines(&task.id, &ev.check_results)
                         .lines()
                         .skip(1)
                         .map(|l| format!("  {l}\n"))

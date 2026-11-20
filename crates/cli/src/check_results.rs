@@ -1,7 +1,8 @@
 //! `alm check-result` (Task-A01-easel128, decision 0029 § 5): one check's result on a task, as a
-//! record in its history, and the lines `alm show` lists them with, failed and not run first.
+//! record in its history, and the lines `alm show` lists them with, failed and not run first. A
+//! failed check may bring screenshots (Task-A01-fondue470, § 6), copied into the taskbag.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use allomos_core::Problem;
 use allomos_core::check_result::Recorded;
@@ -18,8 +19,10 @@ pub(crate) fn record(
     name: &str,
     result: &str,
     detail: Option<&str>,
+    screenshots: &[PathBuf],
 ) -> Result<Done, Problem> {
     let root = locate(cli, cwd)?;
+    let screenshots: Vec<PathBuf> = screenshots.iter().map(|p| cwd.join(p)).collect();
     let c = check_results::record(
         &root,
         Actor::alm(cli.holder.as_deref()),
@@ -28,6 +31,7 @@ pub(crate) fn record(
         name,
         result,
         detail,
+        &screenshots,
     )?;
     let mut out = format!("{}\n", task_line(&c.task));
     let what = if c.changed {
@@ -36,7 +40,7 @@ pub(crate) fn record(
         "already recorded so; nothing changed"
     };
     out.push_str(&format!("{}: {} {what}.\n", c.check.name, c.check.result));
-    out.push_str(&lines(&c.results));
+    out.push_str(&lines(&c.task.id, &c.results));
     // alm tells; the agent checks (AGENTS.md): it runs no check and judges none.
     out.push_str(
         "Fact: alm records what you report; it runs no check. Record each check you ran or did not run; the same name again replaces its result.\n",
@@ -51,7 +55,7 @@ pub(crate) fn record(
 
 /// The lines `alm show` and `alm check-result` list a task's results with: failed, then not run,
 /// then passed. Empty when it has none.
-pub(crate) fn lines(results: &[Recorded]) -> String {
+pub(crate) fn lines(task: &str, results: &[Recorded]) -> String {
     if results.is_empty() {
         return String::new();
     }
@@ -68,6 +72,12 @@ pub(crate) fn lines(results: &[Recorded]) -> String {
             out.push_str(&format!(": {d}"));
         }
         out.push('\n');
+        for s in &r.check.screenshots {
+            out.push_str(&format!(
+                "           screenshot: tasks/{task}/{}/{s}\n",
+                allomos_core::check_result::EVIDENCE_DIR
+            ));
+        }
     }
     out
 }

@@ -80,9 +80,11 @@ export function valueText(field: string, value: unknown, t: T, taskT: T = t): st
   if (field === "link" && typeof value === "object") return linkText(value as Pick<LinkRecord, "kind" | "ref">, t);
   // A test result (Task-A01-easel128): the check's name and its result in words.
   if (field === "check_result" && typeof value === "object" && "name" in value) {
-    const r = value as { name: unknown; result?: unknown };
+    const r = value as { name: unknown; result?: unknown; screenshots?: unknown };
     const key = resultKey(String(r.result ?? ""));
-    return `${String(r.name)}: ${key ? t(key) : String(r.result ?? "")}`;
+    // A failed check's screenshots (Task-A01-fondue470): how many, after the result.
+    const shots = Array.isArray(r.screenshots) && r.screenshots.length ? ` (${t("pane.check_result_shots", { n: r.screenshots.length })})` : "";
+    return `${String(r.name)}: ${key ? t(key) : String(r.result ?? "")}${shots}`;
   }
   // A human check (Task-A01-table778): its result, where, who and the person's words.
   if (field === "human_check" && typeof value === "object") return humanCheckText(value as HumanCheck, t);

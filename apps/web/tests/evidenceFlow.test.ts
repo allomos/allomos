@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { changeTotals, codeLinks, commitSubject, evidenceParts, isEvidenceHeading, resultKey } from "../src/evidenceFlow.ts";
+import { changeTotals, codeLinks, commitSubject, evidenceParts, evidenceReader, isEvidenceHeading, resultKey, screenshotType } from "../src/evidenceFlow.ts";
 import { changeLine } from "../src/historyFlow.ts";
 import { decorated } from "../src/stopFlow.ts";
 import type { Opened, Task } from "../src/types.ts";
@@ -77,4 +77,28 @@ test("the history shows a test result as its check and result in words", () => {
   const t = (key: string) => ({ "pane.check_result": "Test result", "evidence.result_fail": "Failed", "evidence.result_pass": "Passed" })[key] ?? key;
   const line = changeLine({ field: "check_result", from: { name: "npm test", result: "fail" }, to: { name: "npm test", result: "pass" } }, t as never);
   assert.equal(line, "Test result: npm test: Failed → npm test: Passed");
+});
+
+test("a failed check's screenshots: the picture type by name, the reader per taskbag, the count in the history (Task-A01-fondue470)", async () => {
+  assert.equal(screenshotType("login.png"), "image/png");
+  assert.equal(screenshotType("crash.jpg"), "image/jpeg");
+  assert.equal(screenshotType("CRASH.JPEG"), "image/jpeg");
+  assert.equal(screenshotType("a.webp"), "image/webp");
+
+  const asked: string[] = [];
+  const reader = evidenceReader(
+    {
+      codeChanges: async (root, hashes) => (asked.push(`${root}:${hashes.join(",")}`), { commits: [], files: [] }),
+      evidenceScreenshot: async (root, task, file) => (asked.push(`${root}:${task}/${file}`), new ArrayBuffer(1)),
+    },
+    "/bag",
+  );
+  await reader.changes(["abc1234"]);
+  assert.equal((await reader.screenshot("A01-x", "a.png")).byteLength, 1);
+  assert.deepEqual(asked, ["/bag:abc1234", "/bag:A01-x/a.png"]);
+
+  const t = (key: string, p?: Record<string, string | number>) =>
+    ({ "evidence.result_fail": "Failed", "pane.check_result_shots": `${p?.n} screenshot(s)` })[key] ?? key;
+  const line = changeLine({ field: "check_result", to: { name: "e2e", result: "fail", screenshots: ["a.png", "b.png"] } }, t as never);
+  assert.match(line, /e2e: Failed \(2 screenshot\(s\)\)/);
 });

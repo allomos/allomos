@@ -12,10 +12,13 @@ import type { Messenger } from "./messenger";
 import type { Agent } from "./types";
 import { baseAgent } from "./monitorFlow";
 import { labelOf } from "./agentAccounts";
-import { MANUAL, chooseGroup, firstChoice, foundGroups, groupOf } from "./agentPickerFlow";
+import { MANUAL, chooseGroup, firstChoice, foundGroups, groupOf, requestWay } from "./agentPickerFlow";
 import type { Choice } from "./agentPickerFlow";
 import { offer as offerFor, offered } from "./updateTaskbagFlow";
 import type { LastUsed, Offer } from "./updateTaskbagFlow";
+
+/** How the chosen tool will open, by how the request reaches it. */
+const HOW_KEY = { typed: "agents.how_link", sent: "agents.how_sent", paste: "agents.how_paste" } as const;
 
 export const AGENT_KEY: Record<Agent["id"], Key> = {
   claude_cli: "agents.claude_cli",
@@ -171,14 +174,14 @@ export function AgentPicker({
                       {/* How it will open: only for the chosen tool (owner, 2026-10-12). */}
                       {picked && (
                         <span className="muted">
-                          — {how?.[a.id] ?? t(a.how === "link" ? "agents.how_link" : a.id === "antigravity_cli" ? "agents.how_sent" : "agents.how_paste")} ({a.found})
+                          — {how?.[a.id] ?? t(HOW_KEY[requestWay(a)], { agent: t(AGENT_KEY[a.id]) })} ({a.found})
                         </span>
                       )}
                       {why && <span className="muted small hint">{why}</span>}
                       {/* The Claude app asks once per folder; cancelling it starts the session in no folder. */}
                       {a.id === "claude_app" && !why && <span className="muted small hint">{t("agents.claude_app_trust")}</span>}
                       {/* The chosen tool takes the request from the clipboard: say how, right here (Antigravity's agy sends it itself). */}
-                      {picked && a.how === "paste" && a.id !== "antigravity_cli" && !how?.[a.id] && (
+                      {picked && requestWay(a) === "paste" && !how?.[a.id] && (
                         <span className="small hint paste-tip">{t("agents.paste_tip", { keys: PASTE_KEYS })}</span>
                       )}
                     </label>

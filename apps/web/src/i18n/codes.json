@@ -344,6 +344,26 @@
   "retention_invalid": [
     "value"
   ],
+  "screenshot_needs_fail": [
+    "result"
+  ],
+  "screenshot_not_image": [
+    "file"
+  ],
+  "screenshot_too_large": [
+    "file",
+    "size"
+  ],
+  "screenshot_unreadable": [
+    "file",
+    "detail"
+  ],
+  "screenshots_full": [
+    "id",
+    "count",
+    "have",
+    "room"
+  ],
   "second_active_iteration": [
     "id",
     "active"

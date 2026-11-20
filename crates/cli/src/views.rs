@@ -14,7 +14,7 @@ use serde_json::{Value, json};
 use crate::{
     Cli, Command, Done, approve, blocked_text, check_results, classify, decision_lines, effects,
     exceptions, finished_blockers_text, folders, heartbeat, indent, iteration_heading, links,
-    locate, rules_line, stop_lines, task_json_in, task_line, traces_text,
+    locate, reopen_lines, rules_line, stop_lines, task_json_in, task_line, traces_text,
 };
 
 /// Runs the commands this module holds; `execute` in `lib.rs` sends only those here.
@@ -181,7 +181,8 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 .map(|h| heartbeat::heartbeat_line(h, allomos_store::now_secs()));
             let doing_text = allomos_core::heartbeat::doing(&task)
                 .map(|(w, at)| heartbeat::doing_line(w, at, allomos_store::now_secs()));
-            let fields = [
+            let reopen_reasons = allomos_store::reopen::active_for(&root, &task);
+            let fields_before_reopen = [
                 ("id", Some(task.id.as_str())),
                 ("title", Some(task.title.as_str())),
                 ("area", Some(task.area.as_str())),
@@ -197,12 +198,20 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 ("waiting for", task.who.as_deref()),
                 ("blockers", blocked.as_deref()),
                 ("next dependency", task.next_dependency.as_deref()),
+            ];
+            let fields_after_reopen = [
                 ("handoff note", task.handoff_note.as_deref()),
                 ("not human-checked", task.without_human_check.as_deref()),
             ];
             // For `alm title` / `alm describe --expected-version` (Task-A01-57).
             let version = ops::task_version(&task);
-            for (name, value) in fields {
+            for (name, value) in fields_before_reopen {
+                if let Some(v) = value {
+                    text.push_str(&format!("{name}: {v}\n"));
+                }
+            }
+            text.push_str(&reopen_lines(&reopen_reasons, ""));
+            for (name, value) in fields_after_reopen {
                 if let Some(v) = value {
                     text.push_str(&format!("{name}: {v}\n"));
                 }
@@ -264,7 +273,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             let check_results = allomos_store::check_results::by_task(&root)
                 .remove(&task.id)
                 .unwrap_or_default();
-            text.push_str(&check_results::lines(&check_results));
+            text.push_str(&check_results::lines(&task.id, &check_results));
             let withdrawn = allomos_core::approval::withdrawn_notice(&task, &approvals);
             if let Some(r) = withdrawn {
                 text.push_str(&approve::withdrawn_line(
@@ -287,7 +296,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 text.push_str(&task.description);
             }
             let mut done = Done::new(
-                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "branches": branches, "traces": traces, "ai_decisions": decisions, "approvals": approvals, "classification": classification, "effects": outside_effects, "exceptions": task_exceptions, "links": task_links, "check_results": check_results, "approval_withdrawn": withdrawn.map(|r| &r.approval.id), "taking_over": taking_over }),
+                json!({ "taskbag": root, "task": task_json_in(&bag, &task), "reopen_reasons": reopen_reasons, "branches": branches, "traces": traces, "ai_decisions": decisions, "approvals": approvals, "classification": classification, "effects": outside_effects, "exceptions": task_exceptions, "links": task_links, "check_results": check_results, "approval_withdrawn": withdrawn.map(|r| &r.approval.id), "taking_over": taking_over }),
                 text,
             );
             done.issues = issues;
@@ -326,8 +335,11 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         } => {
             let root = locate(cli, cwd)?;
             let (bag, issues) = taskbag_of(&root, load(&root))?;
-            // `alm` lists; the agent chooses (Task-A03-14).
+            // `alm` lists; the agent chooses (Task-A03-14). Reopened tasks come ahead of other
+            // ready tasks in the same iteration (decision 0030 § 6).
+            let reopened = allomos_store::reopen::by_task(&root);
             let mut tasks = ops::next(&bag, iteration.as_deref())?;
+            allomos_core::reopen::prioritize_reopened(&mut tasks, &bag, &reopened);
             // Run inside a project folder: only its tasks, without those that have no folder
             // (approver, 2026-10-25; Task-A01-dime494).
             let here = (!*all_folders)
@@ -411,13 +423,19 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 if let Some(n) = &t.next_dependency {
                     text.push_str(&format!("  next dependency: {n}\n"));
                 }
+                let reasons = allomos_core::reopen::active_for(t, &reopened);
+                text.push_str(&reopen_lines(reasons, "  "));
                 if let Some(note) = &t.handoff_note {
                     text.push_str(&format!("  handoff note: {note}\n"));
                 }
                 if let Some(line) = finished_blockers_text(&bag, t) {
                     text.push_str(&format!("  {line}: {READ_BLOCKERS_FIRST}.\n"));
                 }
-                listed.push(task_json_in(&bag, t));
+                let mut item = task_json_in(&bag, t);
+                if !reasons.is_empty() {
+                    item["reopen_reasons"] = json!(reasons);
+                }
+                listed.push(item);
             }
             if !tasks.is_empty() {
                 text.push('\n');

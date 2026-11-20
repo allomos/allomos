@@ -355,6 +355,20 @@ fn busy(tab: &SessionTab) -> Option<bool> {
     }
 }
 
+/// Bring the recorded tab to the front without starting another shell or sending it input.
+#[cfg(target_os = "macos")]
+pub fn focus(tab: &SessionTab) -> bool {
+    if !plain_tty(&tab.tty) {
+        return false;
+    }
+    let script = format!(
+        "tell application \"Terminal\"\nset t to {}\nset w to window id {}\nset selected tab of w to t\nset miniaturized of w to false\nset frontmost of w to true\nactivate\nend tell",
+        tab_ref(tab),
+        tab.window,
+    );
+    osascript(&script).is_some()
+}
+
 /// What the tab shows now (Terminal's `contents`), to read why a session did not start
 /// (A03-otter944); none when the tab is gone or this is not macOS.
 pub fn text_of(tab: &SessionTab) -> Option<String> {

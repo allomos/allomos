@@ -152,9 +152,9 @@ pub struct Run {
     pub every: u32,
     /// When it started (ms).
     pub started: i64,
-    /// The tasks it started a session for, in order.
+    /// The tasks it started a session for, in order. A task may be dispatched more than once.
     pub taken: Vec<String>,
-    /// The agent each of those tasks was given to (task ID → agent ID).
+    /// The latest agent each of those tasks was given to (task ID → agent ID).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub taken_by: BTreeMap<String, String>,
     /// The sessions working a task now.
@@ -173,7 +173,7 @@ pub struct Run {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unreadable: Option<String>,
     /// The tasks it let go because another session holds them, the latest [`LET_GO_KEPT`]
-    /// (A03-cart761). They stay in `taken`, so the run does not start a session for them again.
+    /// (A03-cart761). They stay in `taken` for the panel.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub let_go: Vec<LetGo>,
     /// The agents given no session for now, and why (agent ID → pause; A03-otter944): their
@@ -305,8 +305,27 @@ impl Run {
         }
     }
 
+    /// Restore only this task's retry allowance. Repeated requests are harmless, even after
+    /// dispatch: only a task still given up can be reset. `share` checks its current eligibility.
+    pub fn requeue(&mut self, id: &str) -> bool {
+        if !self.given_up.iter().any(|g| g == id) {
+            return false;
+        }
+        self.given_up.retain(|g| g != id);
+        self.failures.remove(id);
+        self.checked = 0;
+        true
+    }
+
     /// One more failure of `id`'s sessions; at [`MAX_FAILURES`] the task is given up.
     fn failed(&mut self, id: &str) {
+        // Stop counting this attempt in the panel, keeping any earlier dispatches.
+        if let Some(index) = self.taken.iter().rposition(|taken| taken == id) {
+            self.taken.remove(index);
+        }
+        if !self.taken.iter().any(|taken| taken == id) {
+            self.taken_by.remove(id);
+        }
         let n = self.failures.entry(id.to_string()).or_insert(0);
         *n += 1;
         if *n >= MAX_FAILURES && !self.given_up.iter().any(|g| g == id) {
@@ -316,8 +335,8 @@ impl Run {
 
     /// The sessions whose task went lost while they held it (A03-husky861): the same test as
     /// `alm next` ([`heartbeat::lost`], the project's `lost_after_secs`). They leave the sessions at
-    /// work, which frees their slots, and their tasks leave the taken ones, so the next share
-    /// offers them first; returned in the order started. Nothing is done to the sessions.
+    /// work, which frees their slots, so the next share offers their tasks first (unless given
+    /// up); returned in the order started. Nothing is done to the sessions.
     pub fn lost_ones(&mut self, tasks: &[Task], lost_after_secs: i64, now: i64) -> Vec<Working> {
         let (gone, kept): (Vec<Working>, Vec<Working>) = self.working.drain(..).partition(|w| {
             tasks.iter().find(|t| t.id == w.id).is_some_and(|t| {
@@ -331,8 +350,6 @@ impl Run {
         });
         self.working = kept;
         for w in &gone {
-            self.taken.retain(|id| id != &w.id);
-            self.taken_by.remove(&w.id);
             self.failed(&w.id);
         }
         gone
@@ -417,8 +434,7 @@ impl Run {
     }
 
     /// Which tasks the run takes from the next check on (A03-yolk481). The sessions at work
-    /// finish their tasks; a task the run already took is not given again. An iteration with no
-    /// ID is ignored.
+    /// finish their tasks. An iteration with no ID is ignored.
     pub fn set_scope(&mut self, scope: Scope) {
         if matches!(&scope, Scope::Iteration { id } if id.trim().is_empty()) {
             return;
@@ -495,14 +511,20 @@ impl Run {
         if self.let_go.len() > LET_GO_KEPT {
             self.let_go.drain(..self.let_go.len() - LET_GO_KEPT);
         }
+        let now_secs = now.div_euclid(1000);
+        self.not_started.retain(|n| {
+            tasks
+                .iter()
+                .any(|t| t.id == n.id && can_dispatch_again(t, now_secs, lost_after_secs))
+        });
         finished
     }
 
     /// The sessions that did not start (A03-otter944): started [`NOT_STARTED_MS`] ago or more and
     /// their task never claimed by them: still ready and held by no one, or still held by the
     /// former holder it had when the session was started (A03-husky861). They are taken off the
-    /// sessions at work, and their tasks off the taken ones, so they are given out again (until
-    /// [`MAX_FAILURES`]); returned in the order started.
+    /// sessions at work, freeing them for another attempt (until [`MAX_FAILURES`]); returned in
+    /// the order started.
     pub fn unclaimed(&mut self, tasks: &[Task], now: i64) -> Vec<Working> {
         let (gone, kept): (Vec<Working>, Vec<Working>) = self.working.drain(..).partition(|w| {
             let unclaimed = tasks.iter().any(|t| {
@@ -513,8 +535,6 @@ impl Run {
         });
         self.working = kept;
         for w in &gone {
-            self.taken.retain(|id| id != &w.id);
-            self.taken_by.remove(&w.id);
             self.failed(&w.id);
         }
         gone
@@ -571,12 +591,22 @@ impl Run {
 
     /// One check's share-out: each free session slot, in the run's order, gets the first task in
     /// its agent's difficulty range: first the lost tasks in the scope (A03-husky861: a session
-    /// went quiet holding them, decision 0022), then the ready ones this run has not taken yet; a
-    /// slot with no such task gets none (see [`Run::unfilled`]). A lost task is offered even when
-    /// this run took it before; only one a session of the run works now, or one given up
-    /// ([`MAX_FAILURES`]), is not. Every session claims its task first, so two sessions never work
-    /// the same one.
+    /// went quiet holding them, decision 0022), then the currently ready ones (reopened tasks
+    /// first within their iteration, decision 0030 § 6). Dispatch history
+    /// does not affect eligibility. A task being followed, including a session waiting to claim
+    /// it, or a task given up ([`MAX_FAILURES`]), is excluded.
     pub fn share(&self, bag: &Taskbag, now_secs: i64) -> Vec<(String, Task)> {
+        self.share_with_reopened(bag, now_secs, &std::collections::BTreeMap::new())
+    }
+
+    /// [`share`] with reopen reasons from the taskbag's history, so reopened ready tasks are
+    /// dispatched ahead of other ready tasks in the same iteration (decision 0030 § 6).
+    pub fn share_with_reopened(
+        &self,
+        bag: &Taskbag,
+        now_secs: i64,
+        reopened: &std::collections::BTreeMap<String, Vec<allomos_core::reopen::ReopenReason>>,
+    ) -> Vec<(String, Task)> {
         let iteration = match &self.scope {
             Scope::All => None,
             Scope::Iteration { id } => Some(id.as_str()),
@@ -593,8 +623,10 @@ impl Run {
                     && heartbeat::lost(t, now_secs, lost_after, None).is_some()
             })
             .collect();
-        for t in ops::next(bag, iteration).unwrap_or_default() {
-            if !self.taken.contains(&t.id) && !left_out(t) && !ready.iter().any(|r| r.id == t.id) {
+        let mut next = ops::next(bag, iteration).unwrap_or_default();
+        allomos_core::reopen::prioritize_reopened(&mut next, bag, reopened);
+        for t in next {
+            if !left_out(t) && !ready.iter().any(|r| r.id == t.id) {
                 ready.push(t);
             }
         }
@@ -641,6 +673,7 @@ impl Run {
         tab: Option<SessionTab>,
         now: i64,
     ) {
+        self.not_started.retain(|n| n.id != task.id);
         self.taken.push(task.id.clone());
         self.taken_by.insert(task.id.clone(), agent.to_string());
         self.working.push(Working {
@@ -682,6 +715,13 @@ impl Run {
         w.awaiting_approval = since;
         began
     }
+}
+
+/// Whether `task` is still open for a monitor to give out again: ready and held by no one, or
+/// in progress with a lost holder (A03-throne493).
+fn can_dispatch_again(task: &Task, now_secs: i64, lost_after_secs: i64) -> bool {
+    (task.state == State::Ready && task.holder.is_none())
+        || heartbeat::lost(task, now_secs, lost_after_secs, None).is_some()
 }
 
 /// What of a task its session changes as it works it.
@@ -955,7 +995,7 @@ mod tests {
 
     /// A03-cart761 (the approver's screenshot): the Claude Code session never claimed its task;
     /// a Codex session claims it. The run lets it go at the next check: the row is gone, the
-    /// slot is free, the reason is noted, and the task is not given to this run again.
+    /// slot is free, and the reason is noted.
     #[test]
     fn a_task_another_session_claims_is_let_go_and_its_slot_freed() {
         let mut r = run(&["claude_cli"]);
@@ -1004,9 +1044,9 @@ mod tests {
             noted,
             [("A01-1", "codex-a01-1", 30), ("A01-2", "codex-a01-2", 30)]
         );
-        // Still taken: not given to this run again while ready; once lost, a new session takes
-        // it over (A03-husky861).
-        assert!(r.share(&bag_of(ready.to_vec()), 0).is_empty());
+        // While the other sessions hold them, they are not offered. Once lost, a new session
+        // takes over (A03-husky861).
+        assert!(r.share(&bag_of(tasks.to_vec()), 0).is_empty());
         let lost = bag_of(vec![held_since(
             "A01-1",
             "codex-a01-1",
@@ -1277,6 +1317,47 @@ mod tests {
     fn a_new_run_checks_at_once() {
         let r = run(&["claude_cli"]);
         assert_eq!(r.next_check(), 1_000_000);
+    }
+
+    #[test]
+    fn a_reopened_task_is_shared_again_without_duplicating_the_unclaimed_session() {
+        let agent = "codex_cli";
+        let id = "A01-1";
+        let mut r = run(&[agent]);
+        r.set_sessions(agent, 2);
+        r.set_difficulty(agent, "2");
+        r.set_scope(Scope::Iteration { id: "I-1".into() });
+        let mut ready = leveled(id, 2);
+        ready.iteration = Some("I-1".into());
+        let mut bag = bag_of(vec![ready]);
+        bag.iterations.push(
+            serde_json::from_value(serde_json::json!({ "id": "I-1", "name": "First", "order": 1 }))
+                .unwrap(),
+        );
+
+        let first = r.share(&bag, 1000);
+        assert_eq!(first.len(), 1);
+        r.take(agent, &first[0].1, Some("first".into()), None, 1_000_000);
+        bag.tasks[0].state = State::Done;
+        assert_eq!(r.follow(&bag.tasks, LOST, 1_001_000).len(), 1);
+        assert!(r.share(&bag, 1001).is_empty());
+        bag.tasks[0] = ops::reopen(&bag, id, "more work").unwrap().task;
+
+        // This state was already saved by older monitors: an old dispatch and no active session.
+        let saved = serde_json::to_string(&r).unwrap();
+        let restored: Run = serde_json::from_str(&saved).unwrap();
+        for mut current in [r, restored] {
+            assert_eq!(current.taken, [id]);
+            let shares = current.share(&bag, 1002);
+            assert_eq!(shares.len(), 1);
+            assert_eq!(shares[0].1.id, id);
+            current.take(agent, &shares[0].1, Some("second".into()), None, 1_002_000);
+            assert_eq!(current.taken, [id, id]);
+            assert_eq!(current.free_agents(), [agent]);
+            assert!(current.follow(&bag.tasks, LOST, 1_003_000).is_empty());
+            assert!(current.share(&bag, 1003).is_empty());
+            assert_eq!(current.working[0].session_id.as_deref(), Some("second"));
+        }
     }
 
     #[test]
@@ -1914,5 +1995,183 @@ mod tests {
         }
         let back: Run = serde_json::from_value(v).unwrap();
         assert_eq!(back, r);
+    }
+
+    #[test]
+    fn not_started_is_cleared_when_re_dispatched_and_done() {
+        let mut r = run(&["codex_cli"]);
+        let t = leveled("A01-iris713", 3);
+        let bag = bag_of(vec![t.clone()]);
+        r.take("codex_cli", &t, None, None, T0);
+        let gone = r.unclaimed(&bag.tasks, T0 + NOT_STARTED_MS);
+        assert_eq!(gone.len(), 1);
+        r.did_not_start(&gone[0], PauseWhy::NoClaim, None, T0 + NOT_STARTED_MS);
+        assert_eq!(r.not_started.len(), 1);
+
+        // Re-dispatched later, claimed, then finished as done: no stale not_started left.
+        r.resume("codex_cli");
+        let shares = r.share(&bag, (T0 + 40 * MIN) / 1000);
+        assert_eq!(shares.len(), 1);
+        r.take("codex_cli", &shares[0].1, None, None, T0 + 40 * MIN);
+        assert!(r.not_started.is_empty());
+
+        let claimed_task = task("A01-iris713", State::InProgress, Some("codex/1"));
+        assert!(r.follow(&[claimed_task], LOST, T0 + 45 * MIN).is_empty());
+        let done_task = task("A01-iris713", State::Done, None);
+        assert_eq!(r.follow(&[done_task], LOST, T0 + 60 * MIN).len(), 1);
+        assert!(r.not_started.is_empty());
+    }
+
+    #[test]
+    fn stale_not_started_is_dropped_when_task_is_no_longer_dispatchable() {
+        let mut r = run(&["codex_cli"]);
+        let now = T0 + 60 * MIN;
+        let ids = [
+            "A01-ready",
+            "A01-lost",
+            "A01-claimed",
+            "A01-done",
+            "A01-dropped",
+            "A01-waiting",
+            "A01-backlog",
+            "A01-gone",
+        ];
+        for id in ids {
+            r.not_started.push(NotStarted {
+                agent: "codex_cli".into(),
+                id: id.into(),
+                at: T0,
+                found: T0 + NOT_STARTED_MS,
+                why: PauseWhy::NoClaim,
+                resets: None,
+            });
+        }
+        let tasks = vec![
+            task("A01-ready", State::Ready, None),
+            held_by("A01-lost", "codex/old", "old-sid", 0),
+            held_by("A01-claimed", "codex/live", "live-sid", 55),
+            task("A01-done", State::Done, None),
+            task("A01-dropped", State::Dropped, None),
+            task("A01-waiting", State::Waiting, None),
+            task("A01-backlog", State::Backlog, None),
+        ];
+        r.follow(&tasks, LOST, now);
+        let kept: Vec<&str> = r.not_started.iter().map(|n| n.id.as_str()).collect();
+        assert_eq!(kept, ["A01-ready", "A01-lost"]);
+    }
+
+    #[test]
+    fn requeue_only_one_failed_task_when_a_slot_becomes_free() {
+        for lost in [false, true] {
+            let mut r = run(&["claude_cli"]);
+            let now = T0 + 120 * MIN;
+            let mut tasks = Vec::new();
+            for id in ["A01-7", "A01-8"] {
+                let t = if lost {
+                    held_by(id, "old", "old-sid", 0)
+                } else {
+                    task(id, State::Ready, None)
+                };
+                for n in 0..MAX_FAILURES {
+                    let at = T0 + i64::from(n) * 40 * MIN;
+                    r.take("claude_cli", &t, Some(format!("new-{n}")), None, at);
+                    if lost {
+                        let held = held_by(id, "new-holder", &format!("new-{n}"), 0);
+                        r.follow(&[held.clone()], LOST, at + MIN);
+                        assert_eq!(r.lost_ones(&[held], LOST, at + 35 * MIN).len(), 1);
+                    } else {
+                        assert_eq!(r.unclaimed(&[t.clone()], at + NOT_STARTED_MS).len(), 1);
+                    }
+                }
+                tasks.push(t);
+            }
+            assert_eq!(r.given_up, ["A01-7", "A01-8"]);
+            let bag = bag_of(tasks);
+            assert!(r.share(&bag, now / 1000).is_empty());
+            r.take(
+                "claude_cli",
+                &task("A01-9", State::Ready, None),
+                None,
+                None,
+                now,
+            );
+            assert!(r.requeue("A01-7"));
+            assert!(!r.requeue("A01-7"));
+            assert!(!r.requeue("unknown"));
+            assert_eq!(r.given_up, ["A01-8"]);
+            assert!(!r.failures.contains_key("A01-7"));
+            assert_eq!(r.failures["A01-8"], MAX_FAILURES);
+            assert_eq!(r.checked, 0);
+            assert!(r.share(&bag, now / 1000).is_empty(), "slot full");
+            r.follow(&[task("A01-9", State::Done, None)], LOST, now + MIN);
+            let shares = r.share(&bag, (now + MIN) / 1000);
+            assert_eq!(shares.len(), 1);
+            assert_eq!(shares[0].1.id, "A01-7");
+            r.take("claude_cli", &shares[0].1, None, None, now + MIN);
+            r.failures.insert("A01-7".into(), 1);
+            assert!(
+                !r.requeue("A01-7"),
+                "late duplicate leaves new attempt alone"
+            );
+            assert_eq!(r.failures["A01-7"], 1);
+            assert!(r.share(&bag, (now + MIN) / 1000).is_empty());
+        }
+    }
+
+    #[test]
+    fn requeue_preserves_current_eligibility_and_monitor_settings() {
+        let now = T0 + 60 * MIN;
+        let mut r = run(&["claude_cli"]);
+        let task_to_retry = leveled("A01-7", 2);
+        r.take("claude_cli", &task_to_retry, None, None, T0);
+        r.follow(&[task("A01-7", State::Done, None)], LOST, T0 + MIN);
+        for _ in 0..MAX_FAILURES {
+            r.take("claude_cli", &task_to_retry, None, None, T0);
+            assert_eq!(r.unclaimed(&[task_to_retry.clone()], now).len(), 1);
+        }
+        assert_eq!(r.taken, ["A01-7"], "keep the earlier dispatch");
+        let bag = bag_of(vec![task_to_retry]);
+        assert!(r.share(&bag, now / 1000).is_empty());
+        r.requeue("A01-7");
+        for state in [State::Done, State::Dropped, State::Waiting, State::Backlog] {
+            assert!(
+                r.share(&bag_of(vec![task("A01-7", state, None)]), now / 1000)
+                    .is_empty()
+            );
+        }
+        let held = held_by("A01-7", "alive", "alive-sid", 59);
+        assert!(r.share(&bag_of(vec![held]), now / 1000).is_empty());
+        r.set_difficulty("claude_cli", "4-5");
+        assert!(r.share(&bag, now / 1000).is_empty());
+        r.set_difficulty("claude_cli", "1-5");
+        r.set_scope(Scope::Iteration { id: "other".into() });
+        assert!(r.share(&bag, now / 1000).is_empty());
+        r.set_scope(Scope::All);
+        r.pause("claude_cli", PauseWhy::Quota, None, now);
+        assert!(r.share(&bag, now / 1000).is_empty());
+        r.resume("claude_cli");
+        assert_eq!(r.share(&bag, now / 1000).len(), 1);
+    }
+
+    #[test]
+    fn share_with_reopened_dispatches_reopened_task_first() {
+        let mut r = run(&["claude_cli"]);
+        r.set_sessions("claude_cli", 1);
+        let bag = bag_of(vec![
+            task("A01-1", State::Ready, None),
+            task("A01-2", State::Ready, None),
+        ]);
+        let mut reopened = std::collections::BTreeMap::new();
+        reopened.insert(
+            "A01-2".to_string(),
+            vec![allomos_core::reopen::ReopenReason {
+                at: "2026-11-20T09:00:00Z".into(),
+                by: Some("will".into()),
+                reason: "fix check".into(),
+            }],
+        );
+        let shares = r.share_with_reopened(&bag, 0, &reopened);
+        assert_eq!(shares.len(), 1);
+        assert_eq!(shares[0].1.id, "A01-2");
     }
 }

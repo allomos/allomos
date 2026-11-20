@@ -152,6 +152,9 @@ export interface CheckResultRecord {
   /** `pass`, `fail` or `not-run`. */
   result: string;
   detail?: string;
+  /** A failed check's screenshots (Task-A01-fondue470, decision 0029 § 6): file names in the
+   * task's `evidence/` folder in the taskbag; left out when it has none. */
+  screenshots?: string[];
   at: string;
   by?: string;
 }
@@ -413,8 +416,10 @@ export interface Agent {
   id: "claude_cli" | "claude_app" | "codex_cli" | "codex_app" | "antigravity_cli";
   /** The command's path, or the app's name. */
   found: string;
-  /** "link": opens with the request typed in; "paste": a terminal opens and the request is on the clipboard. */
-  how: "link" | "paste";
+  /** "link": opens with the request typed in; "sent": a terminal opens and the agent is given the
+   * request at once (terminal agents on macOS, Task-A03-marina834); "paste": a terminal opens and
+   * the request is on the clipboard (Windows). */
+  how: "link" | "sent" | "paste";
 }
 
 /** The agent `alm` last ran under for a task (crates/store `events::last_agent`, Task-A03-27). */

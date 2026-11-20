@@ -36,10 +36,8 @@ impl Command {
             | Command::Block { id, .. }
             | Command::Unblock { id, .. }
             | Command::Done { id, .. }
-            | Command::Checked { id, .. }
             | Command::Recheck { id, .. }
             | Command::AiDecided { id, .. }
-            | Command::Reviewed { id }
             | Command::Release { id, .. }
             | Command::Needs { id, .. }
             | Command::Plan { id, .. }
@@ -56,7 +54,9 @@ impl Command {
             | Command::Reopen { id, .. } => Some(id),
             Command::Add(Add::Task { id, .. }) => id.as_deref(),
             Command::Beat { id, .. } => id.as_deref(),
-            Command::Approve { ids, .. } => ids.first().map(String::as_str),
+            Command::Approve { ids, .. }
+            | Command::Checked { ids, .. }
+            | Command::Reviewed { ids } => ids.first().map(String::as_str),
             Command::Withdraw { .. } => None,
             Command::Effect { id, .. } => Some(id),
             Command::Effects { .. } => None,

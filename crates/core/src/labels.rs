@@ -444,6 +444,37 @@ pub fn checked(
     Ok(out)
 }
 
+/// A person checked one or more done tasks (`alm checked <id>…`, decision 0030 § 3): every given
+/// task must be eligible or none is returned. `--result partly` applies to a single task only.
+/// Duplicate IDs are collapsed while keeping order.
+pub fn checked_many(
+    taskbag: &Taskbag,
+    ids: &[String],
+    which: Option<&str>,
+    given: &CheckGiven,
+) -> Result<Vec<Outcome>, Problem> {
+    if ids.is_empty() {
+        return Err(Problem::BadUsage {
+            detail: "name at least one task".into(),
+        });
+    }
+    if given.result == CheckResult::Partly && ids.len() > 1 {
+        return Err(Problem::BadUsage {
+            detail: "--result partly takes one task ID at a time: a partial pass carries conditions for one task.".into(),
+        });
+    }
+    let mut seen = Vec::with_capacity(ids.len());
+    let mut outcomes = Vec::with_capacity(ids.len());
+    for id in ids {
+        let out = checked(taskbag, id, which, given)?;
+        if !seen.contains(&out.task.id) {
+            seen.push(out.task.id.clone());
+            outcomes.push(out);
+        }
+    }
+    Ok(outcomes)
+}
+
 /// The `human_check` record for a check against `steps` that gave `label`.
 fn human_check(steps: Option<&str>, label: &str, given: &CheckGiven) -> Value {
     let clean = |s: Option<&str>| s.map(str::trim).filter(|s| !s.is_empty()).map(String::from);

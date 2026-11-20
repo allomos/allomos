@@ -45,6 +45,47 @@ fn review_as(root: &Path, name: Option<&str>, id: &str) -> Result<(), Problem> {
     allomos_store::review_ai_decisions(root, actor, LOCK_WAIT, id).map(|_| ())
 }
 
+/// Approve multiple tasks in batch (decision 0030 § 1, 2, 3):
+/// Records `checked` for tasks in `check_ids`, and `reviewed` for tasks in `review_ids`.
+#[tauri::command(async)]
+pub(crate) fn approve_selected(
+    root: PathBuf,
+    check_ids: Vec<String>,
+    review_ids: Vec<String>,
+) -> Result<(), Problem> {
+    approve_selected_as(
+        &root,
+        allomos_store::saved_owner_name().as_deref(),
+        &check_ids,
+        &review_ids,
+    )
+}
+
+pub(crate) fn approve_selected_as(
+    root: &Path,
+    name: Option<&str>,
+    check_ids: &[String],
+    review_ids: &[String],
+) -> Result<(), Problem> {
+    let actor = app_actor(name)?;
+    if !check_ids.is_empty() {
+        let given = allomos_core::labels::CheckGiven {
+            checker: actor.by,
+            result: allomos_core::labels::CheckResult::Pass,
+            words: None,
+        };
+        allomos_store::change_tasks(root, actor, LOCK_WAIT, |bag| {
+            allomos_core::labels::checked_many(bag, check_ids, None, &given)
+                .map(|o| (o, "checked"))
+        })?;
+        crate::audit::after_approval(root);
+    }
+    if !review_ids.is_empty() {
+        allomos_store::review_ai_decisions_many(root, actor, LOCK_WAIT, review_ids)?;
+    }
+    Ok(())
+}
+
 /// The task pane's Approve (Task-A01-baker800, decision 0021 § 1.1): the same record as
 /// `alm approve <id>`, channel `app`, approver this computer's person's pseudonym, made as the
 /// person's saved name. `shown` is the description the confirmation showed: if the task's plan is
@@ -182,6 +223,15 @@ pub(crate) fn companion_change(
         }
         "review_ai_decisions" => {
             review_as(root, name, &arg::<String>(&args, "id")?)?;
+            Ok(serde_json::Value::Null)
+        }
+        "approve_selected" => {
+            approve_selected_as(
+                root,
+                name,
+                &arg::<Vec<String>>(&args, "check_ids").unwrap_or_default(),
+                &arg::<Vec<String>>(&args, "review_ids").unwrap_or_default(),
+            )?;
             Ok(serde_json::Value::Null)
         }
         "add_area" => json(serde_json::to_value(add_area_as(
@@ -1198,6 +1248,84 @@ mod tests {
             ),
             (1, 1, "Tracking work")
         );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn approve_selected_checks_and_reviews_multiple_tasks() {
+        let dir = std::env::temp_dir()
+            .join(format!("allomos-desktop-approve-selected-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let root = dir.join(allomos_store::DEFAULT_DIR);
+        allomos_store::init(&root, "p", "P").unwrap();
+        let will = Some("Will");
+        let area = add_area_as(&root, will, None, "Core").unwrap();
+        let t1 = add_task_as(
+            &root,
+            will,
+            allomos_store::NewTask {
+                id: None,
+                area: area.id.clone(),
+                iteration: None,
+                title: "Task 1".into(),
+                description: None,
+                difficulty: None,
+                base: None,
+                branch: None,
+                folders: Vec::new(),
+            },
+        )
+        .unwrap();
+        let t2 = add_task_as(
+            &root,
+            will,
+            allomos_store::NewTask {
+                id: None,
+                area: area.id,
+                iteration: None,
+                title: "Task 2".into(),
+                description: None,
+                difficulty: None,
+                base: None,
+                branch: None,
+                folders: Vec::new(),
+            },
+        )
+        .unwrap();
+
+        // Mark t1 done so it can be checked
+        edit_task_as(
+            &root,
+            will,
+            &t1.id,
+            &allomos_core::ops::Edit::State {
+                state: allomos_core::State::Done,
+                waiting_on: None,
+                who: None,
+            },
+        )
+        .unwrap();
+
+        // Record an AI decision on t2
+        allomos_store::record_ai_decision(
+            &root,
+            allomos_store::Actor::alm(Some("agent")),
+            LOCK_WAIT,
+            &t2.id,
+            "Used Rust",
+            None,
+        )
+        .unwrap();
+
+        approve_selected_as(&root, will, &[t1.id.clone()], &[t2.id.clone()]).unwrap();
+
+        let bag = load(&root).taskbag.unwrap();
+        let checked_t1 = bag.tasks.iter().find(|t| t.id == t1.id).unwrap();
+        assert!(checked_t1.has_label(allomos_core::labels::LOCALLY_BY_HUMAN));
+
+        let reviewed_t2 = bag.tasks.iter().find(|t| t.id == t2.id).unwrap();
+        assert!(!reviewed_t2.has_label(allomos_core::labels::AI_DECISIONS));
+
         std::fs::remove_dir_all(dir).unwrap();
     }
 }

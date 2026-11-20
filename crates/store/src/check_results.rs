@@ -1,9 +1,12 @@
 //! Test results in the history (Task-A01-easel128, decision 0029 § 5): recording one
-//! (`alm check-result`), under the taskbag's lock. The rules are in
+//! (`alm check-result`), under the taskbag's lock, with the screenshots of a failed check copied
+//! into the task's `evidence/` folder (Task-A01-fondue470, § 6). The rules are in
 //! [`allomos_core::check_result`].
 
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::fs;
+use std::io::Read;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use allomos_core::check_result::{self, CheckResult, Recorded};
@@ -32,8 +35,50 @@ pub fn by_task(root: &Path) -> BTreeMap<String, Vec<Recorded>> {
     check_result::by_task(&events::list(root).0)
 }
 
+/// The task's screenshot folder, `tasks/<id>/evidence/`.
+pub fn evidence_dir(root: &Path, id: &str) -> PathBuf {
+    root.join("tasks").join(id).join(check_result::EVIDENCE_DIR)
+}
+
+/// The files task `id`'s screenshot folder holds, by name (none when it has no folder).
+pub fn kept(root: &Path, id: &str) -> Vec<String> {
+    let mut out: Vec<String> = fs::read_dir(evidence_dir(root, id))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|e| e.path().is_file())
+        .filter_map(|e| e.file_name().to_str().map(String::from))
+        .filter(|n| !n.starts_with('.') && !n.starts_with(crate::TMP_PREFIX))
+        .collect();
+    out.sort();
+    out
+}
+
+/// A screenshot as given, read and checked: its bytes and kind (`png`, `jpeg`, `webp`).
+fn read_screenshot(path: &Path) -> Result<(Vec<u8>, &'static str), Problem> {
+    let file = path.display().to_string();
+    let unreadable = |e: std::io::Error| Problem::ScreenshotUnreadable {
+        file: file.clone(),
+        detail: e.to_string(),
+    };
+    let mut f = fs::File::open(path).map_err(unreadable)?;
+    let size = f.metadata().map_err(unreadable)?.len();
+    let mut head = [0u8; 16];
+    let n = f.read(&mut head).map_err(unreadable)?;
+    if let Some(p) = check_result::screenshot_problem(&file, size, &head[..n]) {
+        return Err(p);
+    }
+    let mut bytes = head[..n].to_vec();
+    f.read_to_end(&mut bytes).map_err(unreadable)?;
+    let kind = check_result::image_kind(&bytes).expect("checked above");
+    Ok((bytes, kind))
+}
+
 /// Record one check's result on task `id`: one `check-result` event, under the lock, when it
-/// changes; the task's files do not change.
+/// changes. `screenshots` (paths on this computer) go only with a failed check: each is checked
+/// and copied into the task's `evidence/` folder, and the record names them (decision 0029 § 6).
+/// When writing fails, the copies are taken back with the event.
+#[allow(clippy::too_many_arguments)]
 pub fn record(
     root: &Path,
     actor: Actor,
@@ -42,12 +87,36 @@ pub fn record(
     name: &str,
     result: &str,
     detail: Option<&str>,
+    screenshots: &[PathBuf],
 ) -> Result<Checked, Problem> {
     let (lock, bag, issues) = lock_for_change(root, wait)?;
     let recorded = by_task(root);
-    let (change, check) =
-        check_result::record(&bag, &recorded, id, actor.by, name, result, detail)?;
     let task = ops::find_task(&bag, id)?;
+    let kept = kept(root, &task.id);
+    // The rules first (holder, result, how many), then the files: a refusal reads none.
+    check_result::record(
+        &bag,
+        &recorded,
+        id,
+        actor.by,
+        name,
+        result,
+        detail,
+        &vec![String::new(); screenshots.len()],
+        &kept,
+    )?;
+    let mut taken = kept.clone();
+    let mut copies = Vec::new();
+    for path in screenshots {
+        let (bytes, kind) = read_screenshot(path)?;
+        let name = check_result::screenshot_name(&path.to_string_lossy(), kind, &taken);
+        taken.push(name.clone());
+        copies.push((name, bytes));
+    }
+    let names: Vec<String> = copies.iter().map(|(n, _)| n.clone()).collect();
+    let (change, check) = check_result::record(
+        &bag, &recorded, id, actor.by, name, result, detail, &names, &kept,
+    )?;
     let changed = change.is_some();
     if let Some(change) = change {
         let event = actor.event(
@@ -56,7 +125,21 @@ pub fn record(
             Some(&task.id),
             vec![change],
         );
-        lock.record(&event, |_| Ok(()))?;
+        let dir = evidence_dir(root, &task.id);
+        lock.record(&event, |_| {
+            let mut written = Vec::new();
+            for (name, bytes) in &copies {
+                let path = dir.join(name);
+                if let Err(e) = crate::writing::write_new_file(&path, bytes) {
+                    for w in &written {
+                        let _ = fs::remove_file(w);
+                    }
+                    return Err(e);
+                }
+                written.push(path);
+            }
+            Ok(())
+        })?;
     }
     let results = check_result::ordered(&by_task(root).remove(&task.id).unwrap_or_default());
     Ok(Checked {

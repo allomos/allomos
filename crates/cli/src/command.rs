@@ -196,11 +196,14 @@ pub(crate) enum Command {
         #[arg(long)]
         steps: bool,
     },
-    /// A person has checked a finished task: it gets "deployed and verified by human" when it
-    /// carries "deployed and verified by agent", else "locally verified by human", and leaves To
-    /// check; the note and the steps stay in its history. Run it only when the person says so.
+    /// A person has checked one or more finished tasks: each gets "deployed and verified by human"
+    /// when it carries "deployed and verified by agent", else "locally verified by human", and
+    /// leaves To check; the note and the steps stay in its history. Every given task must be
+    /// eligible or none is recorded. Run it only when the person says so.
     Checked {
-        id: String,
+        /// One or more task IDs.
+        #[arg(required = true, value_name = "ID")]
+        ids: Vec<String>,
         /// The person checked it in the deployed app: "deployed and verified by human".
         #[arg(long, conflicts_with = "locally")]
         deployed: bool,
@@ -208,7 +211,8 @@ pub(crate) enum Command {
         #[arg(long)]
         locally: bool,
         /// What the person saw: `pass`, or `partly` (passed with conditions; say which in
-        /// --words). A check that failed is not `alm checked`: reopen or recheck the task instead.
+        /// --words; only one task ID at a time). A check that failed is not `alm checked`: run
+        /// `alm reopen` instead.
         #[arg(long, value_name = "RESULT", default_value = "pass", value_parser = ["pass", "partly"])]
         result: String,
         /// The person's own words about the check, as they said them.
@@ -248,9 +252,14 @@ pub(crate) enum Command {
         #[arg(long, value_parser = ["visible", "principle", "detail"])]
         kind: Option<String>,
     },
-    /// A person has reviewed the task's AI decisions: they leave To review; the history keeps
-    /// them. Run it only when the person says so.
-    Reviewed { id: String },
+    /// A person has reviewed one or more tasks' AI decisions: they leave To review; the history
+    /// keeps them. Every given task must have decisions waiting for review or none is recorded.
+    /// Run it only when the person says so.
+    Reviewed {
+        /// One or more task IDs.
+        #[arg(required = true, value_name = "ID")]
+        ids: Vec<String>,
+    },
     /// Record a person's approval of a plan (decision 0021): who approved (their pseudonym ID),
     /// of exactly which plan (the SHA-256 of the tasks' descriptions, or of `--plan`'s file), when,
     /// through which channel, in their own words, and until when. Once the plan changes, it no
@@ -486,6 +495,10 @@ pub(crate) enum Command {
         /// One sentence: what ran, or why it failed or did not run.
         #[arg(long, value_name = "TEXT")]
         detail: Option<String>,
+        /// A screenshot of the failure (PNG, JPEG or WebP, at most 2 MB), only with
+        /// --result fail; may be given again; a task keeps at most 3.
+        #[arg(long, value_name = "FILE")]
+        screenshot: Vec<std::path::PathBuf>,
     },
     /// The tasks a commit (by its hash, 7 digits or more), branch, PR, run, tag or web address
     /// goes with; with none given, every task's links.
