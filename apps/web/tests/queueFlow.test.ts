@@ -3,10 +3,23 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { askText, askedNow, forYouTitle, nextChoice, riskWord, splitQueue, todoText, waitedText, type QueueRow } from "../src/queueFlow.ts";
+import {
+  askText,
+  askedNow,
+  batchApprovePartition,
+  cannotBatchApproveReason,
+  cannotBatchApproveText,
+  forYouTitle,
+  nextChoice,
+  riskWord,
+  splitQueue,
+  todoText,
+  waitedText,
+  type QueueRow,
+} from "../src/queueFlow.ts";
 import en from "../src/i18n/en.json" with { type: "json" };
 import zh from "../src/i18n/zh-CN.json" with { type: "json" };
-import type { ConfirmRequest } from "../src/types.ts";
+import type { ConfirmRequest, Task } from "../src/types.ts";
 
 const tr = (words: Record<string, string>) => (key: string, params: Record<string, string | number> = {}) =>
   (words[key] ?? key).replace(/\{(\w+)\}/g, (_, p: string) => String(params[p]));
@@ -78,4 +91,72 @@ test("open alm confirm questions that name a task count as plans to approve", ()
 test("the window is named after its project", () => {
   assert.equal(forYouTitle("Allomos", tz), "待你处理 · Allomos");
   assert.equal(forYouTitle(null, t), "For You");
+});
+
+test("rows that cannot be batch-approved give reasons; unclassified or passing tests can be ticked", () => {
+  // Agent waiting
+  const waitingRow = row("W", { agent_waiting: true, todo: ["answer"] });
+  assert.equal(cannotBatchApproveReason(waitingRow), "agent_waiting");
+  assert.equal(cannotBatchApproveText("agent_waiting", tz), "有代理在等你，需单独处理");
+
+  // High risk
+  const highRow = row("H", { risk: "high", todo: ["check"] });
+  assert.equal(cannotBatchApproveReason(highRow), "high_risk");
+  assert.equal(cannotBatchApproveText("high_risk", tz), "高风险，需单独确认");
+
+  // Failed test
+  const failedTask = {
+    id: "F",
+    evidence: {
+      parts: ["tests"],
+      summary: "",
+      check_results: [{ name: "unit test", result: "fail", at: "2026-11-20" }],
+    },
+  } as unknown as Task;
+  const mediumRow = row("F", { risk: "medium", todo: ["check"] });
+  assert.equal(cannotBatchApproveReason(mediumRow, failedTask), "test_failed");
+  assert.equal(cannotBatchApproveText("test_failed", tz), "有测试未通过或未跑");
+
+  // Unrun test
+  const unrunTask = {
+    id: "U",
+    evidence: {
+      parts: ["tests"],
+      summary: "",
+      check_results: [{ name: "e2e", result: "not-run", at: "2026-11-20" }],
+    },
+  } as unknown as Task;
+  assert.equal(cannotBatchApproveReason(mediumRow, unrunTask), "test_failed");
+
+  // Passing tests -> eligible
+  const passTask = {
+    id: "P",
+    evidence: {
+      parts: ["tests"],
+      summary: "",
+      check_results: [{ name: "unit test", result: "pass", at: "2026-11-20" }],
+    },
+  } as unknown as Task;
+  assert.equal(cannotBatchApproveReason(mediumRow, passTask), null);
+
+  // Unclassified row with no tests recorded -> eligible (returns null)
+  const unclassifiedRow = row("O", { risk: null, todo: ["check"] });
+  assert.equal(cannotBatchApproveReason(unclassifiedRow), null);
+
+  // Low risk -> eligible
+  const lowRow = row("L", { risk: "low", todo: ["review"] });
+  assert.equal(cannotBatchApproveReason(lowRow), null);
+});
+
+test("batchApprovePartition splits check and review IDs and counts unclassified tasks", () => {
+  const rows = [
+    row("A", { risk: "low", todo: ["check"] }),
+    row("B", { risk: "medium", todo: ["review"] }),
+    row("C", { risk: null, todo: ["check", "review"] }),
+    row("D", { risk: "unclassified_custom", todo: ["check"] }),
+  ];
+  const { checkIds, reviewIds, unclassifiedCount } = batchApprovePartition(["A", "B", "C", "D"], rows);
+  assert.deepEqual(checkIds, ["A", "C", "D"]);
+  assert.deepEqual(reviewIds, ["B", "C"]);
+  assert.equal(unclassifiedCount, 2); // C and D are unclassified
 });
