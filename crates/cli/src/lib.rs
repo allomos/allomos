@@ -597,8 +597,8 @@ use confirm::{confirm, confirm_project};
 pub(crate) use share::{Before, for_codex, git_heading, quoted, share};
 pub(crate) use text::{
     blocked_text, decision_lines, decision_text, difficulty_level, difficulty_range,
-    finished_blockers_text, human_task_line, indent, iteration_heading, notes_reminder, rules_line,
-    stop_lines, task_json, task_json_in, task_line, traces_text,
+    finished_blockers_text, human_task_line, indent, iteration_heading, notes_reminder,
+    reopen_lines, rules_line, stop_lines, task_json, task_json_in, task_line, traces_text,
 };
 mod check_results;
 mod classify;

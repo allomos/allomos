@@ -45,6 +45,8 @@ pub(crate) fn next_ready(
     except: &[&str],
 ) -> Option<(String, String)> {
     let mut tasks = ops::next(bag, None).ok()?;
+    let reopened = allomos_store::reopen::by_task(root);
+    allomos_core::reopen::prioritize_reopened(&mut tasks, bag, &reopened);
     if let Some(name) = folders::folder_here(root, &bag.project, cwd) {
         tasks = allomos_core::folders::in_folder(tasks, &name);
     }

@@ -30,6 +30,7 @@ mod model;
 pub mod ops;
 mod problem;
 pub mod queue;
+pub mod reopen;
 pub mod request;
 pub mod retention;
 pub mod risk;

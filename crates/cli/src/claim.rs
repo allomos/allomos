@@ -7,8 +7,8 @@ use allomos_store::{Actor, load, task_language, taskbag_of};
 use serde_json::{Value, json};
 
 use crate::{
-    Cli, Command, Done, blocked_text, heartbeat, locate, lock_wait, non_blank, quoted, task_json,
-    task_line,
+    Cli, Command, Done, blocked_text, heartbeat, locate, lock_wait, non_blank, quoted,
+    reopen_lines, task_json, task_line,
 };
 
 /// Runs the commands this module holds; `execute` in `lib.rs` sends only those here.
@@ -54,7 +54,9 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                 }),
             )?;
             let at = &claimed.branches;
+            let reopen_reasons = allomos_store::reopen::active_for(&root, &claimed.changed.task);
             let mut text = format!("{}\n", task_line(&claimed.changed.task));
+            text.push_str(&reopen_lines(&reopen_reasons, "  "));
             if let Some(t) = &claimed.took_over {
                 text.push_str(&took_over_text(&root, t));
             }
@@ -78,6 +80,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     "taskbag": root,
                     "blocked_fact": blocked_fact,
                     "task": task_json(&claimed.changed.task),
+                    "reopen_reasons": reopen_reasons,
                     "branches": at.branches,
                     "base_why": at.why,
                     "branch_commands": { "start": steps.start, "merge": steps.merge },
