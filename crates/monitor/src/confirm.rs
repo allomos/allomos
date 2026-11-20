@@ -98,6 +98,28 @@ fn pending_in(dir: &Path, tty: &str, started: i64) -> Option<i64> {
     (ms >= started).then_some(ms)
 }
 
+/// What a run makes of a session's terminal (A03-table574): a mark counts only while the tab the
+/// run opened is still open (`tab_open`, asked only when there is a mark). Once that tab is
+/// closed its device may be another window's, and a mark there is that session's, not this one's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Look {
+    /// No confirmation shows.
+    Clear,
+    /// The session shows a confirmation, since then (ms).
+    Waiting(i64),
+    /// The tab is gone: the session no longer has a tab to follow.
+    Gone,
+}
+
+/// The look from the mark's time (`since`, from [`pending_since`]) and whether the tab is open.
+pub fn look(since: Option<i64>, tab_open: impl FnOnce() -> bool) -> Look {
+    match since {
+        None => Look::Clear,
+        Some(_) if !tab_open() => Look::Gone,
+        Some(at) => Look::Waiting(at),
+    }
+}
+
 /// Remove the mark of terminal `tty` (its session has finished).
 pub fn clear(tty: &str) {
     if let Some(path) = dir().and_then(|d| mark(&d, tty)) {
@@ -127,6 +149,18 @@ mod tests {
             .unwrap();
         let out = child.wait_with_output().unwrap();
         String::from_utf8_lossy(&out.stdout).trim().to_string()
+    }
+
+    /// A mark counts only for the tab still open; the tab is asked only when there is a mark.
+    #[test]
+    fn a_mark_counts_only_while_the_session_tab_is_open() {
+        // Really waiting: a mark, and the tab Allomos opened is open.
+        assert_eq!(look(Some(5), || true), Look::Waiting(5));
+        // The window was closed and its device reused by another session, which shows a prompt:
+        // the mark is that session's, and this one's tab is gone.
+        assert_eq!(look(Some(5), || false), Look::Gone);
+        // No mark: the tab is not asked (no AppleScript each look).
+        assert_eq!(look(None, || panic!("asked")), Look::Clear);
     }
 
     /// The mark follows `tool_confirmation_pending`; the title says so; a mark older than the

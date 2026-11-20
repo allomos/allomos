@@ -715,6 +715,17 @@ impl Run {
         w.awaiting_approval = since;
         began
     }
+
+    /// `id`'s tab is closed (A03-table574): the run forgets it, so no mark on its device (now
+    /// perhaps another session's) is taken for this session's, and it does not wait for an
+    /// approval; its heartbeats decide again whether it is lost. True when it had a tab.
+    pub fn tab_gone(&mut self, id: &str) -> bool {
+        let Some(w) = self.working.iter_mut().find(|w| w.id == id) else {
+            return false;
+        };
+        w.awaiting_approval = None;
+        w.tab.take().is_some()
+    }
 }
 
 /// Whether `task` is still open for a monitor to give out again: ready and held by no one, or
@@ -1303,7 +1314,13 @@ mod tests {
         assert_eq!(noted, [("A01-2", "codex-b", 20), ("A01-1", "codex-a", 30)]);
 
         // If A01-2 is taken again and let go again at a later time, only the new entry remains.
-        r.take("claude_cli", &task("A01-2", State::Ready, None), None, None, 50);
+        r.take(
+            "claude_cli",
+            &task("A01-2", State::Ready, None),
+            None,
+            None,
+            50,
+        );
         r.follow(&tasks, LOST, 60);
         let noted: Vec<(&str, &str, i64)> = r
             .let_go
@@ -1860,6 +1877,28 @@ mod tests {
             .remove("awaiting_approval");
         let read: Run = serde_json::from_value(older).unwrap();
         assert_eq!(read.working[0].awaiting_approval, None);
+    }
+
+    /// A03-table574: once a waiting session's tab is closed, the run forgets the tab, the session
+    /// no longer waits for an approval, takes its slot, and goes lost by the heartbeat rules.
+    #[test]
+    fn a_session_whose_tab_closed_no_longer_waits_for_an_approval() {
+        let mut r = holding_a01_7();
+        let held = held_by("A01-7", "claude-a", "mine", 1);
+        r.working[0].tab = Some(SessionTab {
+            window: 14837,
+            tty: "/dev/ttys006".into(),
+        });
+        r.set_awaiting("A01-7", Some(T0 + 3 * MIN));
+        assert!(r.tab_gone("A01-7"));
+        assert!(!r.tab_gone("A01-7"), "forgotten once");
+        assert!(!r.tab_gone("A09-9"), "no such session");
+        assert_eq!(r.working[0].tab, None);
+        assert_eq!(r.working[0].awaiting_approval, None);
+        assert!(r.free_agents().is_empty());
+        let lost = r.lost_ones(&[held], LOST, T0 + 90 * MIN);
+        assert_eq!(lost.len(), 1);
+        assert_eq!(lost[0].id, "A01-7");
     }
 
     #[test]

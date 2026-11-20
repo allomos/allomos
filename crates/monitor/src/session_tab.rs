@@ -369,6 +369,21 @@ pub fn focus(tab: &SessionTab) -> bool {
     osascript(&script).is_some()
 }
 
+/// Whether the tab Allomos opened is still open: its window, with the same terminal device. A
+/// device of a closed window may be taken by another window's tab (A03-table574), so the device
+/// alone does not say whose a mark is. True where it cannot be told (not macOS).
+pub fn is_open(tab: &SessionTab) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        busy(tab).is_some()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = tab;
+        true
+    }
+}
+
 /// What the tab shows now (Terminal's `contents`), to read why a session did not start
 /// (A03-otter944); none when the tab is gone or this is not macOS.
 pub fn text_of(tab: &SessionTab) -> Option<String> {

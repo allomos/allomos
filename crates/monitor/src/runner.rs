@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 
 use allomos_core::{Problem, Task, Taskbag};
 
+use crate::confirm::{Look, look};
 use crate::flow::{Closing, PauseWhy, Run, Stuck, Working, tab_to_close, waiting_alert};
 use crate::quota::{self, UsedUp};
 use crate::registry::{self, Held, Record, Request};
@@ -351,7 +352,8 @@ impl Loop {
         if !self.record.run.quiet {
             return false;
         }
-        let looks: Vec<(String, Option<i64>)> = self
+        // A mark counts only while the session's own tab is open (A03-table574).
+        let looks: Vec<(String, Look)> = self
             .record
             .run
             .working
@@ -359,11 +361,24 @@ impl Loop {
             .filter(|w| accounts::base_agent(&w.agent) == "antigravity_cli")
             .filter_map(|w| {
                 let tab = w.tab.as_ref()?;
-                Some((w.id.clone(), crate::confirm::pending_since(&tab.tty, w.at)))
+                let since = crate::confirm::pending_since(&tab.tty, w.at);
+                Some((w.id.clone(), look(since, || session_tab::is_open(tab))))
             })
             .collect();
         let mut began = false;
-        for (id, since) in looks {
+        for (id, seen) in looks {
+            if seen == Look::Gone {
+                if self.record.run.tab_gone(&id) {
+                    log(&format!(
+                        "{id}: its tab is closed; a mark on its terminal is another session's"
+                    ));
+                }
+                continue;
+            }
+            let since = match seen {
+                Look::Waiting(at) => Some(at),
+                _ => None,
+            };
             let was = self
                 .record
                 .run
