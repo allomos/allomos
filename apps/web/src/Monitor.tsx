@@ -39,8 +39,10 @@ import {
   dayTimeText,
   notStartedShown,
   lostShown,
+  requeuePlace,
 } from "./monitorFlow";
 import type { Current, Frequency, Pause, LastRun, LostRun, Levels, MonitorFolds, MonitorSettings, Run, RunState, Scope, TerminalAgent } from "./monitorFlow";
+import { RequeueLines, useRequeue } from "./MonitorRequeue";
 import { useAgentAccounts } from "./useAgentAccounts";
 import { isProblem } from "./types";
 import type { Task } from "./types";
@@ -225,6 +227,8 @@ export function useMonitor({
         .then(() => read())
         .catch((e) => onError(isProblem(e) ? problem(e) : String(e)));
     },
+    requeue: (run: Run, id: string) => messenger.monitorAsk(run.id, { action: "requeue", id })
+      .then(() => { window.setTimeout(() => void read(), 1_200); }),
     stop: (run: Run) => ask(run, { action: "stop" }),
     undoStop: (run: Run) => ask(run, { action: "undo_stop" }),
     stopNow: (run: Run) => ask(run, { action: "stop_now" }),
@@ -496,6 +500,7 @@ function RunPanel({
   onError: (e: unknown) => void;
 }) {
   const { t } = useI18n();
+  const requeue = useRequeue({ run, tasks, now, requeue: (id) => monitor.requeue(run, id), onError });
   const free = freeAgents(run);
   const late = stalled(run, now);
   const notStarted = notStartedShown(run, tasks, now);
@@ -589,12 +594,10 @@ function RunPanel({
             <p className="muted small monitor-group-note">{t(run.noTask.length ? "monitor.group_no_task" : "monitor.sessions_none")}</p>
           )}
           {run.letGo.map((l) => (
-            <p key={l.id} className="muted small monitor-let-go">{t("monitor.let_go", { id: l.id, holder: l.holder })}</p>
+            <p key={`${l.id}-${l.at}`} className="muted small monitor-let-go">{t("monitor.let_go", { id: l.id, holder: l.holder })}</p>
           ))}
           {!grouped(run) && run.paused.map((p) => <PauseNote key={p.agent} pause={p} />)}
-          {run.givenUp.length > 0 && (
-            <p className="monitor-stalled small" role="status">{t("monitor.given_up", { ids: run.givenUp.join(", ") })}</p>
-          )}
+          <RequeueLines ids={requeue.own} status={requeue.status} />
           {lostShown(run).length > 0 && (
             <>
               <h4 className="monitor-sessions-title small">{t("monitor.lost_title")}</h4>
@@ -612,7 +615,7 @@ function RunPanel({
                             : t("monitor.lost_quota")
                           : t("monitor.lost_no_beat")}
                       </span>
-                      <span className="muted small"> · {t(`monitor.lost_${state}`, { time: dayTimeText(l.found, now) })}</span>
+                      <span className="muted small"> · {requeue.status(l.id, dayTimeText(l.found, now)) ?? t(`monitor.lost_${state}`, { time: dayTimeText(l.found, now) })}</span>
                     </span>
                   </li>
                 ))}
@@ -638,14 +641,10 @@ function RunPanel({
                       </span>
                       <span className="muted small">
                         {" · "}
-                        {t(
-                          state === "given_up"
-                            ? "monitor.lost_given_up"
-                            : state === "again"
-                              ? "monitor.not_started_again"
-                              : "monitor.not_started_found",
-                          { time: dayTimeText(n.found, now) },
-                        )}
+                        {requeuePlace(run, n.id, tasks, now) === "lost"
+                          ? t(state === "again" ? "monitor.not_started_again" : "monitor.not_started_found", { time: dayTimeText(n.found, now) })
+                          : requeue.status(n.id, dayTimeText(n.found, now)) ??
+                            t(state === "again" ? "monitor.not_started_again" : "monitor.not_started_found", { time: dayTimeText(n.found, now) })}
                       </span>
                     </span>
                   </li>

@@ -22,7 +22,7 @@ pub(crate) fn show(cli: &Cli, cwd: &Path, id: &str) -> Result<Done, Problem> {
     let task = ops::find_task(&bag, id)?;
     let ev = allomos_store::evidence::by_task(&root, &bag)
         .remove(&task.id)
-        .unwrap_or_else(|| evidence::evidence(&task, &[], &[], &[]));
+        .unwrap_or_else(|| evidence::evidence(&task, &[], &[], &[], &[]));
     let links = allomos_store::links::by_task(&root)
         .remove(&task.id)
         .unwrap_or_default();
@@ -65,10 +65,18 @@ pub(crate) fn show(cli: &Cli, cwd: &Path, id: &str) -> Result<Done, Problem> {
             }
             Part::CheckSteps => {
                 let mut body = String::new();
-                if let Some(steps) = task.human_check_steps.as_deref().filter(|s| !s.trim().is_empty()) {
+                if let Some(steps) = task
+                    .human_check_steps
+                    .as_deref()
+                    .filter(|s| !s.trim().is_empty())
+                {
                     body.push_str(&indent(steps));
                 }
-                if let Some(why) = task.without_human_check.as_deref().filter(|s| !s.trim().is_empty()) {
+                if let Some(why) = task
+                    .without_human_check
+                    .as_deref()
+                    .filter(|s| !s.trim().is_empty())
+                {
                     body.push_str(&format!("    finished without the human check: {why}\n"));
                 }
                 ("Human check steps", body)
@@ -79,15 +87,28 @@ pub(crate) fn show(cli: &Cli, cwd: &Path, id: &str) -> Result<Done, Problem> {
                     body.push_str(&indent(&ev.summary));
                 }
                 for l in evidence::code_links(&links) {
-                    let url = l.link.url.as_deref().map(|u| format!("  {u}")).unwrap_or_default();
+                    let url = l
+                        .link
+                        .url
+                        .as_deref()
+                        .map(|u| format!("  {u}"))
+                        .unwrap_or_default();
                     body.push_str(&format!("    {}: {}{url}\n", l.link.kind, l.link.reference));
                 }
                 ("What changed", body)
             }
             Part::Tests => (
                 "Test results",
-                "    none recorded by the agent: see the Evidence section of the description (`alm show <id>`)\n"
-                    .replace("<id>", &task.id),
+                if ev.check_results.is_empty() {
+                    "    none recorded by the agent: see the Evidence section of the description (`alm show <id>`)\n"
+                        .replace("<id>", &task.id)
+                } else {
+                    crate::check_results::lines(&task.id, &ev.check_results)
+                        .lines()
+                        .skip(1)
+                        .map(|l| format!("  {l}\n"))
+                        .collect()
+                },
             ),
             Part::Decisions => {
                 let (review, details): (Vec<_>, Vec<_>) =

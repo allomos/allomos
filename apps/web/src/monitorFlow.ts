@@ -384,6 +384,8 @@ export interface LetGo {
   agent: TerminalAgent;
   /** Who holds it now (the other session's name). */
   holder: string;
+  /** When the run stopped following this session (ms). */
+  at: number;
 }
 
 /** One entry of `monitor_runs` (as `alm monitor status --json` lists it): a run, or a process
@@ -409,7 +411,7 @@ export function readEntry(e: any, active: string | null | undefined): Run | Lost
     letGo: (Array.isArray(r.let_go) ? r.let_go : [])
       .map((l: any): LetGo | null => {
         const agent = asAgent(l?.agent);
-        return agent && typeof l.id === "string" && typeof l.holder === "string" ? { id: l.id, agent, holder: l.holder } : null;
+        return agent && typeof l.id === "string" && typeof l.holder === "string" ? { id: l.id, agent, holder: l.holder, at: num(l.at) } : null;
       })
       .filter((l: LetGo | null): l is LetGo => l !== null),
     offered: agents(r.offered),
@@ -536,7 +538,7 @@ export function lastRunCounts(
   const done = mine.filter((t) => t.state === "done");
   // The done tasks per agent that gave them out (Task-A03-weasel276), in the order they were taken.
   const byAgent = new Map<TerminalAgent, number>();
-  for (const id of last.taken) {
+  for (const id of new Set(last.taken)) {
     const agent = last.takenBy?.[id];
     if (agent && done.some((t) => t.id === id)) byAgent.set(agent, (byAgent.get(agent) ?? 0) + 1);
   }
@@ -613,7 +615,7 @@ export const RUN_STATES: readonly RunState[] = ["stalled", "need_you", "stopping
 
 /** The tasks of `run` waiting on the person (not on someone named): they need you. */
 export function needYou(run: Run, tasks: Task[]): string[] {
-  const parked = run.taken.filter((id) => tasks.some((t) => t.id === id && t.state === "waiting" && !t.who));
+  const parked = [...new Set(run.taken)].filter((id) => tasks.some((t) => t.id === id && t.state === "waiting" && !t.who));
   // A session at a confirmation waits for the person too (Task-A03-candle790).
   const approving = run.working.filter((w) => w.awaitingApproval !== null && !parked.includes(w.id)).map((w) => w.id);
   return [...parked, ...approving];
@@ -748,6 +750,22 @@ export function lostShown(run: Run): { lost: LostSession; state: LostState }[] {
       lost,
       state: run.givenUp.includes(lost.id) ? "given_up" : run.working.some((w) => w.id === lost.id) ? "taken_over" : "waiting",
     }));
+}
+
+/** Where a stopped task's one Requeue button goes (A03-gadget373): on its row under Lost
+ * sessions, else on its row under Did not start, else (no row lists it) on a line of its own. */
+export type RequeuePlace = "lost" | "not_started" | "own";
+
+export function requeuePlace(
+  run: Run,
+  id: string,
+  tasks: Task[],
+  now: number,
+  lostAfterMinutes = 30,
+): RequeuePlace {
+  if (run.lost.some((l) => l.id === id)) return "lost";
+  if (notStartedShown(run, tasks, now, lostAfterMinutes).some(({ item }) => item.id === id)) return "not_started";
+  return "own";
 }
 
 /** Whether the sessions list is grouped by agent: more than one agent, or one that may have

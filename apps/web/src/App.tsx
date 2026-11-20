@@ -74,11 +74,11 @@ import { MonitorControl, useMonitor } from "./Monitor";
 import { MonitorDialog } from "./MonitorDialog";
 import { readyTasks, type OpenedFrom } from "./monitorFlow";
 import type { AppSettingsMessenger, Messenger } from "./messenger";
-import { isProblem } from "./types";
+import { evidenceReader } from "./evidenceFlow";
 import { intervalMinutes, lostAfterMinutes } from "./heartbeatFlow";
 import { TabActive } from "./tabActive";
 import type { TabStart } from "./tabsFlow";
-import type { AlmStatus, UpdateStatus, Edit, InstructionFiles, Issue, Iteration, NewIteration, NextIds, Opened, Problem, SetupState, Task, TaskHistory } from "./types";
+import { isProblem, type AlmStatus, type UpdateStatus, type Edit, type InstructionFiles, type Issue, type Iteration, type NewIteration, type NextIds, type Opened, type Problem, type SetupState, type Task, type TaskHistory } from "./types";
 
 /** The file manager's name on this computer, for the button's words. */
 const FILE_MANAGER_KEY = /Mac/.test(navigator.userAgent)
@@ -115,7 +115,7 @@ const WATCH_FILES_FOR_MS = 30 * 60 * 1000;
 const WITNESS_TICK_MS = 5 * 60 * 1000;
 
 /** A banner's text: an interface message, or a problem sent by Rust. */
-type Note = Message | { problem: Problem } | { text: string };
+type Note = Message | { problem: Problem } | { text: ReactNode };
 
 function errorNote(e: unknown): Note {
   return isProblem(e) ? { problem: e } : { key: "error.unexpected", params: { detail: String(e) } };
@@ -1390,7 +1390,7 @@ function TaskbagView({
   /** Shows what went wrong, in words already written (Monitor ready tasks, Task-A03-moth285). */
   onFailure: (message: string) => void;
   /** Shows what an action did, in the window's notices (Work on it…, Task-A03-galley051). */
-  onNotice: (message: string) => void;
+  onNotice: (message: ReactNode) => void;
   /** The update notice already says the taskbag is from an older Allomos. */
   hideOlder: boolean;
   /** The desktop app, where agent sessions run: the task pane can reopen them (Task-A03-hive049). */
@@ -2138,7 +2138,7 @@ function TaskbagView({
                 onHandOver={canOpenSessions ? () => setHandingOver(selected.id) : undefined}
                 lostAfter={lostAfter}
                 lastChange={opened.last_changed?.[selected.id]}
-                readChanges={canOpenSessions ? (hashes) => messenger.codeChanges(opened.root, hashes) : undefined}
+                reader={canOpenSessions ? evidenceReader(messenger, opened.root) : undefined}
               />
             )}
           </div>
@@ -2217,6 +2217,7 @@ function TaskbagView({
             setProceeding(null);
             setHandingOver(proceeding.id);
           }}
+          onOpenTask={setSelectedId}
           onClose={(message) => {
             setProceeding(null);
             if (message) onNotice(message);
@@ -2226,7 +2227,6 @@ function TaskbagView({
     </>
   );
 }
-
 /** An iteration's release and dates, for the line under its name. */
 function iterationSub(it: Iteration, t: ReturnType<typeof useI18n>["t"]): string {
   const parts: string[] = [];

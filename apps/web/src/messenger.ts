@@ -17,6 +17,7 @@ import type { FormerWorktree } from "./proceedFlow";
 import type { CodeChanges } from "./evidenceFlow";
 /** What a running monitor can be asked (Task-A03-cow112), as `alm monitor` leaves it. */
 export type MonitorRequest =
+  | { action: "requeue"; id: string }
   | { action: "check" }
   | { action: "stop" }
   | { action: "undo_stop" }
@@ -34,7 +35,7 @@ import { withDecisions } from "./stopFlow";
 import type { AskedNow, QueueRow } from "./queueFlow";
 import type { TaskChange } from "./taskChangeFlow";
 import type { StartWith, WindowStart } from "./tabsFlow";
-import type { AgentAccount, AgentAccounts } from "./monitorFlow";
+import type { AgentAccount, AgentAccounts, SessionTab } from "./monitorFlow";
 import type { ModelsRead } from "./agentModelsFlow";
 import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, AuditSettings, KeyReplaced, RedactDone, ThisComputer, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, IdentityLevel, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck, WitnessWhen } from "./types";
 
@@ -137,7 +138,9 @@ export interface Messenger {
   /** Work on it… (Task-A03-galley051): the taskbag's path as an agent in its project folder passes it to `--taskbag`. */
   proceedTaskbag(taskbag: string): Promise<string>;
   /** Work on it…: opens `agent` in the project folder of the taskbag at `taskbag` with `request` typed in. Rejects with a Problem. */
-  proceedWithAgent(agent: string, taskbag: string, request: string): Promise<void>;
+  proceedWithAgent(agent: string, taskbag: string, request: string): Promise<SessionTab | null>;
+  /** Focus the Terminal tab returned by Work on it…; false when it is no longer available. */
+  focusLaunchedTerminal(tab: SessionTab): Promise<boolean>;
   /** Work on it… with Manual: `request` as the person copies it. */
   proceedManualRequest(request: string): Promise<string>;
   /** Take over… (Task-A01-flag101): the former holder's worktree on the working branch `working`,
@@ -147,6 +150,10 @@ export interface Messenger {
   /** The Evidence screen's What changed (Task-A01-hyena938): the recorded commits' first lines and
    * the files they changed, read from the project's own git. Only reads (no fetch). */
   codeChanges(taskbag: string, hashes: string[]): Promise<CodeChanges>;
+  /** A failed check's screenshot (Task-A01-fondue470): the picture's bytes, read from the task's
+   * `evidence/` folder in the taskbag. Only reads. Rejects with a Problem when this computer does
+   * not have it. */
+  evidenceScreenshot(taskbag: string, task: string, file: string): Promise<ArrayBuffer>;
   /** Monitor ready tasks (Task-A03-cow112): the runs of the taskbag at `root` (several may run at
    * once), as `alm monitor status --json` lists them; read again when `onMonitorsChanged` says. */
   monitorRuns(root: string): Promise<unknown[]>;
@@ -597,10 +604,12 @@ export const desktopMessenger: Messenger = {
   translateTaskbag: (agent, taskbag, language, target, name) => invoke<void>("translate_taskbag", { agent, taskbag, language, target, name }),
   translateRequest: (taskbag, language, target, name) => invoke<string>("translate_request", { taskbag, language, target, name }),
   proceedTaskbag: (taskbag) => invoke<string>("proceed_taskbag", { taskbag }),
-  proceedWithAgent: (agent, taskbag, request) => invoke<void>("proceed_with_agent", { agent, taskbag, request }),
+  proceedWithAgent: (agent, taskbag, request) => invoke<SessionTab | null>("proceed_with_agent", { agent, taskbag, request }),
+  focusLaunchedTerminal: (tab) => invoke<boolean>("focus_launched_terminal", { tab }),
   proceedManualRequest: (request) => invoke<string>("proceed_manual_request", { request }),
   formerWorktree: (taskbag, folder, working) => invoke<FormerWorktree | null>("former_worktree", { taskbag, folder, working }),
   codeChanges: (taskbag, hashes) => invoke<CodeChanges>("code_changes", { taskbag, hashes }),
+  evidenceScreenshot: (taskbag, task, file) => invoke<ArrayBuffer>("evidence_screenshot", { taskbag, task, file }),
   monitorRuns: (root) => invoke<unknown[]>("monitor_runs", { root }),
   monitorStart: (root, agents, every, quiet, iteration, sessions, difficulties, models, efforts) =>
     invoke<string>("monitor_start", { root, agents, every, quiet, iteration, sessions, difficulties, models, efforts }),

@@ -16,10 +16,12 @@ pub fn of(root: &Path, task: &Task) -> Evidence {
     let events = events::list(root).0;
     let links = allomos_core::link::by_task(&events).remove(&task.id);
     let decisions = allomos_core::decision::pending(&events).remove(&task.id);
+    let results = allomos_core::check_result::by_task(&events).remove(&task.id);
     evidence::evidence(
         task,
         links.as_deref().unwrap_or_default(),
         decisions.as_deref().unwrap_or_default(),
+        results.as_deref().unwrap_or_default(),
         &events,
     )
 }
@@ -29,6 +31,7 @@ pub fn by_task(root: &Path, bag: &Taskbag) -> BTreeMap<String, Evidence> {
     let events = events::list(root).0;
     let links = allomos_core::link::by_task(&events);
     let decisions = allomos_core::decision::pending(&events);
+    let results = allomos_core::check_result::by_task(&events);
     bag.tasks
         .iter()
         .map(|t| {
@@ -36,6 +39,7 @@ pub fn by_task(root: &Path, bag: &Taskbag) -> BTreeMap<String, Evidence> {
                 t,
                 links.get(&t.id).map_or(&[][..], Vec::as_slice),
                 decisions.get(&t.id).map_or(&[][..], Vec::as_slice),
+                results.get(&t.id).map_or(&[][..], Vec::as_slice),
                 &events,
             );
             (t.id.clone(), e)

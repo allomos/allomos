@@ -202,6 +202,9 @@ impl Loop {
             Request::Check => {
                 run.checked = 0;
             }
+            Request::Requeue { id } => {
+                run.requeue(&id);
+            }
             Request::StopNow => self.stop_now = true,
             Request::Stop => run.stopping = true,
             Request::UndoStop => run.stopping = false,
@@ -506,12 +509,9 @@ impl Loop {
                 .find(|(id, _)| *id == base)
                 .map(|(_, p)| p.display().to_string());
             // Antigravity adds the taskbag and its other project folders to its workspace
-            // (Task-A03-latch882); Codex makes them writable in its sandbox (Task-A03-bag625).
-            let dirs = if base == "antigravity_cli" || base == "codex_cli" {
-                terminal::workspace_dirs(&self.record.taskbag, &self.record.project)
-            } else {
-                Vec::new()
-            };
+            // (Task-A03-latch882); Codex makes them writable in its sandbox (Task-A03-bag625);
+            // Claude Code edits them without asking (Task-A03-emu042).
+            let dirs = terminal::workspace_dirs(&self.record.taskbag, &self.record.project);
             let started = match (found, accounts::config_of(&agent, &accounts)) {
                 (Some(found), Ok(config)) => terminal::start_session(
                     &base,
@@ -915,3 +915,7 @@ mod tests {
 #[cfg(test)]
 #[path = "runner_stop_tests.rs"]
 mod stop_tests;
+
+#[cfg(test)]
+#[path = "runner_requeue_tests.rs"]
+mod requeue_tests;

@@ -142,6 +142,38 @@ pub(crate) fn write_atomic(path: &Path, text: &str) -> Result<(), Problem> {
     })
 }
 
+/// Write a new file of `bytes` whole (a screenshot, Task-A01-fondue470): to a temporary file in
+/// the same folder (made when missing), then renamed to `path`. Refused when `path` exists.
+pub(crate) fn write_new_file(path: &Path, bytes: &[u8]) -> Result<(), Problem> {
+    let dir = path.parent().expect("taskbag files are inside a folder");
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+    let tmp = tmp_path(dir, name);
+    let result = (|| {
+        fs::create_dir_all(dir)?;
+        if path.exists() {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "already exists",
+            ));
+        }
+        let mut f = fs::File::create(&tmp)?;
+        f.write_all(bytes)?;
+        f.sync_all()?;
+        drop(f);
+        replace_file(&tmp, path)
+    })();
+    match result {
+        Ok(()) => {
+            note_written(path);
+            Ok(())
+        }
+        Err(e) => {
+            let _ = fs::remove_file(&tmp);
+            Err(write_failed(path, e))
+        }
+    }
+}
+
 /// Fill a new folder with files, then rename it to `target` in one step, so a reader never
 /// sees it half-made. Refused when `target` already exists.
 pub(crate) fn create_dir_atomic(target: &Path, files: &[(&str, String)]) -> Result<(), Problem> {

@@ -9,6 +9,7 @@ pub mod audit;
 pub mod branch;
 pub mod canonical;
 pub mod card;
+pub mod check_result;
 pub mod classify;
 pub mod conflict;
 pub mod decision;

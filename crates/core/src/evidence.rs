@@ -8,6 +8,7 @@
 use serde::Serialize;
 
 use crate::Task;
+use crate::check_result::{self, Recorded as CheckResult};
 use crate::decision::{Decision, DecisionKind};
 use crate::event::{Event, Kind, REASON};
 use crate::labels::AI_DECISIONS;
@@ -23,8 +24,8 @@ pub enum Part {
     CheckSteps,
     /// The handoff note's first sentence and the commits and merges recorded.
     Summary,
-    /// The test results (decision 0029 point 5: not recorded yet, so it points to the
-    /// description's Evidence section).
+    /// The test results the agent recorded with `alm check-result` (decision 0029 point 5);
+    /// a task with none points to the description's Evidence section.
     Tests,
     /// The AI decisions not reviewed yet (to review, and details to read).
     Decisions,
@@ -52,14 +53,20 @@ pub struct Evidence {
     /// The reason given with the newest risk recorded ([`risk_reason`]).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub risk_reason: Option<String>,
+    /// The test results recorded (Task-A01-easel128): failed first, then not run, then passed;
+    /// empty when the agent recorded none (older tasks).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub check_results: Vec<CheckResult>,
 }
 
 /// The screen of `task`: `links` are its recorded links, `decisions` its AI decisions not reviewed
-/// yet, `events` the history (any task's; only this task's classify events are read).
+/// yet, `results` its test results ([`check_result::by_task`]), `events` the history (any task's;
+/// only this task's classify events are read).
 pub fn evidence(
     task: &Task,
     links: &[Recorded],
     decisions: &[Decision],
+    results: &[CheckResult],
     events: &[Event],
 ) -> Evidence {
     let summary = summary_sentence(task.handoff_note.as_deref());
@@ -71,6 +78,7 @@ pub fn evidence(
         parts,
         summary,
         risk_reason: risk_reason(events, &task.id),
+        check_results: check_result::ordered(results),
     }
 }
 
@@ -205,14 +213,39 @@ mod tests {
             "labels": [AI_DECISIONS], "human_check_steps": "1. Open it.",
             "handoff_note": "Built and merged. Nothing to do."
         }));
-        let e = evidence(&t, &[], &[], &[]);
+        let e = evidence(&t, &[], &[], &[], &[]);
         assert_eq!(e.parts, ORDER.to_vec());
         assert_eq!(e.summary, "Built and merged.");
     }
 
     #[test]
+    fn test_results_come_failed_first_and_are_left_out_when_none() {
+        let result = |name: &str, result: &str| {
+            serde_json::from_value::<Event>(serde_json::json!({
+                "at": "2026-11-20T00:00:00Z", "via": "alm", "command": "check-result",
+                "kind": "task", "id": "A01-01",
+                "changes": [{"field": "check_result", "to": {"name": name, "result": result}}]
+            }))
+            .unwrap()
+        };
+        let events = [result("npm test", "pass"), result("cargo test", "fail")];
+        let results = check_result::by_task(&events).remove("A01-01").unwrap();
+        let e = evidence(&task(serde_json::json!({})), &[], &[], &results, &events);
+        let names: Vec<&str> = e
+            .check_results
+            .iter()
+            .map(|r| r.check.name.as_str())
+            .collect();
+        assert_eq!(names, vec!["cargo test", "npm test"]);
+        let json = serde_json::to_value(&e).unwrap();
+        assert_eq!(json["check_results"][0]["result"], "fail");
+        let bare = serde_json::to_value(evidence(&task(serde_json::json!({})), &[], &[], &[], &[]));
+        assert!(bare.unwrap().get("check_results").is_none());
+    }
+
+    #[test]
     fn a_bare_task_has_only_the_ask_and_the_tests() {
-        let e = evidence(&task(serde_json::json!({})), &[], &[], &[]);
+        let e = evidence(&task(serde_json::json!({})), &[], &[], &[], &[]);
         assert_eq!(e.parts, vec![Part::AskRisk, Part::Tests]);
         assert_eq!(e.summary, "");
         assert_eq!(e.risk_reason, None);
@@ -225,7 +258,7 @@ mod tests {
             link("commit", "abcdef1"),
             link("pr", "https://example.com/1"),
         ];
-        let e = evidence(&t, &links, &[], &[]);
+        let e = evidence(&t, &links, &[], &[], &[]);
         assert_eq!(
             e.parts,
             vec![Part::AskRisk, Part::CheckSteps, Part::Summary, Part::Tests]

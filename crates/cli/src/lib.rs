@@ -600,6 +600,7 @@ pub(crate) use text::{
     finished_blockers_text, human_task_line, indent, iteration_heading, notes_reminder, rules_line,
     stop_lines, task_json, task_json_in, task_line, traces_text,
 };
+mod check_results;
 mod classify;
 mod effects;
 mod evidence;
@@ -682,6 +683,7 @@ fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         | Command::Redact { .. }
         | Command::Classify { .. }
         | Command::Link { .. }
+        | Command::CheckResult { .. }
         | Command::Links { .. }
         | Command::Reviewed { .. }
         | Command::Human { .. }

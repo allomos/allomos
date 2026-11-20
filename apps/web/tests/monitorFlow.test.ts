@@ -22,6 +22,7 @@ import {
   lostShown,
   dayTimeText,
   notStartedShown,
+  requeuePlace,
   nextCheck,
   parseLevels,
   readEntry,
@@ -150,7 +151,7 @@ test("the last run counts the done tasks per agent that gave them out", () => {
   const last = {
     ended: "2026-11-09T10:00:00Z",
     scope: { kind: "all" as const },
-    taken: ["A01-01", "A01-02", "A01-03"],
+    taken: ["A01-01", "A01-02", "A01-03", "A01-01"],
     takenBy: { "A01-01": "claude_cli" as const, "A01-02": "codex_cli" as const, "A01-03": "claude_cli" as const },
   };
   const now = [
@@ -177,7 +178,7 @@ test("the tasks a run let go to another session are read, each with who holds it
     null,
   );
   assert.ok(r && isRun(r));
-  assert.deepEqual(r.letGo, [{ id: "A01-02", agent: "claude_cli", holder: "codex-a01-02" }], "an unknown agent or a missing holder is left out");
+  assert.deepEqual(r.letGo, [{ id: "A01-02", agent: "claude_cli", holder: "codex-a01-02", at: 30 }], "an unknown agent or a missing holder is left out");
   // Its slot is free again.
   assert.deepEqual(freeAgents(r), ["claude_cli", "codex_cli"]);
   const none = readEntry(entry(), null);
@@ -249,6 +250,12 @@ const entry = (over: Record<string, unknown> = {}) => ({
     checked: 100,
     ...over,
   },
+});
+
+test("a task dispatched twice is shown only once when it needs you", () => {
+  const r = readEntry(entry({ taken: ["A01-02", "A01-02"], working: [] }), "I-haul");
+  assert.ok(r && isRun(r));
+  assert.deepEqual(needYou(r, [task("A01-02", { state: "waiting" })]), ["A01-02"]);
 });
 
 test("a session at a confirmation frees its slot, is not stalled and needs you (Task-A03-candle790)", () => {
@@ -445,4 +452,37 @@ test("dayTimeText shows HH:MM on the same day and YYYY-MM-DD HH:MM on another da
   const twoDaysAgo = new Date(2026, 10, 18, 0, 25).getTime();
   assert.equal(dayTimeText(sameDay, now), "00:25");
   assert.equal(dayTimeText(twoDaysAgo, now), "2026-11-18 00:25");
+});
+
+test("each stopped task gets one Requeue place, on its lower row (A03-gadget373)", () => {
+  const now = Date.parse("2026-11-20T00:35:00Z");
+  const r = readEntry(
+    entry({
+      working: [{ agent: "claude_cli", id: "A01-09", at: 10, seen_held: true, changed: 10 }],
+      lost: [
+        { agent: "claude_cli", id: "A01-03", holder: "claude-old", at: 1, found: 5 },
+        { agent: "codex_cli", id: "A01-04", holder: "codex-a", at: 1, found: 6 },
+      ],
+      not_started: [
+        { agent: "codex_cli", id: "A01-04", found: 7, why: "no_claim" },
+        { agent: "codex_cli", id: "A01-05", found: 8, why: "no_claim" },
+        { agent: "claude_cli", id: "A01-09", found: 9, why: "no_claim" },
+      ],
+      given_up: ["A01-03", "A01-04", "A01-05", "A01-07"],
+    }),
+    null,
+  );
+  assert.ok(r && isRun(r));
+  const tasks: Task[] = [
+    task("A01-03", { state: "ready" }),
+    task("A01-04", { state: "ready" }),
+    task("A01-05", { state: "ready" }),
+    task("A01-07", { state: "ready" }),
+    task("A01-09", { state: "ready" }),
+  ];
+  // Lost and did not start: only the lost row carries it; a task no row lists gets its own line.
+  assert.deepEqual(
+    ["A01-03", "A01-04", "A01-05", "A01-07", "A01-09"].map((id) => requeuePlace(r, id, tasks, now)),
+    ["lost", "lost", "not_started", "own", "own"],
+  );
 });

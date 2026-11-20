@@ -8,6 +8,7 @@ pub mod accounts;
 pub mod confirm;
 pub mod flow;
 pub mod notify;
+mod permissions;
 pub mod quota;
 pub mod registry;
 pub mod request;

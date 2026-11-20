@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { groupAppChanges } from "./appSharingFlow";
 import { fieldName } from "./historyFlow";
 import { useI18n } from "./i18n";
 import { AgentPicker, AGENT_KEY, PASTE_KEYS, useAgents } from "./AgentPicker";
@@ -20,15 +21,27 @@ export function AppSharingNotice({ messenger, opened }: { messenger: Messenger; 
     void messenger.appChanges(opened.root).then((next) => { if (live) setApp(next); }).catch(() => {});
     return () => { live = false; };
   }, [messenger, opened]);
-  if (!app?.count) return null;
-  const titles = new Map(opened.loaded.taskbag?.tasks.map((task) => [task.id, task.title]));
-  return <><section className="banner update app-sharing" aria-label={t("sharing.count", { count: app.count })}>
-    <details>
-      <summary>{t("sharing.count", { count: app.count })}</summary>
-      <ul>{app.entries.map((e) => <li key={e.event}>
-        {e.id ? [e.id, titles.get(e.id)].filter(Boolean).join(" · ") : t("sharing.project")} · {e.fields.map((f) => fieldName(f, t)).join(", ")} · <time dateTime={e.at}>{new Date(e.at).toLocaleString()}</time>
-      </li>)}</ul>
-    </details>
+  const group = groupAppChanges(app, opened.loaded.taskbag);
+  if (!group) return null;
+  return <><section className="banner update app-sharing" aria-label={t("sharing.count", { count: group.count })}>
+    <div className="app-sharing-body">
+      <details>
+        <summary>{t("sharing.count", { count: group.count })}</summary>
+        <div className="app-sharing-group">
+          <div className="app-sharing-group-title">{t("sharing.group_app", { count: group.count })}</div>
+          <ul>{group.items.map((item) => <li key={item.key}>
+            <span className="app-sharing-target">
+              {item.id ? [item.id, item.title].filter(Boolean).join(" · ") : t("sharing.project")}
+            </span>
+            {item.fields.length > 0 && <> · {item.fields.map((f) => fieldName(f, t)).join(", ")}</>}
+            {item.count > 1 && <> · {t("sharing.item_count", { count: item.count })}</>}
+            {" · "}
+            <time dateTime={item.latestAt}>{new Date(item.latestAt).toLocaleString()}</time>
+          </li>)}</ul>
+        </div>
+      </details>
+      <p className="app-sharing-reason">{t("sharing.reason")}</p>
+    </div>
     <button type="button" onClick={() => setAsking(true)}>{t("sharing.ask")}</button>
   </section>
     {asking && <SharingDialog messenger={messenger} root={opened.root} onClose={() => setAsking(false)} />}

@@ -10,9 +10,10 @@ use allomos_store::{Actor, Lock, load, plain_path, read_text, taskbag_of};
 use serde_json::json;
 
 use crate::{
-    CardsWhat, Cli, Command, Done, approve, change, classify, decision_text, effects, exceptions,
-    folders, for_codex, heartbeat, human, links, locate, lock_wait, non_blank, quoted, redact,
-    save_project, stop_lines, task_json, task_json_in, task_line, traces_text, trail,
+    CardsWhat, Cli, Command, Done, approve, change, check_results, classify, decision_text,
+    effects, exceptions, folders, for_codex, heartbeat, human, links, locate, lock_wait, non_blank,
+    quoted, redact, save_project, stop_lines, task_json, task_json_in, task_line, traces_text,
+    trail,
 };
 
 /// Runs the commands this module holds; `execute` in `lib.rs` sends only those here.
@@ -410,6 +411,13 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             url,
             remove,
         } => links::link(cli, cwd, id, kind, reference, url.as_deref(), *remove),
+        Command::CheckResult {
+            id,
+            name,
+            result,
+            detail,
+            screenshot,
+        } => check_results::record(cli, cwd, id, name, result, detail.as_deref(), screenshot),
         Command::Links { reference } => links::list(cli, cwd, reference.as_deref()),
         Command::Reviewed { id } => {
             let root = locate(cli, cwd)?;

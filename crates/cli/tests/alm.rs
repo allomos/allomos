@@ -6861,6 +6861,322 @@ fn a_task_traces_to_requirements_and_decisions_and_back() {
 }
 
 #[test]
+fn check_results_are_recorded_in_the_history_and_listed_failed_first() {
+    // Task-A01-easel128 (decision 0029 § 5): `alm check-result` records one check's result as a
+    // `check_result` change in the task's history only; the same name again replaces it;
+    // `alm show` lists them, failed and not run first.
+    let repo = filled();
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    let before = task_file(&repo, "A01-01");
+    let events = event_count(&repo);
+    refused(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "check-result",
+            "A01-01",
+            "--name",
+            "npm test",
+            "--result",
+            "ok",
+        ],
+        1,
+        "check_result_unknown",
+    );
+    refused(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "check-result",
+            "A01-01",
+            "--name",
+            "  ",
+            "--result",
+            "pass",
+        ],
+        1,
+        "check_name_missing",
+    );
+    refused(
+        &repo,
+        &[
+            "--as",
+            "b",
+            "check-result",
+            "A01-01",
+            "--name",
+            "npm test",
+            "--result",
+            "pass",
+        ],
+        1,
+        "task_held",
+    );
+    assert_eq!(event_count(&repo), events, "a refusal records nothing");
+
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "check-result",
+            "A01-01",
+            "--name",
+            "npm test",
+            "--result",
+            "FAIL",
+            "--detail",
+            "2 of 400 failed",
+        ],
+    );
+    assert_eq!(v["changed"], true);
+    assert_eq!(v["check_result"]["result"], "fail");
+    assert_eq!(task_file(&repo, "A01-01"), before, "task.json is untouched");
+    let history = ok(&repo, &["history", "A01-01"]);
+    let last = &history["events"][0];
+    assert_eq!(last["command"], "check-result");
+    assert_eq!(last["changes"][0]["field"], "check_result");
+    assert_eq!(
+        last["changes"][0]["to"],
+        json!({ "name": "npm test", "result": "fail", "detail": "2 of 400 failed" })
+    );
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "check-result",
+            "A01-01",
+            "--name",
+            "cargo test",
+            "--result",
+            "pass",
+        ],
+    );
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "check-result",
+            "A01-01",
+            "--name",
+            "click through",
+            "--result",
+            "not-run",
+            "--detail",
+            "no display",
+        ],
+    );
+
+    // The same result again records nothing; a new one for the same name replaces it.
+    let events = event_count(&repo);
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "check-result",
+            "A01-01",
+            "--name",
+            "cargo test",
+            "--result",
+            "pass",
+        ],
+    );
+    assert_eq!(v["changed"], false);
+    assert_eq!(event_count(&repo), events);
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "check-result",
+            "A01-01",
+            "--name",
+            "npm test",
+            "--result",
+            "pass",
+        ],
+    );
+    let history = ok(&repo, &["history", "A01-01"]);
+    assert_eq!(
+        history["events"][0]["changes"][0]["from"],
+        json!({ "name": "npm test", "result": "fail", "detail": "2 of 400 failed" })
+    );
+    let names: Vec<&str> = v["check_results"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, vec!["click through", "npm test", "cargo test"]);
+
+    let v = ok(&repo, &["show", "A01-01"]);
+    assert_eq!(v["check_results"].as_array().unwrap().len(), 3, "{v}");
+    let out = String::from_utf8(alm(&repo, &["show", "A01-01", "--evidence"]).stdout).unwrap();
+    assert!(
+        out.contains("Test results:\n    NOT RUN  click through: no display\n"),
+        "{out}"
+    );
+    let out = String::from_utf8(alm(&repo, &["show", "A01-01"]).stdout).unwrap();
+    assert!(
+        out.contains("Check results:\n  NOT RUN  click through: no display\n  PASS     npm test\n  PASS     cargo test\n"),
+        "{out}"
+    );
+}
+
+#[test]
+fn a_failed_check_brings_at_most_three_screenshots_into_the_taskbag() {
+    // Task-A01-fondue470 (decision 0029 § 6): `--screenshot` goes only with a failed check; the
+    // file is copied into `tasks/<id>/evidence/` and the record names it; a 4th, a file that is
+    // not a PNG, JPEG or WebP picture and one over 2 MB are refused, saying what to do.
+    let repo = filled();
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    let png = |name: &str, extra: usize| {
+        let path = repo.join(name);
+        let mut bytes = b"\x89PNG\r\n\x1a\nrest".to_vec();
+        bytes.extend(std::iter::repeat_n(0u8, extra));
+        fs::write(&path, bytes).unwrap();
+        name.to_string()
+    };
+    let check = |name: &str, result: &str, shots: &[&str]| {
+        let mut args = vec![
+            "--as",
+            "a",
+            "check-result",
+            "A01-01",
+            "--name",
+            name,
+            "--result",
+            result,
+        ];
+        for s in shots {
+            args.push("--screenshot");
+            args.push(s);
+        }
+        args.into_iter().map(String::from).collect::<Vec<_>>()
+    };
+    fn run(args: &[String]) -> Vec<&str> {
+        args.iter().map(String::as_str).collect()
+    }
+    let dir = repo.join(".allomos/taskbag/tasks/A01-01/evidence");
+    let events = event_count(&repo);
+
+    let one = png("login screen.png", 0);
+    let v = refused(
+        &repo,
+        &run(&check("npm test", "pass", &[&one])),
+        1,
+        "screenshot_needs_fail",
+    );
+    assert_eq!(v["error"]["params"]["result"], "pass");
+    refused(
+        &repo,
+        &run(&check("npm test", "not-run", &[&one])),
+        1,
+        "screenshot_needs_fail",
+    );
+    fs::write(repo.join("notes.txt"), "not a picture").unwrap();
+    refused(
+        &repo,
+        &run(&check("npm test", "fail", &["notes.txt"])),
+        1,
+        "screenshot_not_image",
+    );
+    let big = png("big.png", 2 * 1024 * 1024);
+    let v = refused(
+        &repo,
+        &run(&check("npm test", "fail", &[&big])),
+        1,
+        "screenshot_too_large",
+    );
+    assert!(
+        v["error"]["message"].as_str().unwrap().contains("sips"),
+        "{v}"
+    );
+    refused(
+        &repo,
+        &run(&check("npm test", "fail", &["missing.png"])),
+        1,
+        "screenshot_unreadable",
+    );
+    assert_eq!(event_count(&repo), events, "a refusal records nothing");
+    assert!(!dir.exists(), "a refusal copies nothing");
+
+    // Copied under a plain name, named in the record and in the files to save.
+    let v = ok(&repo, &run(&check("npm test", "fail", &[&one])));
+    assert_eq!(
+        v["check_result"]["screenshots"],
+        json!(["login-screen.png"])
+    );
+    assert_eq!(
+        fs::read(dir.join("login-screen.png")).unwrap(),
+        fs::read(repo.join(&one)).unwrap()
+    );
+    let files = v["changed_files"].to_string();
+    assert!(
+        files.contains("tasks/A01-01/evidence/login-screen.png"),
+        "{files}"
+    );
+    let history = ok(&repo, &["history", "A01-01"]);
+    assert_eq!(
+        history["events"][0]["changes"][0]["to"]["screenshots"],
+        json!(["login-screen.png"])
+    );
+
+    // Recorded again as failed: the earlier one stays and the new one is added; the same name
+    // gets a number.
+    let v = ok(&repo, &run(&check("npm test", "fail", &[&one])));
+    assert_eq!(
+        v["check_result"]["screenshots"],
+        json!(["login-screen.png", "login-screen-2.png"])
+    );
+    let jpeg = repo.join("crash.JPEG");
+    fs::write(&jpeg, [0xFF, 0xD8, 0xFF, 0xE0, 0, 0]).unwrap();
+    ok(&repo, &run(&check("e2e", "fail", &["crash.JPEG"])));
+    assert!(dir.join("crash.jpg").is_file());
+
+    // A 4th is refused, naming the 3 the task has.
+    let v = refused(
+        &repo,
+        &run(&check("e2e", "fail", &[&one])),
+        1,
+        "screenshots_full",
+    );
+    let message = v["error"]["message"].as_str().unwrap();
+    assert!(
+        message.contains("crash.jpg, login-screen-2.png, login-screen.png"),
+        "{message}"
+    );
+
+    // Passed later: the record has no screenshots, the files stay and still count.
+    let v = ok(&repo, &run(&check("npm test", "pass", &[])));
+    assert_eq!(v["check_result"].get("screenshots"), None, "{v}");
+    refused(
+        &repo,
+        &run(&check("npm test", "fail", &[&one])),
+        1,
+        "screenshots_full",
+    );
+    let out = String::from_utf8(alm(&repo, &["show", "A01-01", "--evidence"]).stdout).unwrap();
+    assert!(
+        out.contains(
+            "    FAIL     e2e\n             screenshot: tasks/A01-01/evidence/crash.jpg\n"
+        ),
+        "{out}"
+    );
+    let v = ok(&repo, &["show", "A01-01"]);
+    assert_eq!(
+        v["check_results"][1]["screenshots"],
+        json!(["crash.jpg"]),
+        "{v}"
+    );
+}
+
+#[test]
 fn an_outside_effect_is_recorded_before_and_after_and_listed() {
     // Task-A01-job650 (decision 0021 § 1.1 "Outside effects"): `alm effect` records target,
     // action, rollback, approval and result as an `effect` change in the task's history only;

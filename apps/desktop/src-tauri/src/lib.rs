@@ -12,6 +12,7 @@ mod app_sharing;
 mod audit;
 mod code_changes;
 mod codex_rules;
+mod evidence_screenshot;
 mod file_size_settings;
 mod for_you;
 mod former_worktree;
@@ -318,9 +319,11 @@ pub fn run() {
             agent_commands::translate_request,
             agent_commands::proceed_taskbag,
             agent_commands::proceed_with_agent,
+            agent_commands::focus_launched_terminal,
             agent_commands::proceed_manual_request,
             former_worktree::former_worktree,
             code_changes::code_changes,
+            evidence_screenshot::evidence_screenshot,
             monitor_runs::monitor_runs,
             monitor_runs::monitor_start,
             agent_models::agent_models,

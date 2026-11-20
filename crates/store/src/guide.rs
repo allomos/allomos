@@ -150,8 +150,8 @@ Read this before you add a task, so it fits this project.
    The description is the task's record. A project that keeps a card file per task keeps it
    beside the task, as `tasks/<id>/card.md` (`alm card <id> --from <file>`), linked from the
    description's `Card:` line, never in the project folder (`alm guide move-cards`). As the work
-   goes on, keep it up to date with `alm describe <id> --from <file.md>` (its approvals, and what was
-   checked, with numbers and logs, under an **Evidence** heading).
+   goes on, keep it up to date with `alm describe <id> --from <file.md>` (its approvals and other
+   evidence under an **Evidence** heading); each check's result goes in with `alm check-result`.
 6. **Difficulty.** Say how hard it is, from 1 to 5: `--difficulty <1-5>` (Task-A01-actor813).
    1: one small change in one place, nothing to decide. 2: a small change across a few files, or
    one well-known step. 3: an ordinary task, one feature or fix with its tests and a few routine
@@ -441,6 +441,10 @@ Plan:
   too. alm runs no Git: give what your version control tool and CI show, with the web address
   so the app can open it. `alm links <ref>` finds the task of a commit (7 digits of its hash or
   more), branch, PR, run, tag or address; `alm links`, every task's links; `alm show` lists them.
+- `alm check-result <id> --name \"<check>\" --result pass|fail|not-run [--detail \"<one
+  sentence>\"] [--screenshot <file>]`: one check you ran or did not run, in the task's history (the same
+  name again replaces it); only a failed one brings screenshots (PNG, JPEG or WebP, at most 2 MB, 3 a
+  task) into `tasks/<id>/evidence/`. `alm show` and the Evidence screen list them, failed first.
 - `alm title <id> \"<title>\"`; `alm describe <id> --text \"<markdown>\"` or
   `alm describe <id> --from <file.md>`: a new title or description (`--text \"\"` removes the
   description). Same holder rule as `alm label`; each is recorded in `alm history`. Add
@@ -544,59 +548,6 @@ About Allomos:
   handoff note, the card files and the project notes in that language (any language code, such
   as `vi` or `pt-BR`), and make it the task language (`alm task-language <code>`). It changes
   nothing; the person confirms the plan with `alm confirm`.
-";
-
-/// `alm guide move-cards` (Task-A00-30, approver 2026-10-16): Allomos reads only the tasks'
-/// `Card:` links (Task-A01-51); the agent finds the other card files, reports them with
-/// `alm cards found`, and moves them in after the person's Go ahead (`alm confirm`).
-const MOVE_CARDS: &str = "# Moving card files in beside their tasks
-
-A card file holds one task's detail in a file of its own (its outcome, approvals, notes and
-evidence). In Allomos it lives in the taskbag, beside the task's own files, as
-`tasks/<id>/card.md`, and the task's description links to it with a line
-`Card: [card.md](card.md)`, so a task is kept in one place and the Allomos app opens its card.
-`alm` and the app read only each task's `Card:` link: `alm cards` lists the tasks whose link
-points outside the task's folder, and the app shows them. You find the rest, and nothing moves
-until the person says Go ahead.
-
-1. Look first, change nothing. Start from `alm cards`: the tasks whose `Card:` link points
-   outside the taskbag, and what agents reported. Then find the descriptions that link to a card
-   file in another way it does not read (`alm list --json` gives every description). Also look in the project folder for card files named after task IDs (for
-   example `docs/tasks/Task-A01-02-*.md`) that no description links to. A card file belongs to the
-   task its link or its name names. Card files without a task are never moved: list them for the
-   person. A description that holds a whole card merged into it may be split back the same way:
-   the card's part becomes the card file, the description keeps the rest and the `Card:` link.
-2. Report what you found that `alm cards` does not list yet, or where a link names the wrong
-   file, so the person sees it even before you ask: `alm cards found <id>=<path> <id>=<path> …`
-   (each path relative to the project folder; several in one command; a report wins over the
-   task's link). The Allomos app shows \"N tasks keep their card files in the project folder\"
-   with **Update the taskbag…**, which opens an agent with this guide's request typed in (`alm
-   move-in` prints it). `alm cards` lists them; `alm cards found <id>=` withdraws a report.
-3. The one question. Write the plan in Markdown to a file outside the project: every card file
-   and the task it goes to (`tasks/<id>/card.md`); the links that change (each description's
-   `Card:` link; links inside a card that are relative to its old place; links in other documents
-   to a card's old place); the originals you will remove from the project folder; card files
-   without a task; tasks you cannot change (an open task held by another session: its holder
-   moves it later); and how you will commit. Then `alm confirm --title \"Update the taskbag\"
-   --plan <file>`. Exit code 0 means go ahead with the whole plan; any other means change
-   nothing: tell the person and stop. (In a quiet run, do not use `alm confirm`: park the plan as
-   a question with `alm wait`.)
-4. Move each card. When it links to other files by relative paths, first write a copy outside the
-   project whose links work from `tasks/<id>/`: a link to another card becomes `../<ID>/card.md`;
-   a link to a project file becomes its path from the task's folder (the form the `Card:` links
-   used, for example `../../../../docs/x.md` when the taskbag is the project's
-   `.allomos/taskbag/`); a link to a file that no longer exists becomes plain text. Then
-   `alm card <id> --from <copy>` (without `--from`: the reported file, else the linked one, as it
-   is). `alm` writes
-   `tasks/<id>/card.md`, points the description's `Card:` link to it (adding one at the top when
-   there is none) and clears the report; it never replaces a different `card.md` (`card_exists`).
-   A finished or dropped task can be changed whoever is named as its holder.
-5. Finish what the plan names: remove the originals from the project folder (in Git: `git rm`), change the
-   documents that linked to a card's old place, and remove the cards folder once it is empty.
-   Save and share the taskbag's changes (the files `alm` listed; it printed the Git commands as the
-   example) and the project's changes, each in its own repository. Check: `alm cards` lists none, `alm list --json` reports no issues, and
-   every moved task's `Card:` link opens its `card.md`.
-6. Tell the person what moved, what did not and why, and the card files without a task.
 ";
 
 /// `alm guide codex-rules` (Task-A03-pier032, approver 2026-11-09): Allomos's rules for Codex,
@@ -795,7 +746,8 @@ const WORKFLOW: &str = "# How to work the tasks
    any reader: you do not know who takes over, an agent or a person. It replaces the task's
    handoff note, so write the whole of it each time. Each operation with an outside effect that
    must not run twice goes in with `--evidence \"<what>\"` (under the description's
-   **Evidence**); other evidence with `alm describe`.
+   **Evidence**). Record each check you ran or did not run with `alm check-result <id> --name \"<check>\"
+   --result pass|fail|not-run [--detail \"<why>\"] [--screenshot <file>]`; other evidence with `alm describe`.
    **Write for a person first.** A person reads every handoff note, every AI decision and every
    set of check steps, often on the go and without your conversation. Each keeps one order:
    1. One sentence in plain words that a person can act on: where the work stands, or what was
@@ -1963,7 +1915,7 @@ pub fn guide(topic: Option<&str>) -> Option<String> {
         "agent-files" => Some(AGENT_FILES_EN),
         "goal" => Some(GOAL_EN),
         "github-release" => Some(crate::github_release::GITHUB_RELEASE_EN),
-        "move-cards" => Some(MOVE_CARDS),
+        "move-cards" => Some(crate::move_cards::MOVE_CARDS),
         "codex-rules" => Some(CODEX_RULES),
         "file-size" => Some(crate::file_size::FILE_SIZE_GUIDE_EN),
         _ => None,

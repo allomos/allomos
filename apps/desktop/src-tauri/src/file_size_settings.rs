@@ -88,13 +88,23 @@ mod tests {
 
         let s = set_file_size_settings(root.clone(), Some("1500".into()), false).unwrap();
         assert_eq!((s.limit_lines, s.applied_limit_lines), (Some(1500), 1500));
-        assert_eq!(file_size_settings(root.clone()).unwrap().applied_limit_lines, 1500);
+        assert_eq!(
+            file_size_settings(root.clone())
+                .unwrap()
+                .applied_limit_lines,
+            1500
+        );
 
         for bad in ["0", "abc", "1.5"] {
             let e = set_file_size_settings(root.clone(), Some(bad.into()), false).unwrap_err();
             assert!(matches!(e, Problem::FileSizeLimitInvalid { .. }), "{bad}");
         }
-        assert_eq!(file_size_settings(root.clone()).unwrap().applied_limit_lines, 1500);
+        assert_eq!(
+            file_size_settings(root.clone())
+                .unwrap()
+                .applied_limit_lines,
+            1500
+        );
 
         let s = set_file_size_settings(root.clone(), None, true).unwrap();
         assert_eq!((s.limit_lines, s.applied_limit_lines), (None, 1000));

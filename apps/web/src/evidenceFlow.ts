@@ -1,9 +1,11 @@
 // The Evidence screen of a task to check (Task-A01-herb903, decision 0029 points 1 and 2). Which
 // parts it shows and in which order come from the core with the taskbag (Task-A01-inlet632,
 // crates/core/src/evidence.rs), as `alm show --evidence` lists them, so the two never differ. A
-// part with nothing in it is left out, never drawn as an empty box. Test results are not recorded
-// yet (point 5, a later task): that part says so and leads to the description's Evidence section.
+// part with nothing in it is left out, never drawn as an empty box. Test results are the agent's
+// `alm check-result` records (point 5, Task-A01-easel128), ordered in the core; a task with none
+// (older tasks) says so and leads to the description's Evidence section.
 
+import type { Key } from "./i18n";
 import type { EvidencePart, LinkRecord, Task } from "./types";
 
 export type { EvidencePart };
@@ -34,6 +36,32 @@ export interface CodeChanges {
   files: { path: string; added: number | null; removed: number | null }[];
 }
 
+/** What the Evidence screen reads where it can (the desktop app; left out in the companions):
+ * What changed from the project's git, and a failed check's screenshots from the taskbag
+ * (`evidence_screenshot`, Task-A01-fondue470), as the picture's bytes. */
+export interface EvidenceReader {
+  changes(hashes: string[]): Promise<CodeChanges>;
+  screenshot(task: string, file: string): Promise<ArrayBuffer>;
+}
+
+/** The reader for the taskbag at `root`, from the desktop app's messenger. */
+export function evidenceReader(
+  m: {
+    codeChanges(taskbag: string, hashes: string[]): Promise<CodeChanges>;
+    evidenceScreenshot(taskbag: string, task: string, file: string): Promise<ArrayBuffer>;
+  },
+  root: string,
+): EvidenceReader {
+  return { changes: (hashes) => m.codeChanges(root, hashes), screenshot: (task, file) => m.evidenceScreenshot(root, task, file) };
+}
+
+/** The picture type of a screenshot by its file name, as `alm` names them (`.png`, `.jpg`,
+ * `.webp`). */
+export function screenshotType(file: string): string {
+  const end = file.toLowerCase().split(".").pop();
+  return end === "jpg" || end === "jpeg" ? "image/jpeg" : end === "webp" ? "image/webp" : "image/png";
+}
+
 /** How many changed files are listed before "and n more". */
 export const MOST_FILES = 30;
 
@@ -47,4 +75,9 @@ export function changeTotals(files: CodeChanges["files"]): { files: number; adde
  * computer does not have it, undefined while not read (or where git cannot be read). */
 export function commitSubject(changes: CodeChanges | null, ref: string): string | null | undefined {
   return changes?.commits.find((c) => c.hash === ref)?.subject;
+}
+
+/** The words for a test result, by its written form; null for one Allomos does not know. */
+export function resultKey(result: string): Key | null {
+  return result === "fail" ? "evidence.result_fail" : result === "not-run" ? "evidence.result_not_run" : result === "pass" ? "evidence.result_pass" : null;
 }

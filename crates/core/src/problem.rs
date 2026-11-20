@@ -199,6 +199,21 @@ problems! {
     /// `alm trace` with something that is neither a requirement ID nor a decision number
     /// (Task-A01-fennel617).
     TraceInvalid { reference } => "trace_invalid", "\"{reference}\" is neither a requirement ID nor a decision number. Give a requirement as REQUIREMENTS.md numbers it (for example R77) or a decision by its number (for example 0021).";
+    /// `alm check-result` without the check's name (Task-A01-easel128).
+    CheckNameMissing => "check_name_missing", "Name the check whose result you record: `alm check-result <id> --name \"<check>\" --result pass|fail|not-run`.";
+    /// `alm check-result` with a result that is none of the three (Task-A01-easel128).
+    CheckResultUnknown { result } => "check_result_unknown", "\"{result}\" is not a result. Give one of: pass, fail, not-run.";
+    /// `alm check-result --screenshot` with a result other than fail (Task-A01-fondue470,
+    /// decision 0029 § 6).
+    ScreenshotNeedsFail { result } => "screenshot_needs_fail", "Screenshots go only with a failed check (decision 0029 § 6), and this result is {result}. Record it without --screenshot, or with --result fail if the check failed.";
+    /// A task's screenshots would be more than 3 (Task-A01-fondue470).
+    ScreenshotsFull { id, count, have, room } => "screenshots_full", "Task {id} keeps at most 3 screenshots and has {count} already: {have}. Give at most {room} more, or record this result without --screenshot and say in --detail what the picture shows.";
+    /// A screenshot that is not a PNG, JPEG or WebP picture (Task-A01-fondue470).
+    ScreenshotNotImage { file } => "screenshot_not_image", "{file} is not a PNG, JPEG or WebP picture. Give the screenshot saved as one of those.";
+    /// A screenshot larger than 2 MB (Task-A01-fondue470).
+    ScreenshotTooLarge { file, size } => "screenshot_too_large", "{file} is {size}, and a screenshot may be at most 2 MB. Make it smaller first, for example as a JPEG at most 1600 points wide (on macOS: `sips -s format jpeg -s formatOptions 70 -Z 1600 <file> --out <smaller.jpg>`), or capture only the window that shows the failure; then give that file.";
+    /// A screenshot file that cannot be read (Task-A01-fondue470).
+    ScreenshotUnreadable { file, detail } => "screenshot_unreadable", "The screenshot {file} cannot be read: {detail}. Give the path of a picture file on this computer.";
     /// A branch name that is not one: empty, with a space, or starting with `-` (Task-A03-22).
     BranchInvalid { name } => "branch_invalid", "\"{name}\" is not a branch name. Give the branch's real name, as your version control tool shows it (in Git: `git branch --show-current`, for example main).";
     /// A warning: `alm add task` or `alm claim` was not told which branch the agent is on, so the
