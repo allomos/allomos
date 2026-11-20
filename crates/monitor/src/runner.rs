@@ -493,6 +493,9 @@ impl Loop {
                     .get(&task.id)
                     .and_then(|b| b.working.clone()),
             });
+            // A task sent back and not finished again: the session reads why first (0030 § 6).
+            let reopened =
+                !allomos_store::reopen::active_for(&self.record.taskbag, &task).is_empty();
             let text = request::monitor_request(
                 &task.id,
                 &task.title,
@@ -502,6 +505,7 @@ impl Loop {
                 session_id.as_deref(),
                 self.record.run.quiet,
                 takeover.as_ref(),
+                reopened,
             );
             let found = self
                 .found
@@ -619,10 +623,8 @@ impl Loop {
         }
         // A slot freed by a finished, a let-go (A03-cart761) or a not-started task (A03-otter944)
         // is filled at once.
-        let freed = !finished.is_empty()
-            || gone_any
-            || waiting
-            || run.working.len() < before.working.len();
+        let freed =
+            !finished.is_empty() || gone_any || waiting || run.working.len() < before.working.len();
         let due = freed || now >= run.next_check();
         self.look_at_pauses(now);
         let run = &self.record.run;

@@ -96,9 +96,26 @@ fn takeover_paragraph(t: &Takeover, language: &str) -> String {
     }
 }
 
+/// The paragraph that tells a new session the task was sent back after it was finished (decision
+/// 0030 § 6, Task-A01-music456): read the reopen reasons first.
+fn reopened_paragraph(id: &str, language: &str) -> String {
+    match lang(language) {
+        "zh-CN" => format!(
+            "这是一个被退回的任务：做完后，检查的人觉得不行，把它退了回来。先读退回理由：alm show {id} 在交接说明前面列出的 reopen reasons（谁、什么时候、原话），照它们改；交接说明还是上一次做完时写的。\n\n"
+        ),
+        "ja" => format!(
+            "これは差し戻されたタスクです：終わったあと、確認した人が足りないと判断して差し戻しました。まず差し戻しの理由を読んでください：alm show {id} が引き継ぎメモの前に挙げる reopen reasons（だれが、いつ、その言葉）です。それに沿って直してください。引き継ぎメモは前回終えたときのままです。\n\n"
+        ),
+        _ => format!(
+            "This task was sent back: it was finished, and the person who checked it returned it. Read the reasons first: the reopen reasons alm show {id} lists ahead of the handoff note (who, when, their words), and work from them; the handoff note is still the one written when it was last finished.\n\n"
+        ),
+    }
+}
+
 /// The request a new session gets for one task. `taskbag` is the taskbag's path as the agent,
 /// working in the project folder, passes it to `--taskbag`; `session_id` the ID Allomos gave
-/// Claude Code (none for the agents that pick their own).
+/// Claude Code (none for the agents that pick their own). `reopened`: the task was sent back and
+/// not finished again since (decision 0030 § 6).
 #[allow(clippy::too_many_arguments)]
 pub fn monitor_request(
     id: &str,
@@ -109,11 +126,17 @@ pub fn monitor_request(
     session_id: Option<&str>,
     quiet: bool,
     takeover: Option<&Takeover>,
+    reopened: bool,
 ) -> String {
     let tb = format!("--taskbag \"{taskbag}\"");
     let sa = session_agent(agent);
     let usage = format!(
-        "{}{}",
+        "{}{}{}",
+        if reopened {
+            reopened_paragraph(id, language)
+        } else {
+            String::new()
+        },
         takeover
             .map(|t| takeover_paragraph(t, language))
             .unwrap_or_default(),
@@ -420,6 +443,7 @@ mod tests {
             Some("ab-12"),
             true,
             None,
+            false,
         );
         assert!(en.starts_with("Work on task A01-1 (\"Do it\") in this project's taskbag."));
         assert!(en.contains("Run every alm command with --taskbag \"../tb\"."));
@@ -437,6 +461,7 @@ mod tests {
             None,
             false,
             None,
+            false,
         );
         assert!(zh.starts_with("请做这个项目任务袋里的任务 A01-1（“做”）。"));
         assert!(zh.contains("--session-agent codex --session-id <你的会话 ID>"));
@@ -451,6 +476,7 @@ mod tests {
             None,
             true,
             None,
+            false,
         );
         assert!(ja.contains("--session-agent antigravity"));
         assert!(ja.contains("alm wait A01-1 --on"));
@@ -464,6 +490,7 @@ mod tests {
             None,
             false,
             None,
+            false,
         );
         assert!(!ja_normal.contains("git push origin refs/heads/<branch>"));
         let zh_agy = monitor_request(
@@ -475,12 +502,23 @@ mod tests {
             None,
             true,
             None,
+            false,
         );
         assert!(zh_agy.contains("git push origin refs/heads/<branch>"));
         // Another task language: English.
         assert!(
-            monitor_request("A01-1", "x", "tb", "de", "codex_cli", None, true, None)
-                .starts_with("Work on task")
+            monitor_request(
+                "A01-1",
+                "x",
+                "tb",
+                "de",
+                "codex_cli",
+                None,
+                true,
+                None,
+                false
+            )
+            .starts_with("Work on task")
         );
         let en_agy = monitor_request(
             "A01-1",
@@ -491,6 +529,7 @@ mod tests {
             None,
             true,
             None,
+            false,
         );
         assert!(en_agy.contains("only a standalone ordinary push"));
     }
@@ -511,6 +550,7 @@ mod tests {
                 Some("s"),
                 true,
                 Some(&t),
+                false,
             );
             assert!(text.contains("claude-old"), "{language}");
             assert!(text.contains("alm claim A01-1 --as"), "{language}");
@@ -533,10 +573,57 @@ mod tests {
             None,
             true,
             Some(&none),
+            false,
         );
         assert!(en.contains("Its working branch is not recorded"));
         assert!(en.contains("--branch <your branch>"));
-        let plain = monitor_request("A01-1", "x", "tb", "en", "codex_cli", None, true, None);
+        let plain = monitor_request(
+            "A01-1",
+            "x",
+            "tb",
+            "en",
+            "codex_cli",
+            None,
+            true,
+            None,
+            false,
+        );
         assert!(!plain.contains("take it over"));
+    }
+
+    #[test]
+    fn a_reopened_task_tells_the_session_to_read_the_reasons_first() {
+        for (language, words) in [
+            ("en", "This task was sent back"),
+            ("zh-CN", "这是一个被退回的任务"),
+            ("ja", "これは差し戻されたタスクです"),
+        ] {
+            let text = monitor_request(
+                "A01-1",
+                "x",
+                "tb",
+                language,
+                "claude_cli",
+                None,
+                true,
+                None,
+                true,
+            );
+            assert!(text.contains(words), "{language}");
+            assert!(text.contains("alm show A01-1"), "{language}");
+            assert!(text.contains("reopen reasons"), "{language}");
+            let plain = monitor_request(
+                "A01-1",
+                "x",
+                "tb",
+                language,
+                "claude_cli",
+                None,
+                true,
+                None,
+                false,
+            );
+            assert!(!plain.contains(words), "{language}");
+        }
     }
 }
