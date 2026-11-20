@@ -358,7 +358,8 @@ pub fn ask_with_terminal(
         // agent with it, as the monitor does (Task-A03-marina834). Codex gets the monitor's
         // normal-mode command: its `workspace-write` sandbox with the taskbag and its project
         // folders writable; Antigravity adds them to its workspace (Task-A03-latch882); Claude
-        // Code adds them and edits there without asking (Task-A03-emu042).
+        // Code allows alm/tests, adds only permanently trusted folders, and keeps auto mode if
+        // already default (Task-A03-emu042, Task-A03-lava982).
         let dirs = workspace_dirs(taskbag, project);
         let program =
             session_command(id, None, &dirs).ok_or_else(|| ask_failed(id, "no way to open it"))?;
@@ -464,19 +465,79 @@ mod tests {
         assert!(is_terminal_agent("claude_cli") && !is_terminal_agent("claude_app"));
     }
 
-    /// Task-A03-marina834: the app's terminal commands are the monitor's own (normal mode): no
-    /// `claude-cli://`, the request from the start script, and Codex in its `workspace-write`
-    /// sandbox with the taskbag writable.
+    /// Task-A03-marina834, A03-lava982: the app's terminal commands are the monitor's normal-mode
+    /// commands (no `claude-cli://`, request from the start script). Codex and Antigravity keep
+    /// their `--add-dir` flags; Claude Code separates desktop/normal opens from quiet monitoring.
     #[test]
     fn the_apps_terminal_commands_are_the_monitors() {
+        use allomos_monitor::flow::Choice;
+        use allomos_monitor::permissions::{CLAUDE_ALLOWED_TOOLS, ClaudeDefaultMode, ClaudeEnv};
+        use allomos_monitor::terminal::session_command_with_quiet;
+
         let dirs = [PathBuf::from("/w/tb/.allomos/taskbag")];
         let claude = session_command("claude_cli", None, &dirs).unwrap();
-        // Task-A03-emu042: Claude Code edits the project and the taskbag without asking.
-        assert_eq!(
-            claude,
-            "claude --allowedTools 'Bash(alm:*),Bash(cargo test:*),Bash(cargo check:*),Bash(npm test:*),Bash(npm run test:*),Bash(pnpm test:*),Bash(yarn test:*),Bash(pytest:*),Bash(go test:*)' --add-dir '/w/tb/.allomos/taskbag' --permission-mode acceptEdits \"$allomos_request\""
-        );
+        assert!(claude.starts_with(&format!("claude --allowedTools '{CLAUDE_ALLOWED_TOOLS}' ")));
         assert!(!claude.contains("claude-cli://"));
+        assert!(!claude.contains("--add-dir '/w/tb/.allomos/taskbag'"));
+        assert!(claude.ends_with(" \"$allomos_request\""));
+
+        // Explicit env: desktop/normal open vs quiet monitoring for Claude Code.
+        let trusted_other = ClaudeEnv {
+            default_mode: ClaudeDefaultMode::Other,
+            state_json: Some(
+                r#"{"projects":{"/w/tb/.allomos/taskbag":{"hasTrustDialogAccepted":true}}}"#.into(),
+            ),
+        };
+        let desktop_other = session_command_with_quiet(
+            "claude_cli",
+            None,
+            false,
+            &dirs,
+            &Choice::default(),
+            None,
+            Some(&trusted_other),
+        )
+        .unwrap();
+        assert_eq!(
+            desktop_other,
+            format!(
+                "claude --allowedTools '{CLAUDE_ALLOWED_TOOLS}' --add-dir '/w/tb/.allomos/taskbag' --permission-mode acceptEdits \"$allomos_request\""
+            )
+        );
+        let desktop_auto = session_command_with_quiet(
+            "claude_cli",
+            None,
+            false,
+            &dirs,
+            &Choice::default(),
+            None,
+            Some(&ClaudeEnv {
+                default_mode: ClaudeDefaultMode::Auto,
+                state_json: None,
+            }),
+        )
+        .unwrap();
+        assert_eq!(
+            desktop_auto,
+            format!("claude --allowedTools '{CLAUDE_ALLOWED_TOOLS}' -- \"$allomos_request\"")
+        );
+        let monitor_quiet = session_command_with_quiet(
+            "claude_cli",
+            Some("sess-1"),
+            true,
+            &dirs,
+            &Choice::default(),
+            None,
+            Some(&trusted_other),
+        )
+        .unwrap();
+        assert_eq!(
+            monitor_quiet,
+            format!(
+                "claude --session-id 'sess-1' --allowedTools '{CLAUDE_ALLOWED_TOOLS}' --permission-mode auto \"$allomos_request\""
+            )
+        );
+
         assert_eq!(
             session_command("codex_cli", None, &dirs).unwrap(),
             "codex --sandbox workspace-write --add-dir '/w/tb/.allomos/taskbag' \"$allomos_request\""

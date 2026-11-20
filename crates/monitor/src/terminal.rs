@@ -9,7 +9,7 @@ use std::process::Command;
 use std::time::Duration;
 
 use crate::flow::Choice;
-use crate::permissions::{add_dirs, claude_permission_args};
+use crate::permissions::{ClaudeEnv, add_dirs, claude_permission_args};
 use allomos_core::Problem;
 
 /// A program started without a window. On Windows a windowed app's command-line child (`claude
@@ -505,7 +505,7 @@ pub fn powershell_script(
     dirs: &[PathBuf],
 ) -> String {
     let args = if id == "claude_cli" {
-        claude_permission_args(dirs, powershell_quote)
+        claude_permission_args(false, dirs, None, None, false, powershell_quote, "'--'")
     } else {
         add_dirs(dirs, powershell_quote)
     };
@@ -715,10 +715,12 @@ fn antigravity_quiet_settings_from_read(
 /// app access. User settings are untouched. Antigravity adds `dirs` to its workspace
 /// ([`workspace_dirs`], Task-A03-latch882), and Codex makes them writable in its sandbox
 /// (`--add-dir`, Task-A03-bag625), so a quiet session's writes to the taskbag do not fail
-/// silently; Claude Code adds them too and edits there without asking ([`claude_permission_args`](crate::permissions::claude_permission_args),
-/// Task-A03-emu042).
+/// silently; Claude Code separates quiet monitoring (`--permission-mode auto`, no `--add-dir`)
+/// from normal/desktop launches (trusted `--add-dir` only, keeping `auto` when configured;
+/// [`claude_permission_args_for`](crate::permissions::claude_permission_args_for),
+/// Task-A03-emu042, Task-A03-lava982).
 pub fn session_command(id: &str, session_id: Option<&str>, dirs: &[PathBuf]) -> Option<String> {
-    session_command_with_quiet(id, session_id, false, dirs, &Choice::default())
+    session_command_with_quiet(id, session_id, false, dirs, &Choice::default(), None, None)
 }
 
 /// The words a chosen model and reasoning effort add to agent `id`'s command (A03-alto709), each
@@ -747,12 +749,14 @@ pub fn choice_args(id: &str, choice: &Choice, quote: fn(&str) -> String) -> Stri
     out
 }
 
-fn session_command_with_quiet(
+pub fn session_command_with_quiet(
     id: &str,
     session_id: Option<&str>,
     quiet: bool,
     dirs: &[PathBuf],
     choice: &Choice,
+    config: Option<(&str, &Path)>,
+    claude: Option<&ClaudeEnv>,
 ) -> Option<String> {
     let request = REQUEST_ARG;
     let chosen = choice_args(id, choice, shell_quote);
@@ -760,11 +764,11 @@ fn session_command_with_quiet(
         ("claude_cli", Some(s)) => Some(format!(
             "claude --session-id {} {chosen}{}{request}",
             shell_quote(s),
-            claude_permission_args(dirs, shell_quote)
+            claude_permission_args(quiet, dirs, config, claude, true, shell_quote, "--")
         )),
         ("claude_cli", None) => Some(format!(
             "claude {chosen}{}{request}",
-            claude_permission_args(dirs, shell_quote)
+            claude_permission_args(quiet, dirs, config, claude, true, shell_quote, "--")
         )),
         ("codex_cli", _) => Some(format!(
             "codex {CODEX_SANDBOX}{}{}{chosen}{request}",
@@ -810,9 +814,11 @@ pub fn powershell_session(
         false,
         dirs,
         &Choice::default(),
+        None,
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn powershell_session_with_quiet(
     id: &str,
     project: &Path,
@@ -824,6 +830,7 @@ fn powershell_session_with_quiet(
     quiet: bool,
     dirs: &[PathBuf],
     choice: &Choice,
+    claude: Option<&ClaudeEnv>,
 ) -> String {
     let file = powershell_quote(&file.display().to_string());
     let chosen = choice_args(id, choice, powershell_quote);
@@ -831,11 +838,12 @@ fn powershell_session_with_quiet(
         ("claude_cli", Some(s)) => format!(
             "--session-id {} {chosen}{}",
             powershell_quote(s),
-            claude_permission_args(dirs, powershell_quote)
+            claude_permission_args(quiet, dirs, config, claude, true, powershell_quote, "'--'")
         ),
-        ("claude_cli", None) => {
-            format!("{chosen}{}", claude_permission_args(dirs, powershell_quote))
-        }
+        ("claude_cli", None) => format!(
+            "{chosen}{}",
+            claude_permission_args(quiet, dirs, config, claude, true, powershell_quote, "'--'")
+        ),
         ("codex_cli", _) => format!(
             "{CODEX_SANDBOX}{}{}{chosen}",
             add_dirs(dirs, powershell_quote),
@@ -921,7 +929,9 @@ pub fn start_session(
     if session_id.is_some_and(|s| !plain_session_id(s)) {
         return Err(ask_failed(id, "the session ID is not a plain ID"));
     }
-    let Some(program) = session_command_with_quiet(id, session_id, quiet, dirs, choice) else {
+    let Some(program) =
+        session_command_with_quiet(id, session_id, quiet, dirs, choice, config, None)
+    else {
         return Err(ask_failed(id, "no way to start it"));
     };
     // An extra account's folder variable goes in front of the command, for that command only.
@@ -930,7 +940,7 @@ pub fn start_session(
         let file = private_temp_file("allomos-request", "txt", request.as_bytes())
             .map_err(|e| ask_failed(id, e))?;
         let script = powershell_session_with_quiet(
-            id, project, found, &file, session_id, alm_dir, config, quiet, dirs, choice,
+            id, project, found, &file, session_id, alm_dir, config, quiet, dirs, choice, None,
         );
         return new_console("powershell.exe")
             .args(["-NoExit", "-NoLogo", "-Command", &script])
@@ -981,23 +991,49 @@ pub fn find_terminal_agents() -> Vec<(String, PathBuf)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::permissions::CLAUDE_ALLOWED_TOOLS;
+    use crate::permissions::{CLAUDE_ALLOWED_TOOLS, ClaudeDefaultMode};
 
-    /// Task-A03-emu042: what every Claude Code session Allomos starts gets, with no extra folders.
+    /// Task-A03-emu042, A03-lava982: Claude Code permission fragments for tests (explicit
+    /// `ClaudeEnv`, never relying on the host computer's `~/.claude`).
     const CLAUDE_TOOLS: &str = "--allowedTools 'Bash(alm:*),Bash(cargo test:*),Bash(cargo check:*),Bash(npm test:*),Bash(npm run test:*),Bash(pnpm test:*),Bash(yarn test:*),Bash(pytest:*),Bash(go test:*)' ";
     const CLAUDE_EDITS: &str = "--allowedTools 'Bash(alm:*),Bash(cargo test:*),Bash(cargo check:*),Bash(npm test:*),Bash(npm run test:*),Bash(pnpm test:*),Bash(yarn test:*),Bash(pytest:*),Bash(go test:*)' --permission-mode acceptEdits ";
+    const CLAUDE_AUTO: &str = "--allowedTools 'Bash(alm:*),Bash(cargo test:*),Bash(cargo check:*),Bash(npm test:*),Bash(npm run test:*),Bash(pnpm test:*),Bash(yarn test:*),Bash(pytest:*),Bash(go test:*)' --permission-mode auto ";
 
-    /// Task-A03-emu042: Claude Code on Windows gets the same permissions and folders, from the
-    /// monitor (request read from its file) and from the app (request pasted).
+    fn claude_other() -> ClaudeEnv {
+        ClaudeEnv::default()
+    }
+
+    fn claude_with_trusted(mode: ClaudeDefaultMode, trusted: &[&str]) -> ClaudeEnv {
+        let mut projects = serde_json::Map::new();
+        for dir in trusted {
+            projects.insert(
+                (*dir).to_string(),
+                serde_json::json!({ "hasTrustDialogAccepted": true }),
+            );
+        }
+        ClaudeEnv {
+            default_mode: mode,
+            state_json: Some(serde_json::json!({ "projects": projects }).to_string()),
+        }
+    }
+
+    /// Task-A03-emu042, A03-lava982: Claude Code on Windows separates quiet monitoring (`auto`,
+    /// no `--add-dir`) from normal/app launches (trusted `--add-dir` only, keeping `auto` when
+    /// configured, falling back to `acceptEdits` otherwise).
     #[test]
-    fn claude_on_windows_edits_the_project_and_the_taskbag_without_asking() {
-        let dirs = [PathBuf::from(r"C:\tb\.allomos\taskbag")];
+    fn claude_on_windows_separates_quiet_and_normal_permissions() {
+        let trusted_dir = PathBuf::from(r"C:\tb\.allomos\taskbag");
+        let untrusted_dir = PathBuf::from(r"C:\other\.allomos\taskbag");
+        let dirs = [trusted_dir.clone(), untrusted_dir];
         let found = r"C:\npm\claude.cmd";
-        let perms = format!(
+
+        let other_trusted =
+            claude_with_trusted(ClaudeDefaultMode::Other, &[r"C:\tb\.allomos\taskbag"]);
+        let normal_other = format!(
             r"{CLAUDE_TOOLS}--add-dir 'C:\tb\.allomos\taskbag' --permission-mode acceptEdits "
         );
         assert_eq!(
-            powershell_session(
+            powershell_session_with_quiet(
                 "claude_cli",
                 Path::new(r"C:\p"),
                 found,
@@ -1005,17 +1041,66 @@ mod tests {
                 Some("ab-1"),
                 None,
                 None,
+                false,
                 &dirs,
+                &Choice::default(),
+                Some(&other_trusted),
             ),
             format!(
-                r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-1' {perms}$request"
+                r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-1' {normal_other}$request"
             )
         );
+
+        // Normal mode with user already on auto: no downgrade to acceptEdits, `'--'` shields $request.
+        let auto_trusted =
+            claude_with_trusted(ClaudeDefaultMode::Auto, &[r"C:\tb\.allomos\taskbag"]);
+        assert_eq!(
+            powershell_session_with_quiet(
+                "claude_cli",
+                Path::new(r"C:\p"),
+                found,
+                Path::new(r"C:\t\r.txt"),
+                Some("ab-1"),
+                None,
+                None,
+                false,
+                &dirs,
+                &Choice::default(),
+                Some(&auto_trusted),
+            ),
+            format!(
+                r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-1' {CLAUDE_TOOLS}--add-dir 'C:\tb\.allomos\taskbag' '--' $request"
+            )
+        );
+
+        // Quiet mode: `--permission-mode auto`, no `--add-dir` (even for trusted dirs).
+        assert_eq!(
+            powershell_session_with_quiet(
+                "claude_cli",
+                Path::new(r"C:\p"),
+                found,
+                Path::new(r"C:\t\r.txt"),
+                Some("ab-1"),
+                None,
+                None,
+                true,
+                &dirs,
+                &Choice::default(),
+                Some(&other_trusted),
+            ),
+            format!(
+                r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-1' {CLAUDE_AUTO}$request"
+            )
+        );
+
+        // Manual app launch on Windows (`powershell_script`, pasted request): matches local env.
+        let expected_script_args =
+            claude_permission_args(false, &dirs, None, None, false, powershell_quote, "'--'");
         assert_eq!(
             powershell_script("claude_cli", Path::new(r"C:\p"), found, None, &dirs),
             format!(
                 r"Set-Location -LiteralPath 'C:\p'; & '{found}' {}",
-                perms.trim_end()
+                expected_script_args.trim_end()
             )
         );
     }
@@ -1068,8 +1153,9 @@ mod tests {
             model: m.map(str::to_string),
             effort: e.map(str::to_string),
         };
+        let other = claude_other();
         let cmd = |id: &str, c: &Choice| {
-            session_command_with_quiet(id, Some("s-1"), false, &[], c).unwrap()
+            session_command_with_quiet(id, Some("s-1"), false, &[], c, None, Some(&other)).unwrap()
         };
         // The default: exactly the command without a choice.
         assert_eq!(
@@ -1115,6 +1201,7 @@ mod tests {
                 false,
                 &[],
                 c,
+                Some(&other),
             )
         };
         assert!(
@@ -1151,8 +1238,18 @@ mod tests {
     /// Claude Code with the session ID Allomos made.
     #[test]
     fn monitored_sessions_start_with_the_request_sent() {
+        let other = claude_other();
         assert_eq!(
-            session_command("claude_cli", Some("0b1c-2d"), &[]).as_deref(),
+            session_command_with_quiet(
+                "claude_cli",
+                Some("0b1c-2d"),
+                false,
+                &[],
+                &Choice::default(),
+                None,
+                Some(&other),
+            )
+            .as_deref(),
             Some(
                 format!("claude --session-id '0b1c-2d' {CLAUDE_EDITS}\"$allomos_request\"")
                     .as_str()
@@ -1198,7 +1295,7 @@ mod tests {
         assert!(!plain_session_id(""));
         let found = r"C:\npm\claude.cmd";
         assert_eq!(
-            powershell_session(
+            powershell_session_with_quiet(
                 "claude_cli",
                 Path::new(r"C:\p"),
                 found,
@@ -1206,7 +1303,10 @@ mod tests {
                 Some("ab-12"),
                 None,
                 None,
-                &[]
+                false,
+                &[],
+                &Choice::default(),
+                Some(&other),
             ),
             format!(
                 r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-12' {CLAUDE_EDITS}$request"
@@ -1375,9 +1475,16 @@ mod tests {
     fn antigravity_adds_the_taskbag_and_its_project_folders_to_its_workspace() {
         let request = REQUEST_ARG;
         let one = [PathBuf::from("/w/my tb/.allomos/taskbag")];
-        let quiet =
-            session_command_with_quiet("antigravity_cli", None, true, &one, &Choice::default())
-                .expect("quiet Antigravity command");
+        let quiet = session_command_with_quiet(
+            "antigravity_cli",
+            None,
+            true,
+            &one,
+            &Choice::default(),
+            None,
+            None,
+        )
+        .expect("quiet Antigravity command");
         assert!(quiet.starts_with("agy --add-dir '/w/my tb/.allomos/taskbag' --settings '"));
         assert!(quiet.contains(ANTIGRAVITY_PUSH_RULE));
         assert!(quiet.ends_with(&format!(" -i {request}")));
@@ -1395,9 +1502,51 @@ mod tests {
                 .as_str()
             )
         );
+        // Task-A03-lava982: Claude Code in normal mode adds only permanently trusted folders;
+        // in quiet mode it omits --add-dir and uses --permission-mode auto.
+        let trusted_all = claude_with_trusted(
+            ClaudeDefaultMode::Other,
+            &["/w/tb/.allomos/taskbag", "/w/site", "/w/O'Neil app"],
+        );
         assert_eq!(
-            session_command("claude_cli", None, &several).as_deref(),
+            session_command_with_quiet(
+                "claude_cli",
+                None,
+                false,
+                &several,
+                &Choice::default(),
+                None,
+                Some(&trusted_all),
+            )
+            .as_deref(),
             Some(format!("claude {CLAUDE_TOOLS}--add-dir '/w/tb/.allomos/taskbag' --add-dir '/w/site' --add-dir '/w/O'\\''Neil app' --permission-mode acceptEdits {request}").as_str())
+        );
+        let trusted_one = claude_with_trusted(ClaudeDefaultMode::Auto, &["/w/site"]);
+        assert_eq!(
+            session_command_with_quiet(
+                "claude_cli",
+                None,
+                false,
+                &several,
+                &Choice::default(),
+                None,
+                Some(&trusted_one),
+            )
+            .as_deref(),
+            Some(format!("claude {CLAUDE_TOOLS}--add-dir '/w/site' -- {request}").as_str())
+        );
+        assert_eq!(
+            session_command_with_quiet(
+                "claude_cli",
+                Some("ab-12"),
+                true,
+                &several,
+                &Choice::default(),
+                None,
+                Some(&trusted_all),
+            )
+            .as_deref(),
+            Some(format!("claude --session-id 'ab-12' {CLAUDE_AUTO}{request}").as_str())
         );
         let windows_one = [PathBuf::from(r"C:\my tb\.allomos\taskbag")];
         let windows_several = [
@@ -1424,7 +1573,8 @@ mod tests {
                     None,
                     true,
                     dirs,
-                    &Choice::default()
+                    &Choice::default(),
+                    None,
                 ),
                 format!("{start} {args}{settings}-i $request")
             );
@@ -1504,7 +1654,16 @@ mod tests {
             PathBuf::from("/w/O'Neil app"),
         ];
         assert_eq!(
-            session_command_with_quiet("codex_cli", None, true, &one, &Choice::default()).as_deref(),
+            session_command_with_quiet(
+                "codex_cli",
+                None,
+                true,
+                &one,
+                &Choice::default(),
+                None,
+                None,
+            )
+            .as_deref(),
             Some(
                 format!(
                     "codex --sandbox workspace-write --add-dir '/w/my tb/.allomos/taskbag' {quiet}{request}"
@@ -1513,7 +1672,16 @@ mod tests {
             )
         );
         assert_eq!(
-            session_command_with_quiet("codex_cli", None, true, &several, &Choice::default()).as_deref(),
+            session_command_with_quiet(
+                "codex_cli",
+                None,
+                true,
+                &several,
+                &Choice::default(),
+                None,
+                None,
+            )
+            .as_deref(),
             Some(
                 format!(
                     "codex --sandbox workspace-write --add-dir '/w/tb/.allomos/taskbag' --add-dir '/w/site' --add-dir '/w/O'\\''Neil app' {quiet}{request}"
@@ -1554,7 +1722,8 @@ mod tests {
                     None,
                     true,
                     dirs,
-                    &Choice::default()
+                    &Choice::default(),
+                    None,
                 ),
                 format!("{start} {args}{quiet}$request")
             );
@@ -1582,8 +1751,18 @@ mod tests {
         } else {
             ""
         };
+        let other = claude_other();
         assert_eq!(
-            session_command_with_quiet("codex_cli", None, true, &[], &Choice::default()).as_deref(),
+            session_command_with_quiet(
+                "codex_cli",
+                None,
+                true,
+                &[],
+                &Choice::default(),
+                None,
+                None,
+            )
+            .as_deref(),
             Some(format!(
                 "codex --sandbox workspace-write --ask-for-approval never --config sandbox_workspace_write.network_access=true {app_access}{request}"
             ).as_str())
@@ -1593,13 +1772,29 @@ mod tests {
             Some(format!("codex --sandbox workspace-write {request}").as_str())
         );
         assert_eq!(
-            session_command_with_quiet("claude_cli", Some("ab-12"), true, &[], &Choice::default())
-                .as_deref(),
-            Some(format!("claude --session-id 'ab-12' {CLAUDE_EDITS}{request}").as_str())
+            session_command_with_quiet(
+                "claude_cli",
+                Some("ab-12"),
+                true,
+                &[PathBuf::from("/w/untrusted/.allomos/taskbag")],
+                &Choice::default(),
+                None,
+                Some(&other),
+            )
+            .as_deref(),
+            Some(format!("claude --session-id 'ab-12' {CLAUDE_AUTO}{request}").as_str())
         );
         assert_eq!(
-            session_command_with_quiet("antigravity_cli", None, true, &[], &Choice::default())
-                .as_deref(),
+            session_command_with_quiet(
+                "antigravity_cli",
+                None,
+                true,
+                &[],
+                &Choice::default(),
+                None,
+                None,
+            )
+            .as_deref(),
             Some(
                 format!(
                     "agy {}-i {request}",
@@ -1620,7 +1815,8 @@ mod tests {
                 None,
                 true,
                 &[],
-                &Choice::default()
+                &Choice::default(),
+                None,
             ),
             format!(
                 "Set-Location -LiteralPath 'C:\\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\\t\\r.txt'; Remove-Item -LiteralPath 'C:\\t\\r.txt'; & 'C:\\npm\\codex.cmd' --sandbox workspace-write --ask-for-approval never --config sandbox_workspace_write.network_access=true {app_access}$request"
@@ -1685,12 +1881,52 @@ mod tests {
             vec![r#""command(regex:^echo x$)""#; 120].join(",")
         );
         let added_s = added.display().to_string();
+        let claude_trusted = claude_with_trusted(ClaudeDefaultMode::Other, &[&added_s]);
+        let claude_auto_env = claude_with_trusted(ClaudeDefaultMode::Auto, &[&added_s]);
         for shell in ["/bin/zsh", "/bin/sh"] {
             if !Path::new(shell).exists() {
                 continue;
             }
-            for id in ["claude_cli", "codex_cli", "antigravity_cli"] {
-                let mut program = session_command(id, None, &[added.clone()]).unwrap();
+            for (case, id) in [
+                ("claude_normal_edits", "claude_cli"),
+                ("claude_normal_auto", "claude_cli"),
+                ("claude_quiet", "claude_cli"),
+                ("codex", "codex_cli"),
+                ("antigravity", "antigravity_cli"),
+            ] {
+                let mut program = match case {
+                    "claude_normal_edits" => session_command_with_quiet(
+                        id,
+                        None,
+                        false,
+                        &[added.clone()],
+                        &Choice::default(),
+                        None,
+                        Some(&claude_trusted),
+                    )
+                    .unwrap(),
+                    "claude_normal_auto" => session_command_with_quiet(
+                        id,
+                        None,
+                        false,
+                        &[added.clone()],
+                        &Choice::default(),
+                        None,
+                        Some(&claude_auto_env),
+                    )
+                    .unwrap(),
+                    "claude_quiet" => session_command_with_quiet(
+                        id,
+                        None,
+                        true,
+                        &[added.clone()],
+                        &Choice::default(),
+                        None,
+                        Some(&claude_trusted),
+                    )
+                    .unwrap(),
+                    _ => session_command(id, None, &[added.clone()]).unwrap(),
+                };
                 if id == "antigravity_cli" {
                     program = program.replacen(
                         " -i ",
@@ -1740,9 +1976,9 @@ mod tests {
                         .unwrap()
                         .split(|b| *b == 0)
                         .collect();
-                    let mut want: Vec<&[u8]> = match id {
-                        // Task-A03-emu042: each permission word reaches Claude Code whole.
-                        "claude_cli" => vec![
+                    let mut want: Vec<&[u8]> = match case {
+                        // Task-A03-emu042, A03-lava982: each permission word reaches Claude whole.
+                        "claude_normal_edits" => vec![
                             b"--allowedTools",
                             CLAUDE_ALLOWED_TOOLS.as_bytes(),
                             b"--add-dir",
@@ -1750,7 +1986,20 @@ mod tests {
                             b"--permission-mode",
                             b"acceptEdits",
                         ],
-                        "codex_cli" => vec![
+                        "claude_normal_auto" => vec![
+                            b"--allowedTools",
+                            CLAUDE_ALLOWED_TOOLS.as_bytes(),
+                            b"--add-dir",
+                            added_s.as_bytes(),
+                            b"--",
+                        ],
+                        "claude_quiet" => vec![
+                            b"--allowedTools",
+                            CLAUDE_ALLOWED_TOOLS.as_bytes(),
+                            b"--permission-mode",
+                            b"auto",
+                        ],
+                        "codex" => vec![
                             b"--sandbox",
                             b"workspace-write",
                             b"--add-dir",
@@ -1765,7 +2014,7 @@ mod tests {
                         ],
                     };
                     want.push(text.as_bytes());
-                    assert_eq!(args, want, "{shell} {id} request {n}");
+                    assert_eq!(args, want, "{shell} {case} request {n}");
                     assert_eq!(
                         std::fs::read_to_string(format!("{}.pwd", out.display()))
                             .unwrap()

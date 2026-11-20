@@ -1163,7 +1163,7 @@
   "monitor.every_hours": "{n} 時間ごと",
   "monitor.agent": "エージェント",
   "monitor.how_terminal": "「肩代」がタスクごとにターミナルのセッションを開きます。最後まで人の操作はいりません",
-  "monitor.permissions_claude_cli": "タスクごとに新しい Claude Code のセッションを開くため、1 つのセッションで auto mode をオンにしても（Shift+Tab）次のセッションには引き継がれません。始める前に、Claude Code 自身の設定で auto mode を既定にしてください。そうしないと、セッションごとに許可を求めて止まります。「肩代」がエージェントの権限を変えることはありません。",
+  "monitor.permissions_claude_cli": "タスクごとに新しい Claude Code のセッションを開きます。静かなモードでは、「肩代」はそのセッション限りの auto mode（--permission-mode auto。すでに bypassPermissions を使っている場合はそのまま）で起動し、alm と一般的なテストコマンドを許可し、信頼されていないフォルダーで起動時の信頼確認が出ないよう --add-dir を付けません。通常のモードでは、alm と一般的なテストコマンドを許可し、Claude Code がすでに恒久的に信頼しているフォルダーだけ --add-dir で追加し、既定が auto mode でない場合のみ acceptEdits を使います。「肩代」があなたの ~/.claude/settings.json を変更することはありません。始める前に、プロジェクトフォルダーで一度 claude を開いて恒久的に信頼しておいてください。",
   "monitor.permissions_codex_cli": "タスクごとに新しい Codex のセッションが開き、そのコマンドを承認する人はいません。「換肩」の Codex 用ルール（下の選択肢）があれば、各セッションは尋ねずにプル、コミット、プッシュ、マージし、alm を実行できます。ほかのコマンドはこれまでどおり Codex のサンドボックスの中です。このサンドボックスは workspace-write で開くので、プロジェクトフォルダーの中のファイルは尋ねずに変えられます。「換肩」はさらに、これらのセッションに限ってタスクバッグのフォルダーとタスクバッグのほかのプロジェクトフォルダーを書き込み可能にする（--add-dir）ので、そこへの書き込みは失敗しません。Codex の設定は変えません。ルールがないと、Codex はサンドボックスからリポジトリを変えられず、止まります。",
   "monitor.codex_rules_add": "Codex が Git と alm を尋ねずに実行できるようにする（{path} を加える）",
   "monitor.codex_rules_update": "Codex が Git と alm を尋ねずに実行できるようにする（{path} を更新する）",
