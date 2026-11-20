@@ -148,7 +148,7 @@ test("the last run counts the done tasks per agent that gave them out", () => {
   const last = {
     ended: "2026-11-09T10:00:00Z",
     scope: { kind: "all" as const },
-    taken: ["A01-01", "A01-02", "A01-03"],
+    taken: ["A01-01", "A01-02", "A01-03", "A01-01"],
     takenBy: { "A01-01": "claude_cli" as const, "A01-02": "codex_cli" as const, "A01-03": "claude_cli" as const },
   };
   const now = [
@@ -175,7 +175,7 @@ test("the tasks a run let go to another session are read, each with who holds it
     null,
   );
   assert.ok(r && isRun(r));
-  assert.deepEqual(r.letGo, [{ id: "A01-02", agent: "claude_cli", holder: "codex-a01-02" }], "an unknown agent or a missing holder is left out");
+  assert.deepEqual(r.letGo, [{ id: "A01-02", agent: "claude_cli", holder: "codex-a01-02", at: 30 }], "an unknown agent or a missing holder is left out");
   // Its slot is free again.
   assert.deepEqual(freeAgents(r), ["claude_cli", "codex_cli"]);
   const none = readEntry(entry(), null);
@@ -247,6 +247,12 @@ const entry = (over: Record<string, unknown> = {}) => ({
     checked: 100,
     ...over,
   },
+});
+
+test("a task dispatched twice is shown only once when it needs you", () => {
+  const r = readEntry(entry({ taken: ["A01-02", "A01-02"], working: [] }), "I-haul");
+  assert.ok(r && isRun(r));
+  assert.deepEqual(needYou(r, [task("A01-02", { state: "waiting" })]), ["A01-02"]);
 });
 
 test("a session at a confirmation frees its slot, is not stalled and needs you (Task-A03-candle790)", () => {

@@ -590,7 +590,7 @@ function RunPanel({
             <p className="muted small monitor-group-note">{t(run.noTask.length ? "monitor.group_no_task" : "monitor.sessions_none")}</p>
           )}
           {run.letGo.map((l) => (
-            <p key={l.id} className="muted small monitor-let-go">{t("monitor.let_go", { id: l.id, holder: l.holder })}</p>
+            <p key={`${l.id}-${l.at}`} className="muted small monitor-let-go">{t("monitor.let_go", { id: l.id, holder: l.holder })}</p>
           ))}
           {!grouped(run) && run.paused.map((p) => <PauseNote key={p.agent} pause={p} />)}
           <MonitorRequeue run={run} tasks={tasks} requeue={(id) => monitor.requeue(run, id)} onError={onError} />
