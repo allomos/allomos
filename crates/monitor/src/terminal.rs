@@ -1768,6 +1768,30 @@ mod tests {
         }
     }
 
+    /// By hand (Task-A03-marina834): open a real Terminal tab the way the app and the monitor do.
+    /// `ALLOMOS_PROBE_AGENT` (`claude_cli`, `codex_cli`, `antigravity_cli`), `ALLOMOS_PROBE_PROJECT`,
+    /// `ALLOMOS_PROBE_REQUEST` (a file holding the request) and, optionally, `ALLOMOS_PROBE_BIN`
+    /// (put first in the tab's `PATH`, for stand-in agents).
+    #[test]
+    #[ignore = "opens a Terminal window; run by hand"]
+    fn probe_open_terminal() {
+        let var = |k: &str| std::env::var(k).unwrap();
+        let id = var("ALLOMOS_PROBE_AGENT");
+        let request = std::fs::read_to_string(var("ALLOMOS_PROBE_REQUEST")).unwrap();
+        let bin = std::env::var("ALLOMOS_PROBE_BIN").ok().map(PathBuf::from);
+        let program = session_command(&id, None, &[]).unwrap();
+        let tab = open_terminal(
+            &id,
+            Path::new(&var("ALLOMOS_PROBE_PROJECT")),
+            &request,
+            &program,
+            bin.as_deref(),
+            false,
+        )
+        .unwrap();
+        println!("opened {tab:?}");
+    }
+
     /// Task-A03-marina834: each temporary file is new, private and named apart from every other,
     /// even within one process at the same moment.
     #[test]
