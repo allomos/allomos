@@ -115,7 +115,7 @@ const WATCH_FILES_FOR_MS = 30 * 60 * 1000;
 const WITNESS_TICK_MS = 5 * 60 * 1000;
 
 /** A banner's text: an interface message, or a problem sent by Rust. */
-type Note = Message | { problem: Problem } | { text: string };
+type Note = Message | { problem: Problem } | { text: ReactNode };
 
 function errorNote(e: unknown): Note {
   return isProblem(e) ? { problem: e } : { key: "error.unexpected", params: { detail: String(e) } };
@@ -1390,7 +1390,7 @@ function TaskbagView({
   /** Shows what went wrong, in words already written (Monitor ready tasks, Task-A03-moth285). */
   onFailure: (message: string) => void;
   /** Shows what an action did, in the window's notices (Work on it…, Task-A03-galley051). */
-  onNotice: (message: string) => void;
+  onNotice: (message: ReactNode) => void;
   /** The update notice already says the taskbag is from an older Allomos. */
   hideOlder: boolean;
   /** The desktop app, where agent sessions run: the task pane can reopen them (Task-A03-hive049). */
@@ -2217,6 +2217,7 @@ function TaskbagView({
             setProceeding(null);
             setHandingOver(proceeding.id);
           }}
+          onOpenTask={setSelectedId}
           onClose={(message) => {
             setProceeding(null);
             if (message) onNotice(message);
@@ -2226,7 +2227,6 @@ function TaskbagView({
     </>
   );
 }
-
 /** An iteration's release and dates, for the line under its name. */
 function iterationSub(it: Iteration, t: ReturnType<typeof useI18n>["t"]): string {
   const parts: string[] = [];

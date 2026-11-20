@@ -35,7 +35,7 @@ import { withDecisions } from "./stopFlow";
 import type { AskedNow, QueueRow } from "./queueFlow";
 import type { TaskChange } from "./taskChangeFlow";
 import type { StartWith, WindowStart } from "./tabsFlow";
-import type { AgentAccount, AgentAccounts } from "./monitorFlow";
+import type { AgentAccount, AgentAccounts, SessionTab } from "./monitorFlow";
 import type { ModelsRead } from "./agentModelsFlow";
 import type { Agent, AgentStatus, AlmInstalled, AlmStatus, Area, AuditSettings, KeyReplaced, RedactDone, ThisComputer, ConfirmRequest, Edit, FolderInfo, FormatState, HandoffSettings, IdentityLevel, InstructionFiles, Iteration, IterationChange, LastAgent, NewIteration, NewTask, NextIds, Opened, Problem, Progress, SetupState, Task, TaskHistory, UpdateStatus, VersionCheck, WitnessWhen } from "./types";
 
@@ -138,7 +138,9 @@ export interface Messenger {
   /** Work on it… (Task-A03-galley051): the taskbag's path as an agent in its project folder passes it to `--taskbag`. */
   proceedTaskbag(taskbag: string): Promise<string>;
   /** Work on it…: opens `agent` in the project folder of the taskbag at `taskbag` with `request` typed in. Rejects with a Problem. */
-  proceedWithAgent(agent: string, taskbag: string, request: string): Promise<void>;
+  proceedWithAgent(agent: string, taskbag: string, request: string): Promise<SessionTab | null>;
+  /** Focus the Terminal tab returned by Work on it…; false when it is no longer available. */
+  focusLaunchedTerminal(tab: SessionTab): Promise<boolean>;
   /** Work on it… with Manual: `request` as the person copies it. */
   proceedManualRequest(request: string): Promise<string>;
   /** Take over… (Task-A01-flag101): the former holder's worktree on the working branch `working`,
@@ -602,7 +604,8 @@ export const desktopMessenger: Messenger = {
   translateTaskbag: (agent, taskbag, language, target, name) => invoke<void>("translate_taskbag", { agent, taskbag, language, target, name }),
   translateRequest: (taskbag, language, target, name) => invoke<string>("translate_request", { taskbag, language, target, name }),
   proceedTaskbag: (taskbag) => invoke<string>("proceed_taskbag", { taskbag }),
-  proceedWithAgent: (agent, taskbag, request) => invoke<void>("proceed_with_agent", { agent, taskbag, request }),
+  proceedWithAgent: (agent, taskbag, request) => invoke<SessionTab | null>("proceed_with_agent", { agent, taskbag, request }),
+  focusLaunchedTerminal: (tab) => invoke<boolean>("focus_launched_terminal", { tab }),
   proceedManualRequest: (request) => invoke<string>("proceed_manual_request", { request }),
   formerWorktree: (taskbag, folder, working) => invoke<FormerWorktree | null>("former_worktree", { taskbag, folder, working }),
   codeChanges: (taskbag, hashes) => invoke<CodeChanges>("code_changes", { taskbag, hashes }),

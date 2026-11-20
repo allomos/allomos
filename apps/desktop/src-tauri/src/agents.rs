@@ -5,6 +5,7 @@
 use std::path::{Path, PathBuf};
 
 use allomos_core::Problem;
+use allomos_monitor::session_tab::{SessionTab, parse_opened};
 use serde::Serialize;
 
 // Starting terminal agents moved to the monitor crate, shared with `alm monitor` (Task-A03-cow112).
@@ -308,15 +309,30 @@ pub fn copy_text(text: &str) -> Result<(), Problem> {
 /// (Task-A03-16). Antigravity in a terminal also adds the taskbag at `taskbag` and its other
 /// project folders to its workspace (Task-A03-latch882).
 pub fn ask(agent: &Agent, project: &Path, taskbag: &Path, request: &str) -> Result<(), Problem> {
+    ask_with_terminal(agent, project, taskbag, request, false).map(drop)
+}
+
+/// Open the agent and return the macOS tab when Terminal starts it directly. For a task's
+/// Claude Code launch, use Terminal itself so the notice can bring that exact tab forward.
+pub fn ask_with_terminal(
+    agent: &Agent,
+    project: &Path,
+    taskbag: &Path,
+    request: &str,
+    track_claude: bool,
+) -> Result<Option<SessionTab>, Problem> {
     let id = agent.id.as_str();
     if !cfg!(any(target_os = "macos", windows)) {
         return Err(ask_failed(id, "not available on this system yet"));
     }
     let own_alm = crate::alm_command::own();
-    if agent.how == "link" {
+    let track_claude = track_claude && cfg!(target_os = "macos") && id == "claude_cli";
+    if agent.how == "link" && !track_claude {
         let request = link_request(request, own_alm.as_deref());
         if let Some(url) = link(id, project, &request) {
-            return open_link(&url).map_err(|e| ask_failed(id, e));
+            return open_link(&url)
+                .map(|()| None)
+                .map_err(|e| ask_failed(id, e));
         }
     }
     let alm_dir = own_alm.as_deref().and_then(Path::parent);
@@ -348,22 +364,27 @@ pub fn ask(agent: &Agent, project: &Path, taskbag: &Path, request: &str) -> Resu
         return new_console("powershell.exe")
             .args(["-NoExit", "-NoLogo", "-Command", &script])
             .spawn()
-            .map(drop)
+            .map(|_| None)
             .map_err(|e| ask_failed(id, e));
     }
-    let script = format!(
-        "tell application \"Terminal\"\nactivate\ndo script {}\nend tell",
-        applescript_string(&terminal_script(project, &program, alm_dir))
-    );
-    command("/usr/bin/osascript")
+    let line = applescript_string(&terminal_script(project, &program, alm_dir));
+    let script = if track_claude {
+        format!(
+            "tell application \"Terminal\"\nactivate\nset t to do script {line}\nset w to (first window whose tabs contains t)\nreturn (id of w as text) & \", \" & (tty of t)\nend tell"
+        )
+    } else {
+        format!("tell application \"Terminal\"\nactivate\ndo script {line}\nend tell")
+    };
+    let out = command("/usr/bin/osascript")
         .args(["-e", &script])
-        .status()
-        .map_err(|e| ask_failed(id, e))
-        .and_then(|s| {
-            s.success()
-                .then_some(())
-                .ok_or_else(|| ask_failed(id, "Terminal did not open"))
-        })
+        .output()
+        .map_err(|e| ask_failed(id, e))?;
+    if !out.status.success() {
+        return Err(ask_failed(id, "Terminal did not open"));
+    }
+    Ok(track_claude
+        .then(|| parse_opened(&String::from_utf8_lossy(&out.stdout)))
+        .flatten())
 }
 
 /// Open `url` with the app the system has for its scheme.

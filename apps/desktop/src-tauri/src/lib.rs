@@ -319,6 +319,7 @@ pub fn run() {
             agent_commands::translate_request,
             agent_commands::proceed_taskbag,
             agent_commands::proceed_with_agent,
+            agent_commands::focus_launched_terminal,
             agent_commands::proceed_manual_request,
             former_worktree::former_worktree,
             code_changes::code_changes,

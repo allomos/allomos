@@ -162,6 +162,7 @@ button.link:hover { text-decoration: underline; }
 .banner-close { border: none; background: none; color: inherit; font-size: 18px; line-height: 1; padding: 0 2px; cursor: pointer; opacity: 0.7; }
 .banner-close:hover { opacity: 1; }
 .banner.ok { background: var(--ok-bg); color: var(--ok); }
+button.proceed-task-link { font-size: inherit; text-align: start; }
 .banner.error { background: var(--err-bg); color: var(--err); }
 .banner.update { background: var(--warn-bg); color: var(--warn); align-items: center; }
 .banner-line { display: block; }

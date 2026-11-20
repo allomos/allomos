@@ -1116,6 +1116,8 @@
   "proceed.does_waiting": "The AI agent looks at it first: it tells you what it waits on and what could be done, then asks what you want it to do. It changes nothing until you answer.",
   "proceed.how": "An AI agent does it. Choose one: Allomos opens it in your project folder with the request already typed in. Nothing is sent until you send it yourself.",
   "proceed.copied": "✓ Copied. Paste it into your AI agent and send it.",
+  "proceed.open_terminal": "Open terminal",
+  "proceed.terminal_unavailable": "The terminal opened for this task is no longer available.",
   "proceed.asked": "Opened {agent}. Read the request there and send it. The row shows who holds {id} once the agent claims it.",
   "proceed.asked_sent": "Opened {agent} in a terminal, and the request was sent to it at once. The row shows who holds {id} once the agent claims it.",
   "proceed.asked_paste": "Opened {agent} in a terminal. Paste the request with {keys}, read it, and press Enter to send it. The row shows who holds {id} once the agent claims it.",
