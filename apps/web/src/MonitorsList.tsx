@@ -11,7 +11,7 @@ import type { CSSProperties, ReactNode, RefObject } from "react";
 import { useI18n } from "./i18n";
 import type { Messenger, MonitorRequest } from "./messenger";
 import { monitorAgentName } from "./AgentPicker";
-import { freeAgents, listedRuns, nextCheck, stalled, type ListedRun, type Run } from "./monitorFlow";
+import { freeAgents, listedRuns, nextCheck, splitTaskIdPhrase, stalled, type ListedRun, type Run } from "./monitorFlow";
 import { askJump } from "./iterationJumpFlow";
 import { askTaskJump } from "./taskJumpFlow";
 import { isProblem } from "./types";
@@ -271,7 +271,25 @@ function RunRow({
           {line}
         </div>
       ))}
-      {late.length > 0 && <p className="monitor-stalled small" role="status">{t("monitor.task_lost", { ids: late.map((w) => w.id).join(", ") })}</p>}
+      {late.length > 0 && (
+        <p className="monitor-stalled small" role="status">
+          {(() => {
+            const [before, after] = splitTaskIdPhrase(t("monitor.task_lost", { ids: "__TASK_IDS__" }), "__TASK_IDS__");
+            return (
+              <>
+                {before}
+                {late.map((w, index) => (
+                  <span key={w.id}>
+                    {index > 0 && ", "}
+                    {taskLink(w.id)}
+                  </span>
+                ))}
+                {after}
+              </>
+            );
+          })()}
+        </p>
+      )}
       {run.stopping && <p className="muted small">{t("monitor.stop_now_hint")}</p>}
       <div className="row-actions">
         {!run.stopping && free.length > 0 && (

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useI18n } from "./i18n";
 import { requeuePlace, type Run } from "./monitorFlow";
+import { MonitorTaskId } from "./MonitorTaskId";
 import type { Task } from "./types";
 
 /** Requeue (A03-gadget373). A request being written is not an acknowledgement: wait for the
@@ -74,6 +75,26 @@ export function useRequeue({ run, tasks, now, requeue, onError }: {
   return { status, own };
 }
 
-export function RequeueLines({ ids, status }: { ids: string[]; status: (id: string) => ReactNode }) {
-  return <>{ids.map((id) => <div key={id} className="small"><strong>{id}</strong>{" · "}{status(id)}</div>)}</>;
+export function RequeueLines({
+  ids,
+  tasks,
+  onOpenTask,
+  status,
+}: {
+  ids: string[];
+  tasks: readonly Pick<Task, "id">[];
+  onOpenTask: (id: string) => void;
+  status: (id: string) => ReactNode;
+}) {
+  return (
+    <>
+      {ids.map((id) => (
+        <div key={id} className="small">
+          <MonitorTaskId id={id} tasks={tasks} onOpenTask={onOpenTask} />
+          {" · "}
+          {status(id)}
+        </div>
+      ))}
+    </>
+  );
 }

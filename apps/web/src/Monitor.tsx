@@ -43,6 +43,7 @@ import {
 } from "./monitorFlow";
 import type { Current, Frequency, Pause, LastRun, LostRun, Levels, MonitorFolds, MonitorSettings, Run, RunState, Scope, TerminalAgent } from "./monitorFlow";
 import { RequeueLines, useRequeue } from "./MonitorRequeue";
+import { MonitorTaskId, MonitorTaskPhrase, TASK_IDS_PLACEHOLDER } from "./MonitorTaskId";
 import { useAgentAccounts } from "./useAgentAccounts";
 import { isProblem } from "./types";
 import type { Task } from "./types";
@@ -556,7 +557,16 @@ function RunPanel({
         </span>
       </div>
       {run.stopping && <p className="muted small">{t("monitor.stop_now_hint")}</p>}
-      {late.length > 0 && <p className="monitor-stalled small" role="status">{t("monitor.task_lost", { ids: late.map((w) => w.id).join(", ") })}</p>}
+      {late.length > 0 && (
+        <p className="monitor-stalled small" role="status">
+          <MonitorTaskPhrase
+            phrase={t("monitor.task_lost", { ids: TASK_IDS_PLACEHOLDER })}
+            ids={late.map((w) => w.id)}
+            tasks={tasks}
+            onOpenTask={onOpenTask}
+          />
+        </p>
+      )}
       {open && (
         <div className="monitor-panel-body">
           <p className="muted small monitor-settings">{settings}</p>
@@ -594,10 +604,17 @@ function RunPanel({
             <p className="muted small monitor-group-note">{t(run.noTask.length ? "monitor.group_no_task" : "monitor.sessions_none")}</p>
           )}
           {run.letGo.map((l) => (
-            <p key={`${l.id}-${l.at}`} className="muted small monitor-let-go">{t("monitor.let_go", { id: l.id, holder: l.holder })}</p>
+            <p key={`${l.id}-${l.at}`} className="muted small monitor-let-go">
+              <MonitorTaskPhrase
+                phrase={t("monitor.let_go", { id: TASK_IDS_PLACEHOLDER, holder: l.holder })}
+                ids={[l.id]}
+                tasks={tasks}
+                onOpenTask={onOpenTask}
+              />
+            </p>
           ))}
           {!grouped(run) && run.paused.map((p) => <PauseNote key={p.agent} pause={p} />)}
-          <RequeueLines ids={requeue.own} status={requeue.status} />
+          <RequeueLines ids={requeue.own} tasks={tasks} onOpenTask={onOpenTask} status={requeue.status} />
           {lostShown(run).length > 0 && (
             <>
               <h4 className="monitor-sessions-title small">{t("monitor.lost_title")}</h4>
@@ -605,7 +622,7 @@ function RunPanel({
                 {lostShown(run).map(({ lost: l, state }) => (
                   <li key={`${l.id}-${l.found}`} className="monitor-row not-started">
                     <span className="monitor-row-text">
-                      <strong>{l.id}</strong>
+                      <MonitorTaskId id={l.id} tasks={tasks} onOpenTask={onOpenTask} />
                       <span className="muted"> · {monitorAgentName(l.agent, t)}</span>
                       <span className="monitor-stalled small">
                         {" · "}
@@ -629,7 +646,7 @@ function RunPanel({
                 {notStarted.map(({ item: n, state }) => (
                   <li key={`${n.id}-${n.found}`} className="monitor-row not-started">
                     <span className="monitor-row-text">
-                      <strong>{n.id}</strong>
+                      <MonitorTaskId id={n.id} tasks={tasks} onOpenTask={onOpenTask} />
                       <span className="muted"> · {monitorAgentName(n.agent, t)}</span>
                       <span className="monitor-stalled small">
                         {" · "}
@@ -706,7 +723,7 @@ function SessionRow({
   return (
     <li className={`monitor-row${quiet ? " stalled" : ""}`}>
       <span className="monitor-row-text">
-        <button type="button" className="monitor-task-id" onClick={() => onOpenTask(cur.id)}>{cur.id}</button>
+        <MonitorTaskId id={cur.id} tasks={tasks} onOpenTask={onOpenTask} />
         {!inGroup && <span className="muted"> · {monitorAgentName(cur.agent, t)}</span>}
         <span className="muted small"> · {!cur.claimed && cur.takeoverFrom ? t("monitor.session_taking_over", { holder: cur.takeoverFrom, time }) : t(!cur.claimed ? "monitor.session_starting" : finishing ? "monitor.session_finishing" : "monitor.session_working", { time })}</span>
         {quiet && <span className="monitor-stalled small"> · {t("monitor.session_stalled")}</span>}

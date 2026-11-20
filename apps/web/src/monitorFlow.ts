@@ -851,3 +851,17 @@ export function readFolds(text: string | null): MonitorFolds {
 export function keptFolds(folds: MonitorFolds, runIds: string[]): MonitorFolds {
   return { sectionFolded: folds.sectionFolded, open: folds.open.filter((id) => runIds.includes(id)) };
 }
+
+/** Whether a task ID shown in a monitor panel can open a detail pane in this project (A03-scale435):
+ * only tasks that still exist in the project's task list get a clickable link. */
+export function canOpenMonitorTask(id: string, tasks: readonly Pick<Task, "id">[]): boolean {
+  return tasks.some((t) => t.id === id);
+}
+
+/** Splits a translated phrase around a placeholder where one or more task IDs are rendered as
+ * interactive links (A03-scale435). Falls back to `[phrase, ""]` if the placeholder is absent. */
+export function splitTaskIdPhrase(phrase: string, placeholder: string): [string, string] {
+  const at = phrase.indexOf(placeholder);
+  if (at < 0) return [phrase, ""];
+  return [phrase.slice(0, at), phrase.slice(at + placeholder.length)];
+}
