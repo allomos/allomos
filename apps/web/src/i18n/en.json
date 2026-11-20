@@ -1432,6 +1432,8 @@
   "monitor.lost_waiting": "found at {time}; waiting for a new session to take it over on its branch",
   "monitor.lost_taken_over": "found at {time}; a new session is taking it over",
   "monitor.lost_given_up": "found at {time}; it failed several times, so this run gives it out no more",
+  "monitor.requeue_stopped": "Its sessions failed several times; this run is no longer dispatching it.",
+  "monitor.requeue_unavailable": "The task is currently unavailable for dispatch.",
   "monitor.requeue": "Requeue",
   "monitor.requeue_sending": "Request sent; waiting for the monitor to confirm",
   "monitor.requeue_waiting": "Requeued; waiting for the monitor to dispatch",

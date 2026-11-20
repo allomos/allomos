@@ -49,14 +49,15 @@ export function MonitorRequeue({ run, tasks, requeue, onError }: {
     const task = tasks.find((task) => task.id === id);
     const working = run.working.some((work) => work.id === id);
     const current = working || (task && (task.state !== "ready" || task.holder || task.open_blockers?.length));
+    const unavailable = !task || (task.state !== "ready" && task.state !== "in_progress") || !!task.open_blockers?.length;
     return <div key={id} className="monitor-stalled small" role="status">
       <strong>{id}</strong>{" · "}
       {requests[id] === "sent" && run.givenUp.includes(id)
         ? t("monitor.requeue_sending")
         : !run.givenUp.includes(id)
-          ? working ? t("monitor.requeue_working") : t("monitor.requeue_waiting")
-          : t("monitor.given_up", { ids: id })}
-      {current && task && <span>{" · "}{t("monitor.requeue_state", { state: t(`state.${task.state}`) })}</span>}
+          ? working ? t("monitor.requeue_working") : unavailable ? t("monitor.requeue_unavailable") : t("monitor.requeue_waiting")
+          : t("monitor.requeue_stopped")}
+      {current && task && <span>{" · "}{t("monitor.requeue_state", { state: t(`state.${task.open_blockers?.length ? "blocked" : task.state}`) })}</span>}
       {run.givenUp.includes(id) && <>{" "}<button type="button" className="small" disabled={!!requests[id] || run.stopping} onClick={() => send(id)}>
         {t("monitor.requeue")}
       </button></>}

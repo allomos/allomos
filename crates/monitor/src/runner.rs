@@ -918,3 +918,7 @@ mod tests {
 #[cfg(test)]
 #[path = "runner_stop_tests.rs"]
 mod stop_tests;
+
+#[cfg(test)]
+#[path = "runner_requeue_tests.rs"]
+mod requeue_tests;
