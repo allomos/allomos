@@ -315,6 +315,11 @@ export interface Messenger {
    */
   reviewAiDecisions(root: string, id: string): Promise<void>;
   /**
+   * The person approves multiple tasks in batch (decision 0030 § 1, 2, 3): marks tasks in
+   * `checkIds` as checked and tasks in `reviewIds` as reviewed, under the lock.
+   */
+  approveSelected(root: string, checkIds: string[], reviewIds: string[]): Promise<void>;
+  /**
    * Approve task `id`'s plan from the task pane (Task-A01-baker800), like `alm approve`, channel
    * app: `shown` is the description the person read; a plan changed since is refused
    * (`task_changed`). `ready`: then make the backlog task ready, as `alm ready`. Desktop only.
@@ -722,6 +727,7 @@ export const desktopMessenger: Messenger = {
   saveOwnerName: (name) => invoke<void>("save_owner_name", { name }),
   editTask: (root, id, edit) => invoke<TaskChange>("edit_task", { root, id, edit }),
   reviewAiDecisions: (root, id) => invoke<void>("review_ai_decisions", { root, id }),
+  approveSelected: (root, checkIds, reviewIds) => invoke<void>("approve_selected", { root, checkIds, reviewIds }),
   approveTask: (root, id, shown, expires, ready) => invoke<void>("approve_task", { root, id, shown, expires, ready }),
   withdrawApproval: (root, id, reason) => invoke<void>("withdraw_approval", { root, id, reason }),
   nextIds: (root) => invoke<NextIds>("next_ids", { root }),

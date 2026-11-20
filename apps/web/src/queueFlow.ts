@@ -5,12 +5,15 @@
 // Kept apart from React so it can be tested with Node alone (`npm --prefix apps/web test`).
 
 import type { Key } from "./i18n";
-import type { ConfirmRequest } from "./types";
+import type { ConfirmRequest, Task } from "./types";
 
 type T = (key: Key, params?: Record<string, string | number>) => string;
 
 /** One thing the person has to do about a task (allomos_core::queue::Todo). */
 export type Todo = "answer" | "approve" | "approve_afterwards" | "check" | "review";
+
+/** Why a row in For You cannot be ticked for batch approval (decision 0030 § 2). */
+export type CannotBatchReason = "agent_waiting" | "high_risk" | "test_failed" | "not_approvable";
 
 /** One row of the queue, as `human_queue` sends it (allomos_core::queue::Row). */
 export interface QueueRow {
@@ -92,4 +95,40 @@ export function nextChoice(before: readonly QueueRow[], after: readonly QueueRow
 /** The window's title: "For You · <project>". */
 export function forYouTitle(project: string | null | undefined, t: T): string {
   return project?.trim() ? t("for_you.window_title", { project: project.trim() }) : t("for_you.name");
+}
+
+/** Whether this row can be ticked for batch approval (decision 0030 § 2).
+ * Rows with an agent waiting, high risk, or failed/unrun tests have no checkbox.
+ * Unclassified rows can be ticked. */
+export function cannotBatchApproveReason(row: QueueRow, task?: Task | null): CannotBatchReason | null {
+  if (row.agent_waiting) return "agent_waiting";
+  if (row.risk === "high") return "high_risk";
+  const results = task?.evidence?.check_results ?? [];
+  if (results.some((r) => r.result !== "pass")) return "test_failed";
+  if (!row.todo.includes("check") && !row.todo.includes("review")) return "not_approvable";
+  return null;
+}
+
+/** The reason text written on the row when it has no checkbox (decision 0030 § 2). */
+export function cannotBatchApproveText(reason: CannotBatchReason, t: T): string {
+  return t(`for_you.batch.reason_${reason}` as Key);
+}
+
+/** Split selected tasks into IDs for `alm checked` and `alm reviewed`, and count unclassified. */
+export function batchApprovePartition(
+  selectedIds: readonly string[],
+  rows: readonly QueueRow[],
+): { checkIds: string[]; reviewIds: string[]; unclassifiedCount: number } {
+  const rowMap = new Map(rows.map((r) => [r.task, r]));
+  const checkIds: string[] = [];
+  const reviewIds: string[] = [];
+  let unclassifiedCount = 0;
+  for (const id of selectedIds) {
+    const r = rowMap.get(id);
+    if (!r) continue;
+    if (r.todo.includes("check")) checkIds.push(id);
+    if (r.todo.includes("review")) reviewIds.push(id);
+    if (!["high", "medium", "low"].includes(r.risk ?? "")) unclassifiedCount++;
+  }
+  return { checkIds, reviewIds, unclassifiedCount };
 }

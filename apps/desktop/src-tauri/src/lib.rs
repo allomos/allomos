@@ -292,6 +292,7 @@ pub fn run() {
             save_owner_name,
             task_commands::edit_task,
             task_commands::review_ai_decisions,
+            task_commands::approve_selected,
             task_commands::approve_task,
             task_commands::withdraw_approval,
             task_commands::next_ids,
