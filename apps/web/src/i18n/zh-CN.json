@@ -1436,6 +1436,7 @@
   "monitor.lost_given_up": "{time} 发现；多次没能做下去，这次监测不再派发",
   "monitor.requeue_stopped": "会话多次没能继续，这次监测不再派发。",
   "monitor.requeue_unavailable": "任务当前不可派发。",
+  "monitor.requeue_found": "{time} 发现",
   "monitor.requeue": "重新排队",
   "monitor.requeue_sending": "已发送请求，等待监测确认",
   "monitor.requeue_waiting": "已重新排队，等待监测派发",

@@ -685,6 +685,16 @@ export function lostShown(run: Run): { lost: LostSession; state: LostState }[] {
     }));
 }
 
+/** Where a stopped task's one Requeue button goes (A03-gadget373): on its row under Lost
+ * sessions, else on its row under Did not start, else (no row lists it) on a line of its own. */
+export type RequeuePlace = "lost" | "not_started" | "own";
+
+export function requeuePlace(run: Run, id: string): RequeuePlace {
+  if (run.lost.some((l) => l.id === id)) return "lost";
+  if (notStartedShown(run).some((n) => n.id === id)) return "not_started";
+  return "own";
+}
+
 /** Whether the sessions list is grouped by agent: more than one agent, or one that may have
  * several sessions. One agent with one session lists its row alone. */
 export function grouped(run: Run): boolean {

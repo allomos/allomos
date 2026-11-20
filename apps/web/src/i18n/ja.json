@@ -1436,6 +1436,7 @@
   "monitor.lost_given_up": "{time} に判明。何度も続けられなかったため、今回の監視ではもう渡しません",
   "monitor.requeue_stopped": "セッションが何度も続けられなかったため、今回の監視ではもう渡しません。",
   "monitor.requeue_unavailable": "現在このタスクは渡せません。",
+  "monitor.requeue_found": "{time} に判明",
   "monitor.requeue": "再びキューに入れる",
   "monitor.requeue_sending": "リクエスト送信済み。監視の確認を待っています",
   "monitor.requeue_waiting": "キューに戻しました。監視から渡されるのを待っています",

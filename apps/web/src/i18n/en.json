@@ -1436,6 +1436,7 @@
   "monitor.lost_given_up": "found at {time}; it failed several times, so this run gives it out no more",
   "monitor.requeue_stopped": "Its sessions failed several times; this run is no longer dispatching it.",
   "monitor.requeue_unavailable": "The task is currently unavailable for dispatch.",
+  "monitor.requeue_found": "found at {time}",
   "monitor.requeue": "Requeue",
   "monitor.requeue_sending": "Request sent; waiting for the monitor to confirm",
   "monitor.requeue_waiting": "Requeued; waiting for the monitor to dispatch",

@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useI18n } from "./i18n";
-import type { Run } from "./monitorFlow";
+import { requeuePlace, type Run } from "./monitorFlow";
 import type { Task } from "./types";
 
-/** A request being written is not an acknowledgement: wait for the monitor's next record. */
-export function MonitorRequeue({ run, tasks, requeue, onError }: {
+/** Requeue (A03-gadget373). A request being written is not an acknowledgement: wait for the
+ * monitor's next record. `status(id, found)` is what a row says about a stopped or requeued
+ * task, with its one Requeue button, or null when the row keeps its own text. */
+export function useRequeue({ run, tasks, requeue, onError }: {
   run: Run;
   tasks: Task[];
   requeue: (id: string) => Promise<void>;
@@ -45,22 +47,32 @@ export function MonitorRequeue({ run, tasks, requeue, onError }: {
     });
   };
   const ids = [...new Set([...run.givenUp, ...Object.keys(requests)])];
-  return <>{ids.map((id) => {
+  /** `found` is the row's formatted time it was found; a line of its own has none. */
+  const status = (id: string, found?: string): ReactNode => {
+    const stopped = run.givenUp.includes(id);
+    if (!stopped && !requests[id]) return null;
     const task = tasks.find((task) => task.id === id);
     const working = run.working.some((work) => work.id === id);
     const current = working || (task && (task.state !== "ready" || task.holder || task.open_blockers?.length));
     const unavailable = !task || (task.state !== "ready" && task.state !== "in_progress") || !!task.open_blockers?.length;
-    return <div key={id} className="monitor-stalled small" role="status">
-      <strong>{id}</strong>{" · "}
-      {requests[id] === "sent" && run.givenUp.includes(id)
-        ? t("monitor.requeue_sending")
-        : !run.givenUp.includes(id)
-          ? working ? t("monitor.requeue_working") : unavailable ? t("monitor.requeue_unavailable") : t("monitor.requeue_waiting")
-          : t("monitor.requeue_stopped")}
-      {current && task && <span>{" · "}{t("monitor.requeue_state", { state: t(`state.${task.open_blockers?.length ? "blocked" : task.state}`) })}</span>}
-      {run.givenUp.includes(id) && <>{" "}<button type="button" className="small" disabled={!!requests[id] || run.stopping} onClick={() => send(id)}>
+    const text = stopped && requests[id] !== "sent"
+      ? found ? t("monitor.lost_given_up", { time: found }) : t("monitor.requeue_stopped")
+      : `${found ? `${t("monitor.requeue_found", { time: found })} · ` : ""}${
+        stopped ? t("monitor.requeue_sending") : working ? t("monitor.requeue_working") : unavailable ? t("monitor.requeue_unavailable") : t("monitor.requeue_waiting")}`;
+    return <>
+      <span className="monitor-stalled small" role="status">{text}</span>
+      {current && task && <span className="muted small">{" · "}{t("monitor.requeue_state", { state: t(`state.${task.open_blockers?.length ? "blocked" : task.state}`) })}</span>}
+      {stopped && <>{" "}<button type="button" className="small" disabled={!!requests[id] || run.stopping} onClick={() => send(id)}>
         {t("monitor.requeue")}
       </button></>}
-    </div>;
-  })}</>;
+    </>;
+  };
+  /** Stopped or requeued tasks no lower row lists (a session now works a requeued one: its row
+   * says so): each gets a line of its own, so its button is never lost. */
+  const own = ids.filter((id) => requeuePlace(run, id) === "own" && (run.givenUp.includes(id) || !run.working.some((w) => w.id === id)));
+  return { status, own };
+}
+
+export function RequeueLines({ ids, status }: { ids: string[]; status: (id: string) => ReactNode }) {
+  return <>{ids.map((id) => <div key={id} className="small"><strong>{id}</strong>{" · "}{status(id)}</div>)}</>;
 }

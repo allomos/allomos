@@ -38,9 +38,10 @@ import {
   workedFor,
   notStartedShown,
   lostShown,
+  requeuePlace,
 } from "./monitorFlow";
 import type { Current, Frequency, Pause, LastRun, LostRun, Levels, MonitorFolds, MonitorSettings, Run, RunState, Scope, TerminalAgent } from "./monitorFlow";
-import { MonitorRequeue } from "./MonitorRequeue";
+import { RequeueLines, useRequeue } from "./MonitorRequeue";
 import { useAgentAccounts } from "./useAgentAccounts";
 import { isProblem } from "./types";
 import type { Task } from "./types";
@@ -498,6 +499,7 @@ function RunPanel({
   onError: (e: unknown) => void;
 }) {
   const { t } = useI18n();
+  const requeue = useRequeue({ run, tasks, requeue: (id) => monitor.requeue(run, id), onError });
   const free = freeAgents(run);
   const late = stalled(run, now);
   // With several sessions, the badge counts the quiet ones.
@@ -593,7 +595,7 @@ function RunPanel({
             <p key={`${l.id}-${l.at}`} className="muted small monitor-let-go">{t("monitor.let_go", { id: l.id, holder: l.holder })}</p>
           ))}
           {!grouped(run) && run.paused.map((p) => <PauseNote key={p.agent} pause={p} />)}
-          <MonitorRequeue run={run} tasks={tasks} requeue={(id) => monitor.requeue(run, id)} onError={onError} />
+          <RequeueLines ids={requeue.own} status={requeue.status} />
           {lostShown(run).length > 0 && (
             <>
               <h4 className="monitor-sessions-title small">{t("monitor.lost_title")}</h4>
@@ -611,7 +613,7 @@ function RunPanel({
                             : t("monitor.lost_quota")
                           : t("monitor.lost_no_beat")}
                       </span>
-                      <span className="muted small"> · {t(`monitor.lost_${state}`, { time: timeOf(l.found) })}</span>
+                      <span className="muted small"> · {requeue.status(l.id, timeOf(l.found)) ?? t(`monitor.lost_${state}`, { time: timeOf(l.found) })}</span>
                     </span>
                   </li>
                 ))}
@@ -635,7 +637,12 @@ function RunPanel({
                             : t("monitor.not_started_quota")
                           : t("monitor.not_started_no_claim")}
                       </span>
-                      <span className="muted small"> · {t(run.givenUp.includes(n.id) ? "monitor.lost_given_up" : "monitor.not_started_again", { time: timeOf(n.found) })}</span>
+                      <span className="muted small">
+                        {" · "}
+                        {requeuePlace(run, n.id) === "lost"
+                          ? run.givenUp.includes(n.id) ? t("monitor.requeue_found", { time: timeOf(n.found) }) : t("monitor.not_started_again", { time: timeOf(n.found) })
+                          : requeue.status(n.id, timeOf(n.found)) ?? t("monitor.not_started_again", { time: timeOf(n.found) })}
+                      </span>
                     </span>
                   </li>
                 ))}

@@ -20,6 +20,7 @@ import {
   levelsOf,
   levelsText,
   lostShown,
+  requeuePlace,
   nextCheck,
   parseLevels,
   readEntry,
@@ -367,4 +368,29 @@ test("lost sessions are read with what became of their tasks (A03-husky861)", ()
   const old = readEntry(entry(), null);
   assert.ok(old && isRun(old));
   assert.deepEqual([old.lost, old.givenUp], [[], []]);
+});
+
+test("each stopped task gets one Requeue place, on its lower row (A03-gadget373)", () => {
+  const r = readEntry(
+    entry({
+      working: [{ agent: "claude_cli", id: "A01-09", at: 10, seen_held: true, changed: 10 }],
+      lost: [
+        { agent: "claude_cli", id: "A01-03", holder: "claude-old", at: 1, found: 5 },
+        { agent: "codex_cli", id: "A01-04", holder: "codex-a", at: 1, found: 6 },
+      ],
+      not_started: [
+        { agent: "codex_cli", id: "A01-04", found: 7, why: "no_claim" },
+        { agent: "codex_cli", id: "A01-05", found: 8, why: "no_claim" },
+        { agent: "claude_cli", id: "A01-09", found: 9, why: "no_claim" },
+      ],
+      given_up: ["A01-03", "A01-04", "A01-05", "A01-07"],
+    }),
+    null,
+  );
+  assert.ok(r && isRun(r));
+  // Lost and did not start: only the lost row carries it; a task no row lists gets its own line.
+  assert.deepEqual(
+    ["A01-03", "A01-04", "A01-05", "A01-07", "A01-09"].map((id) => requeuePlace(r, id)),
+    ["lost", "lost", "not_started", "own", "own"],
+  );
 });
