@@ -156,7 +156,7 @@ fn push_work_reminder(
                 "git commit -m \"WIP {}: <what you did>\" -m \"Agent: {me}\"",
                 task.id
             ),
-            format!("git push origin {branch}"),
+            format!("git push origin refs/heads/{branch}"),
         ];
         text.push_str(&format!("  {}:\n", task.id));
         for c in &commands {

@@ -591,7 +591,7 @@ pub fn workspace_dirs(taskbag: &Path, project: &Path) -> Vec<PathBuf> {
 /// silently; Claude Code adds them too and edits there without asking ([`claude_permission_args`](crate::permissions::claude_permission_args),
 /// Task-A03-emu042).
 pub fn session_command(id: &str, session_id: Option<&str>, dirs: &[PathBuf]) -> Option<String> {
-    session_command_with_quiet(id, session_id, false, dirs, &Choice::default())
+    session_command_with_quiet(id, session_id, false, dirs, None, &Choice::default())
 }
 
 /// The words a chosen model and reasoning effort add to agent `id`'s command (A03-alto709), each
@@ -625,6 +625,7 @@ fn session_command_with_quiet(
     session_id: Option<&str>,
     quiet: bool,
     dirs: &[PathBuf],
+    taskbag: Option<&Path>,
     choice: &Choice,
 ) -> Option<String> {
     let request = REQUEST_ARG;
@@ -652,7 +653,7 @@ fn session_command_with_quiet(
             "agy {}{}{chosen}-i {request}",
             add_dirs(dirs, shell_quote),
             if quiet {
-                antigravity_quiet_settings_arg(shell_quote)
+                antigravity_quiet_settings_arg(taskbag, shell_quote)
             } else {
                 String::new()
             }
@@ -682,10 +683,12 @@ pub fn powershell_session(
         config,
         false,
         dirs,
+        None,
         &Choice::default(),
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn powershell_session_with_quiet(
     id: &str,
     project: &Path,
@@ -696,6 +699,7 @@ fn powershell_session_with_quiet(
     config: Option<(&str, &Path)>,
     quiet: bool,
     dirs: &[PathBuf],
+    taskbag: Option<&Path>,
     choice: &Choice,
 ) -> String {
     let file = powershell_quote(&file.display().to_string());
@@ -722,7 +726,7 @@ fn powershell_session_with_quiet(
             "{}{}{chosen}-i ",
             add_dirs(dirs, powershell_quote),
             if quiet {
-                antigravity_quiet_settings_arg(powershell_quote)
+                antigravity_quiet_settings_arg(taskbag, powershell_quote)
             } else {
                 String::new()
             }
@@ -776,6 +780,7 @@ pub fn plain_session_id(id: &str) -> bool {
 /// `alm_dir` the folder of the `alm` the session should use, put first in its `PATH`; `dirs` the
 /// folders an Antigravity session adds to its workspace and a Codex session may also write
 /// ([`workspace_dirs`]).
+#[allow(clippy::too_many_arguments)]
 pub fn start_session(
     id: &str,
     found: &str,
@@ -786,6 +791,7 @@ pub fn start_session(
     config: Option<(&str, &Path)>,
     quiet: bool,
     dirs: &[PathBuf],
+    taskbag: Option<&Path>,
     choice: &Choice,
 ) -> Result<Option<crate::session_tab::SessionTab>, Problem> {
     if !cfg!(any(target_os = "macos", windows)) {
@@ -794,7 +800,8 @@ pub fn start_session(
     if session_id.is_some_and(|s| !plain_session_id(s)) {
         return Err(ask_failed(id, "the session ID is not a plain ID"));
     }
-    let Some(program) = session_command_with_quiet(id, session_id, quiet, dirs, choice) else {
+    let Some(program) = session_command_with_quiet(id, session_id, quiet, dirs, taskbag, choice)
+    else {
         return Err(ask_failed(id, "no way to start it"));
     };
     // An extra account's folder variable goes in front of the command, for that command only.
@@ -803,7 +810,7 @@ pub fn start_session(
         let file = private_temp_file("allomos-request", "txt", request.as_bytes())
             .map_err(|e| ask_failed(id, e))?;
         let script = powershell_session_with_quiet(
-            id, project, found, &file, session_id, alm_dir, config, quiet, dirs, choice,
+            id, project, found, &file, session_id, alm_dir, config, quiet, dirs, taskbag, choice,
         );
         return new_console("powershell.exe")
             .args(["-NoExit", "-NoLogo", "-Command", &script])
@@ -942,7 +949,7 @@ mod tests {
             effort: e.map(str::to_string),
         };
         let cmd = |id: &str, c: &Choice| {
-            session_command_with_quiet(id, Some("s-1"), false, &[], c).unwrap()
+            session_command_with_quiet(id, Some("s-1"), false, &[], None, c).unwrap()
         };
         // The default: exactly the command without a choice.
         assert_eq!(
@@ -987,6 +994,7 @@ mod tests {
                 None,
                 false,
                 &[],
+                None,
                 c,
             )
         };
@@ -1093,11 +1101,18 @@ mod tests {
     fn antigravity_adds_the_taskbag_and_its_project_folders_to_its_workspace() {
         let request = REQUEST_ARG;
         let one = [PathBuf::from("/w/my tb/.allomos/taskbag")];
-        let quiet =
-            session_command_with_quiet("antigravity_cli", None, true, &one, &Choice::default())
-                .expect("quiet Antigravity command");
+        let quiet = session_command_with_quiet(
+            "antigravity_cli",
+            None,
+            true,
+            &one,
+            Some(&one[0]),
+            &Choice::default(),
+        )
+        .expect("quiet Antigravity command");
         assert!(quiet.starts_with("agy --add-dir '/w/my tb/.allomos/taskbag' --settings '"));
         assert!(quiet.contains(ANTIGRAVITY_PUSH_RULE));
+        assert!(quiet.contains(r"git -C /w/my\\x20tb/\\.allomos/taskbag push$"));
         assert!(quiet.ends_with(&format!(" -i {request}")));
         let several = [
             PathBuf::from("/w/tb/.allomos/taskbag"),
@@ -1123,7 +1138,6 @@ mod tests {
             PathBuf::from(r"C:\site"),
         ];
         let start = r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\agy\bin\agy.exe'";
-        let settings = antigravity_quiet_settings_arg(powershell_quote);
         for (dirs, args) in [
             (&windows_one[..], r"--add-dir 'C:\my tb\.allomos\taskbag' "),
             (
@@ -1131,6 +1145,7 @@ mod tests {
                 r"--add-dir 'C:\tb\.allomos\taskbag' --add-dir 'C:\site' ",
             ),
         ] {
+            let settings = antigravity_quiet_settings_arg(Some(&dirs[0]), powershell_quote);
             assert_eq!(
                 powershell_session_with_quiet(
                     "antigravity_cli",
@@ -1142,6 +1157,7 @@ mod tests {
                     None,
                     true,
                     dirs,
+                    Some(&dirs[0]),
                     &Choice::default()
                 ),
                 format!("{start} {args}{settings}-i $request")
@@ -1222,7 +1238,8 @@ mod tests {
             PathBuf::from("/w/O'Neil app"),
         ];
         assert_eq!(
-            session_command_with_quiet("codex_cli", None, true, &one, &Choice::default()).as_deref(),
+            session_command_with_quiet("codex_cli", None, true, &one, None, &Choice::default())
+                .as_deref(),
             Some(
                 format!(
                     "codex --sandbox workspace-write --add-dir '/w/my tb/.allomos/taskbag' {quiet}{request}"
@@ -1231,7 +1248,8 @@ mod tests {
             )
         );
         assert_eq!(
-            session_command_with_quiet("codex_cli", None, true, &several, &Choice::default()).as_deref(),
+            session_command_with_quiet("codex_cli", None, true, &several, None, &Choice::default())
+                .as_deref(),
             Some(
                 format!(
                     "codex --sandbox workspace-write --add-dir '/w/tb/.allomos/taskbag' --add-dir '/w/site' --add-dir '/w/O'\\''Neil app' {quiet}{request}"
@@ -1272,6 +1290,7 @@ mod tests {
                     None,
                     true,
                     dirs,
+                    None,
                     &Choice::default()
                 ),
                 format!("{start} {args}{quiet}$request")
@@ -1301,7 +1320,8 @@ mod tests {
             ""
         };
         assert_eq!(
-            session_command_with_quiet("codex_cli", None, true, &[], &Choice::default()).as_deref(),
+            session_command_with_quiet("codex_cli", None, true, &[], None, &Choice::default())
+                .as_deref(),
             Some(format!(
                 "codex --sandbox workspace-write --ask-for-approval never --config sandbox_workspace_write.network_access=true {app_access}{request}"
             ).as_str())
@@ -1311,17 +1331,31 @@ mod tests {
             Some(format!("codex --sandbox workspace-write {request}").as_str())
         );
         assert_eq!(
-            session_command_with_quiet("claude_cli", Some("ab-12"), true, &[], &Choice::default())
-                .as_deref(),
+            session_command_with_quiet(
+                "claude_cli",
+                Some("ab-12"),
+                true,
+                &[],
+                None,
+                &Choice::default()
+            )
+            .as_deref(),
             Some(format!("claude --session-id 'ab-12' {CLAUDE_EDITS}{request}").as_str())
         );
         assert_eq!(
-            session_command_with_quiet("antigravity_cli", None, true, &[], &Choice::default())
-                .as_deref(),
+            session_command_with_quiet(
+                "antigravity_cli",
+                None,
+                true,
+                &[],
+                None,
+                &Choice::default()
+            )
+            .as_deref(),
             Some(
                 format!(
                     "agy {}-i {request}",
-                    antigravity_quiet_settings_arg(shell_quote)
+                    antigravity_quiet_settings_arg(None, shell_quote)
                 )
                 .as_str()
             )
@@ -1338,6 +1372,7 @@ mod tests {
                 None,
                 true,
                 &[],
+                None,
                 &Choice::default()
             ),
             format!(

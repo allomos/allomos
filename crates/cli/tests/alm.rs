@@ -8624,7 +8624,7 @@ fn beats_say_what_a_session_is_doing_and_remind_to_push_work() {
         json!([
             "git add -A",
             "git commit -m \"WIP A01-01: <what you did>\" -m \"Agent: s1\"",
-            "git push origin claude/x",
+            "git push origin refs/heads/claude/x",
         ])
     );
     // Also on a beat too soon to write: an automatic heartbeat may have written the last one.

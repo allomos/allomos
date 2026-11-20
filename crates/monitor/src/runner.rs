@@ -542,6 +542,7 @@ impl Loop {
                     config.as_ref().map(|(var, dir)| (*var, dir.as_path())),
                     self.record.run.quiet,
                     &dirs,
+                    Some(&self.record.taskbag),
                     // The model and effort chosen for this agent, if any (A03-alto709).
                     &self.record.run.choice_of(&agent),
                 ),
