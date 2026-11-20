@@ -359,17 +359,131 @@ pub fn terminal_script(project: &Path, program: &str, alm_dir: Option<&Path>) ->
 /// (1024 bytes on macOS) is cut off before the shell reads it, so a long command (Antigravity's
 /// `--settings` with the person's permission rules) reached zsh with an open quote and stopped at
 /// its continuation prompt. zsh reads the script from the file, whatever its length.
+///
+/// The request is read here from `request` (Task-A03-marina834): into [`REQUEST_ARG`]'s variable,
+/// exactly as written, its last line ends too (`$(…)` alone drops them, so a `.` is read after it
+/// and taken off again), and the file is removed. A request that cannot be read starts nothing:
+/// the window says so, and both files are removed all the same.
 pub fn start_script(
     script: &Path,
+    request: &Path,
     project: &Path,
     program: &str,
     alm_dir: Option<&Path>,
 ) -> String {
+    let file = shell_quote(&request.display().to_string());
     format!(
-        "rm -f {}\n{}\n",
-        shell_quote(&script.display().to_string()),
-        terminal_script(project, program, alm_dir)
+        "rm -f {script}\n\
+if {REQUEST_VAR}=\"$(cat {file} && printf .)\"; then\n\
+rm -f {file}\n\
+{REQUEST_VAR}=\"${{{REQUEST_VAR}%.}}\"\n\
+{start}\n\
+unset {REQUEST_VAR}\n\
+else\n\
+rm -f {file}\n\
+unset {REQUEST_VAR}\n\
+printf '%s\\n' {failed} >&2\n\
+fi\n",
+        script = shell_quote(&script.display().to_string()),
+        start = terminal_script(project, program, alm_dir),
+        failed = shell_quote(START_FAILED),
     )
+}
+
+/// The shell variable the start script reads the request into.
+const REQUEST_VAR: &str = "allomos_request";
+/// How a terminal agent's command takes the request on macOS: the start script's variable
+/// ([`start_script`]), quoted, so it reaches the agent as one argument, whatever it holds.
+const REQUEST_ARG: &str = "\"$allomos_request\"";
+/// What the window says when the request cannot be read (the agent is not started).
+const START_FAILED: &str = "Allomos could not read the request, so the agent was not started. \
+Nothing was sent; open it again from Allomos.";
+
+/// A new file in the temporary folder holding `contents`, readable and writable only by the person
+/// (0600), under a name no other file has: `<prefix>-<process>-<time>-<count>.<ext>`, made new
+/// every time (an existing file is never reused or overwritten; Task-A03-marina834).
+pub fn private_temp_file(prefix: &str, ext: &str, contents: &[u8]) -> std::io::Result<PathBuf> {
+    use std::io::Write;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNT: AtomicU64 = AtomicU64::new(0);
+    loop {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or_default();
+        let n = COUNT.fetch_add(1, Ordering::Relaxed);
+        let path =
+            std::env::temp_dir().join(format!("{prefix}-{}-{stamp}-{n}.{ext}", std::process::id()));
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        match options.open(&path) {
+            Ok(mut f) => {
+                return match f.write_all(contents) {
+                    Ok(()) => Ok(path),
+                    Err(e) => {
+                        let _ = std::fs::remove_file(&path);
+                        Err(e)
+                    }
+                };
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e),
+        }
+    }
+}
+
+/// macOS: open a new Terminal tab that starts `program` (a [`session_command`]) in `project` with
+/// `request` sent, for the monitor and the app alike (Task-A03-marina834). The request and the
+/// start script go into new private files ([`private_temp_file`]); the tab types only
+/// [`start_line`], and the start script reads, checks and removes them. When the tab cannot be
+/// opened, both files are removed here. Returns the tab's window and terminal device.
+pub fn open_terminal(
+    id: &str,
+    project: &Path,
+    request: &str,
+    program: &str,
+    alm_dir: Option<&Path>,
+    activate: bool,
+) -> Result<Option<crate::session_tab::SessionTab>, Problem> {
+    let file = private_temp_file("allomos-request", "txt", request.as_bytes())
+        .map_err(|e| ask_failed(id, e))?;
+    let start = match private_temp_file("allomos-start", "sh", b"") {
+        Ok(start) => start,
+        Err(e) => {
+            let _ = std::fs::remove_file(&file);
+            return Err(ask_failed(id, e));
+        }
+    };
+    let clean = |e: String| {
+        let _ = std::fs::remove_file(&file);
+        let _ = std::fs::remove_file(&start);
+        ask_failed(id, e)
+    };
+    std::fs::write(
+        &start,
+        start_script(&start, &file, project, program, alm_dir),
+    )
+    .map_err(|e| clean(e.to_string()))?;
+    let script = format!(
+        "tell application \"Terminal\"\n{}set t to do script {}\nset w to (first window whose tabs contains t)\nreturn (id of w as text) & \", \" & (tty of t)\nend tell",
+        if activate { "activate\n" } else { "" },
+        applescript_string(&start_line(&start))
+    );
+    let out = command("/usr/bin/osascript")
+        .args(["-e", &script])
+        .output()
+        .map_err(|e| clean(e.to_string()))?;
+    if !out.status.success() {
+        return Err(clean("Terminal did not open".to_string()));
+    }
+    Ok(crate::session_tab::parse_opened(&String::from_utf8_lossy(
+        &out.stdout,
+    )))
 }
 
 /// The short line a new Terminal window types to run the start script (macOS): `. '<script>'`, read
@@ -593,8 +707,8 @@ fn antigravity_quiet_settings_from_read(
     }
 }
 
-/// The command line that starts a terminal agent with the request read from `file` (and the file
-/// removed once read), for Monitor ready tasks (Task-A03-moth285): `claude --session-id <id>`
+/// The command line that starts a terminal agent with the request the start script read
+/// ([`start_script`], [`REQUEST_ARG`]), for Monitor ready tasks and the app (Task-A03-marina834) (Task-A03-moth285): `claude --session-id <id>`
 /// takes the session ID Allomos made, so the app knows the session before it claims; Codex picks
 /// its own, and so does Antigravity's `agy`, which takes an initial prompt only after `-i`
 /// (`--prompt-interactive`; Task-A03-queen969). The request goes through a file because a long, many-line request typed into a
@@ -607,13 +721,8 @@ fn antigravity_quiet_settings_from_read(
 /// ([`workspace_dirs`], Task-A03-latch882), and Codex makes them writable in its sandbox
 /// (`--add-dir`, Task-A03-bag625), so a quiet session's writes to the taskbag do not fail
 /// silently; Claude ignores them.
-pub fn session_command(
-    id: &str,
-    file: &Path,
-    session_id: Option<&str>,
-    dirs: &[PathBuf],
-) -> Option<String> {
-    session_command_with_quiet(id, file, session_id, false, dirs, &Choice::default())
+pub fn session_command(id: &str, session_id: Option<&str>, dirs: &[PathBuf]) -> Option<String> {
+    session_command_with_quiet(id, session_id, false, dirs, &Choice::default())
 }
 
 /// The words a chosen model and reasoning effort add to agent `id`'s command (A03-alto709), each
@@ -644,14 +753,12 @@ pub fn choice_args(id: &str, choice: &Choice, quote: fn(&str) -> String) -> Stri
 
 fn session_command_with_quiet(
     id: &str,
-    file: &Path,
     session_id: Option<&str>,
     quiet: bool,
     dirs: &[PathBuf],
     choice: &Choice,
 ) -> Option<String> {
-    let file = shell_quote(&file.display().to_string());
-    let request = format!("\"$(cat {file}; rm -f {file})\"");
+    let request = REQUEST_ARG;
     let chosen = choice_args(id, choice, shell_quote);
     match (id, session_id) {
         ("claude_cli", Some(s)) => Some(format!(
@@ -808,19 +915,14 @@ pub fn start_session(
     if session_id.is_some_and(|s| !plain_session_id(s)) {
         return Err(ask_failed(id, "the session ID is not a plain ID"));
     }
-    let stamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or_default();
-    let file = std::env::temp_dir().join(format!("allomos-request-{stamp}.txt"));
-    let Some(program) = session_command_with_quiet(id, &file, session_id, quiet, dirs, choice)
-    else {
+    let Some(program) = session_command_with_quiet(id, session_id, quiet, dirs, choice) else {
         return Err(ask_failed(id, "no way to start it"));
     };
     // An extra account's folder variable goes in front of the command, for that command only.
     let program = with_config(&program, config);
-    std::fs::write(&file, request).map_err(|e| ask_failed(id, e))?;
     if cfg!(windows) {
+        let file = private_temp_file("allomos-request", "txt", request.as_bytes())
+            .map_err(|e| ask_failed(id, e))?;
         let script = powershell_session_with_quiet(
             id, project, found, &file, session_id, alm_dir, config, quiet, dirs, choice,
         );
@@ -828,29 +930,15 @@ pub fn start_session(
             .args(["-NoExit", "-NoLogo", "-Command", &script])
             .spawn()
             .map(|_| None)
-            .map_err(|e| ask_failed(id, e));
+            .map_err(|e| {
+                let _ = std::fs::remove_file(&file);
+                ask_failed(id, e)
+            });
     }
     // The new tab's window and terminal device are kept, to close that tab once its task is done
-    // (Task-A03-sierra014).
-    // The command goes through a script file: typed into the window, a long one is cut off
-    // (Task-A03-golf005, [`start_script`]).
-    let start = std::env::temp_dir().join(format!("allomos-start-{stamp}.sh"));
-    std::fs::write(&start, start_script(&start, project, &program, alm_dir))
-        .map_err(|e| ask_failed(id, e))?;
-    let script = format!(
-        "tell application \"Terminal\"\nset t to do script {}\nset w to (first window whose tabs contains t)\nreturn (id of w as text) & \", \" & (tty of t)\nend tell",
-        applescript_string(&start_line(&start))
-    );
-    let out = command("/usr/bin/osascript")
-        .args(["-e", &script])
-        .output()
-        .map_err(|e| ask_failed(id, e))?;
-    if !out.status.success() {
-        return Err(ask_failed(id, "Terminal did not open"));
-    }
-    Ok(crate::session_tab::parse_opened(&String::from_utf8_lossy(
-        &out.stdout,
-    )))
+    // (Task-A03-sierra014). The command goes through a script file: typed into the window, a long
+    // one is cut off (Task-A03-golf005, [`start_script`]).
+    open_terminal(id, project, request, &program, alm_dir, false)
 }
 
 /// A program started in a console window of its own, for the person to use (Windows).
@@ -931,14 +1019,13 @@ mod tests {
 
     #[test]
     fn a_chosen_model_and_effort_are_added_and_the_default_changes_nothing() {
-        let file = Path::new("/tmp/r.txt");
-        let request = "\"$(cat '/tmp/r.txt'; rm -f '/tmp/r.txt')\"";
+        let request = REQUEST_ARG;
         let pick = |m: Option<&str>, e: Option<&str>| Choice {
             model: m.map(str::to_string),
             effort: e.map(str::to_string),
         };
         let cmd = |id: &str, c: &Choice| {
-            session_command_with_quiet(id, file, Some("s-1"), false, &[], c).unwrap()
+            session_command_with_quiet(id, Some("s-1"), false, &[], c).unwrap()
         };
         // The default: exactly the command without a choice.
         assert_eq!(
@@ -1014,24 +1101,17 @@ mod tests {
     /// Claude Code with the session ID Allomos made.
     #[test]
     fn monitored_sessions_start_with_the_request_sent() {
-        let file = Path::new("/tmp/allomos-request-1.txt");
         assert_eq!(
-            session_command("claude_cli", file, Some("0b1c-2d"), &[]).as_deref(),
-            Some(
-                "claude --session-id '0b1c-2d' \"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\""
-            )
+            session_command("claude_cli", Some("0b1c-2d"), &[]).as_deref(),
+            Some("claude --session-id '0b1c-2d' \"$allomos_request\"")
         );
         assert_eq!(
-            session_command("codex_cli", file, Some("ignored"), &[]).as_deref(),
-            Some(
-                "codex --sandbox workspace-write \"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\""
-            )
+            session_command("codex_cli", Some("ignored"), &[]).as_deref(),
+            Some("codex --sandbox workspace-write \"$allomos_request\"")
         );
         assert_eq!(
-            session_command("antigravity_cli", file, Some("ignored"), &[]).as_deref(),
-            Some(
-                "agy -i \"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\""
-            )
+            session_command("antigravity_cli", Some("ignored"), &[]).as_deref(),
+            Some("agy -i \"$allomos_request\"")
         );
         assert_eq!(
             powershell_session(
@@ -1059,7 +1139,7 @@ mod tests {
             ),
             r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\npm\codex.cmd' --sandbox workspace-write $request"
         );
-        assert_eq!(session_command("claude_app", file, None, &[]), None);
+        assert_eq!(session_command("claude_app", None, &[]), None);
         assert!(plain_session_id("8f0e5a52-1c2d-4e3f-9a0b-1c2d3e4f5a6b"));
         assert!(!plain_session_id("x; rm -rf ~"));
         assert!(!plain_session_id(""));
@@ -1240,18 +1320,11 @@ mod tests {
     /// folders to its workspace, one `--add-dir` each, quoted (spaces too); Claude takes none.
     #[test]
     fn antigravity_adds_the_taskbag_and_its_project_folders_to_its_workspace() {
-        let file = Path::new("/tmp/allomos-request-1.txt");
-        let request = "\"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\"";
+        let request = REQUEST_ARG;
         let one = [PathBuf::from("/w/my tb/.allomos/taskbag")];
-        let quiet = session_command_with_quiet(
-            "antigravity_cli",
-            file,
-            None,
-            true,
-            &one,
-            &Choice::default(),
-        )
-        .expect("quiet Antigravity command");
+        let quiet =
+            session_command_with_quiet("antigravity_cli", None, true, &one, &Choice::default())
+                .expect("quiet Antigravity command");
         assert!(quiet.starts_with("agy --add-dir '/w/my tb/.allomos/taskbag' --settings '"));
         assert!(quiet.contains(ANTIGRAVITY_PUSH_RULE));
         assert!(quiet.ends_with(&format!(" -i {request}")));
@@ -1261,7 +1334,7 @@ mod tests {
             PathBuf::from("/w/O'Neil app"),
         ];
         assert_eq!(
-            session_command("antigravity_cli", file, None, &several).as_deref(),
+            session_command("antigravity_cli", None, &several).as_deref(),
             Some(
                 format!(
                     "agy --add-dir '/w/tb/.allomos/taskbag' --add-dir '/w/site' --add-dir '/w/O'\\''Neil app' -i {request}"
@@ -1270,7 +1343,7 @@ mod tests {
             )
         );
         assert_eq!(
-            session_command("claude_cli", file, None, &several).as_deref(),
+            session_command("claude_cli", None, &several).as_deref(),
             Some(format!("claude {request}").as_str())
         );
         let windows_one = [PathBuf::from(r"C:\my tb\.allomos\taskbag")];
@@ -1361,8 +1434,7 @@ mod tests {
     /// in quiet and normal mode, on macOS and on Windows.
     #[test]
     fn codex_makes_the_taskbag_and_its_project_folders_writable() {
-        let file = Path::new("/tmp/allomos-request-1.txt");
-        let request = "\"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\"";
+        let request = REQUEST_ARG;
         let app_access = if cfg!(target_os = "macos") {
             "--config 'computer_use.macos.bundle_ids={\"io.allomos\"=\"allow\"}' "
         } else {
@@ -1378,7 +1450,7 @@ mod tests {
             PathBuf::from("/w/O'Neil app"),
         ];
         assert_eq!(
-            session_command_with_quiet("codex_cli", file, None, true, &one, &Choice::default()).as_deref(),
+            session_command_with_quiet("codex_cli", None, true, &one, &Choice::default()).as_deref(),
             Some(
                 format!(
                     "codex --sandbox workspace-write --add-dir '/w/my tb/.allomos/taskbag' {quiet}{request}"
@@ -1387,7 +1459,7 @@ mod tests {
             )
         );
         assert_eq!(
-            session_command_with_quiet("codex_cli", file, None, true, &several, &Choice::default()).as_deref(),
+            session_command_with_quiet("codex_cli", None, true, &several, &Choice::default()).as_deref(),
             Some(
                 format!(
                     "codex --sandbox workspace-write --add-dir '/w/tb/.allomos/taskbag' --add-dir '/w/site' --add-dir '/w/O'\\''Neil app' {quiet}{request}"
@@ -1396,7 +1468,7 @@ mod tests {
             )
         );
         assert_eq!(
-            session_command("codex_cli", file, None, &one).as_deref(),
+            session_command("codex_cli", None, &one).as_deref(),
             Some(
                 format!(
                     "codex --sandbox workspace-write --add-dir '/w/my tb/.allomos/taskbag' {request}"
@@ -1450,45 +1522,30 @@ mod tests {
 
     #[test]
     fn quiet_monitor_codex_has_no_approval_prompts_and_its_sandbox_can_use_the_network() {
-        let file = Path::new("/tmp/allomos-request-1.txt");
-        let request = "\"$(cat '/tmp/allomos-request-1.txt'; rm -f '/tmp/allomos-request-1.txt')\"";
+        let request = REQUEST_ARG;
         let app_access = if cfg!(target_os = "macos") {
             "--config 'computer_use.macos.bundle_ids={\"io.allomos\"=\"allow\"}' "
         } else {
             ""
         };
         assert_eq!(
-            session_command_with_quiet("codex_cli", file, None, true, &[], &Choice::default()).as_deref(),
+            session_command_with_quiet("codex_cli", None, true, &[], &Choice::default()).as_deref(),
             Some(format!(
                 "codex --sandbox workspace-write --ask-for-approval never --config sandbox_workspace_write.network_access=true {app_access}{request}"
             ).as_str())
         );
         assert_eq!(
-            session_command("codex_cli", file, None, &[]).as_deref(),
+            session_command("codex_cli", None, &[]).as_deref(),
             Some(format!("codex --sandbox workspace-write {request}").as_str())
         );
         assert_eq!(
-            session_command_with_quiet(
-                "claude_cli",
-                file,
-                Some("ab-12"),
-                true,
-                &[],
-                &Choice::default()
-            )
-            .as_deref(),
+            session_command_with_quiet("claude_cli", Some("ab-12"), true, &[], &Choice::default())
+                .as_deref(),
             Some(format!("claude --session-id 'ab-12' {request}").as_str())
         );
         assert_eq!(
-            session_command_with_quiet(
-                "antigravity_cli",
-                file,
-                None,
-                true,
-                &[],
-                &Choice::default()
-            )
-            .as_deref(),
+            session_command_with_quiet("antigravity_cli", None, true, &[], &Choice::default())
+                .as_deref(),
             Some(
                 format!(
                     "agy {}-i {request}",
@@ -1541,9 +1598,11 @@ mod tests {
         );
     }
 
-    /// Task-A03-golf005: a new Terminal window types only a short line; the start script, however
-    /// long, parses in zsh and sh and hands the agent every argument and the request whole, with
-    /// quotes, backslashes, line ends and shell characters in the paths and the text.
+    /// Task-A03-golf005, A03-marina834: a new Terminal window types only a short line; the start
+    /// script, however long, parses in zsh and sh and hands Claude Code, Codex and Antigravity
+    /// every argument and the request byte for byte (Chinese, quotes, backslashes, shell
+    /// characters, line ends inside and at the end; more than the 1024-byte line limit), then
+    /// both files are gone. Two requests opened one after the other do not mix.
     #[cfg(unix)]
     #[test]
     fn terminal_start_script_hands_the_agent_everything_whole() {
@@ -1554,78 +1613,205 @@ mod tests {
         for folder in [&project, &added, &bin] {
             std::fs::create_dir_all(folder).unwrap();
         }
-        let out = dir.path().join("args");
-        executable(
-            &bin.join("agy"),
-            &format!(
-                "#!/bin/sh\npwd -P > {o}.pwd\nfor a in \"$@\"; do printf '%s\\0' \"$a\"; done > {o}\n",
-                o = shell_quote(&out.display().to_string())
-            ),
-        );
-        let request = format!(
-            "Task 'A03' \"quoted\" \\ back $HOME $(touch {}) `id` ; | & > <\nsecond line\n\n{}",
-            shell_quote(&dir.path().join("pwned").display().to_string()),
-            "long text ".repeat(500)
-        );
+        let fake = "#!/bin/sh\npwd -P > \"$ALLOMOS_TEST_OUT.pwd\"\nfor a in \"$@\"; do printf '%s\\0' \"$a\"; done > \"$ALLOMOS_TEST_OUT\"\n";
+        for tool in ["claude", "codex", "agy"] {
+            executable(&bin.join(tool), fake);
+        }
+        let request = |n: usize| {
+            format!(
+                "请求 {n}：任务 'A03' \"引号\" \\ back $HOME $(touch {}) `id` ; | & > <\n第二行  两个空格\n\n{}\n\n",
+                shell_quote(&dir.path().join("pwned").display().to_string()),
+                "接手这个任务，读完说明再动手。".repeat(40)
+            )
+        };
+        assert!(request(1).len() > 1024);
         // As long as the person's permission rules make it (more than the 1024-byte line limit).
         let settings = format!(
             r#"{{"permissions":{{"allow":["command(regex:^git push origin it's \\+[^ ]+$)",{}]}}}}"#,
             vec![r#""command(regex:^echo x$)""#; 120].join(",")
         );
+        let added_s = added.display().to_string();
         for shell in ["/bin/zsh", "/bin/sh"] {
             if !Path::new(shell).exists() {
                 continue;
             }
-            let file = dir.path().join("request.txt");
-            std::fs::write(&file, &request).unwrap();
-            let program = session_command("antigravity_cli", &file, None, &[added.clone()])
-                .unwrap()
-                .replacen(
-                    " -i ",
-                    &format!(" --settings {} -i ", shell_quote(&settings)),
-                    1,
-                );
-            let script = dir.path().join("start.sh");
-            std::fs::write(
-                &script,
-                start_script(&script, &project, &program, Some(&bin)),
-            )
-            .unwrap();
-            let line = start_line(&script);
-            assert!(line.len() < 200 && !line.contains('\n'), "{line}");
-            assert!(std::fs::read_to_string(&script).unwrap().len() > 2048);
-            let syntax = command(shell).arg("-n").arg(&script).status().unwrap();
-            assert!(syntax.success(), "{shell} -n");
-            let run = command(shell).arg("-c").arg(&line).status().unwrap();
-            assert!(run.success(), "{shell} ran {line}");
-            let args = std::fs::read_to_string(&out).unwrap();
-            let args: Vec<&str> = args.trim_end_matches('\0').split('\0').collect();
-            assert_eq!(
-                args,
-                [
-                    "--add-dir",
-                    &added.display().to_string(),
-                    "--settings",
-                    &settings,
-                    "-i",
-                    request.trim_end_matches('\n'),
-                ],
-                "{shell}"
-            );
-            assert_eq!(
-                std::fs::read_to_string(format!("{}.pwd", out.display()))
-                    .unwrap()
-                    .trim_end(),
-                std::fs::canonicalize(&project)
-                    .unwrap()
-                    .display()
-                    .to_string()
-            );
-            assert!(!script.exists() && !file.exists(), "both files removed");
+            for id in ["claude_cli", "codex_cli", "antigravity_cli"] {
+                let mut program = session_command(id, None, &[added.clone()]).unwrap();
+                if id == "antigravity_cli" {
+                    program = program.replacen(
+                        " -i ",
+                        &format!(" --settings {} -i ", shell_quote(&settings)),
+                        1,
+                    );
+                }
+                // Two opened before either window runs its script.
+                let opened: Vec<(String, PathBuf, PathBuf)> = (1..=2)
+                    .map(|n| {
+                        let text = request(n);
+                        let file =
+                            private_temp_file("allomos-request", "txt", text.as_bytes()).unwrap();
+                        let script = private_temp_file("allomos-start", "sh", b"").unwrap();
+                        std::fs::write(
+                            &script,
+                            start_script(&script, &file, &project, &program, Some(&bin)),
+                        )
+                        .unwrap();
+                        (text, file, script)
+                    })
+                    .collect();
+                assert_ne!(opened[0].1, opened[1].1);
+                assert_ne!(opened[0].2, opened[1].2);
+                for (n, (text, file, script)) in opened.iter().enumerate() {
+                    use std::os::unix::fs::PermissionsExt;
+                    for f in [file, script] {
+                        let mode = std::fs::metadata(f).unwrap().permissions().mode();
+                        assert_eq!(mode & 0o777, 0o600, "{}", f.display());
+                    }
+                    let line = start_line(script);
+                    assert!(line.len() < 200 && !line.contains('\n'), "{line}");
+                    assert!(!line.contains("claude-cli://"));
+                    let syntax = command(shell).arg("-n").arg(script).status().unwrap();
+                    assert!(syntax.success(), "{shell} -n");
+                    let out = dir.path().join(format!("args-{n}"));
+                    let run = command(shell)
+                        .arg("-c")
+                        .arg(&line)
+                        .env("ALLOMOS_TEST_OUT", &out)
+                        .status()
+                        .unwrap();
+                    assert!(run.success(), "{shell} ran {line}");
+                    let args = std::fs::read(&out).unwrap();
+                    let args: Vec<&[u8]> = args
+                        .strip_suffix(b"\0")
+                        .unwrap()
+                        .split(|b| *b == 0)
+                        .collect();
+                    let mut want: Vec<&[u8]> = match id {
+                        "claude_cli" => vec![],
+                        "codex_cli" => vec![
+                            b"--sandbox",
+                            b"workspace-write",
+                            b"--add-dir",
+                            added_s.as_bytes(),
+                        ],
+                        _ => vec![
+                            b"--add-dir",
+                            added_s.as_bytes(),
+                            b"--settings",
+                            settings.as_bytes(),
+                            b"-i",
+                        ],
+                    };
+                    want.push(text.as_bytes());
+                    assert_eq!(args, want, "{shell} {id} request {n}");
+                    assert_eq!(
+                        std::fs::read_to_string(format!("{}.pwd", out.display()))
+                            .unwrap()
+                            .trim_end(),
+                        std::fs::canonicalize(&project)
+                            .unwrap()
+                            .display()
+                            .to_string()
+                    );
+                    assert!(!script.exists() && !file.exists(), "both files removed");
+                    std::fs::remove_file(&out).unwrap();
+                }
+            }
             assert!(
                 !dir.path().join("pwned").exists(),
                 "the request ran nothing"
             );
+        }
+    }
+
+    /// Task-A03-marina834: a request file that cannot be read starts no agent; the window says
+    /// why, and both files are removed.
+    #[cfg(unix)]
+    #[test]
+    fn an_unreadable_request_starts_nothing() {
+        let dir = TempDir::new("unreadable");
+        let bin = dir.path().join("bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        let out = dir.path().join("ran");
+        executable(
+            &bin.join("claude"),
+            &format!(
+                "#!/bin/sh\ntouch {}\n",
+                shell_quote(&out.display().to_string())
+            ),
+        );
+        for shell in ["/bin/zsh", "/bin/sh"] {
+            if !Path::new(shell).exists() {
+                continue;
+            }
+            let file = private_temp_file("allomos-request", "txt", b"x").unwrap();
+            std::fs::remove_file(&file).unwrap();
+            let script = private_temp_file("allomos-start", "sh", b"").unwrap();
+            let program = session_command("claude_cli", None, &[]).unwrap();
+            std::fs::write(
+                &script,
+                start_script(&script, &file, dir.path(), &program, Some(&bin)),
+            )
+            .unwrap();
+            let run = command(shell)
+                .arg("-c")
+                .arg(start_line(&script))
+                .output()
+                .unwrap();
+            assert!(!out.exists(), "{shell}: the agent was not started");
+            assert!(
+                String::from_utf8_lossy(&run.stderr).contains(START_FAILED),
+                "{shell}: {}",
+                String::from_utf8_lossy(&run.stderr)
+            );
+            assert!(!script.exists() && !file.exists());
+        }
+    }
+
+    /// By hand (Task-A03-marina834): open a real Terminal tab the way the app and the monitor do.
+    /// `ALLOMOS_PROBE_AGENT` (`claude_cli`, `codex_cli`, `antigravity_cli`), `ALLOMOS_PROBE_PROJECT`,
+    /// `ALLOMOS_PROBE_REQUEST` (a file holding the request) and, optionally, `ALLOMOS_PROBE_BIN`
+    /// (put first in the tab's `PATH`, for stand-in agents).
+    #[test]
+    #[ignore = "opens a Terminal window; run by hand"]
+    fn probe_open_terminal() {
+        let var = |k: &str| std::env::var(k).unwrap();
+        let id = var("ALLOMOS_PROBE_AGENT");
+        let request = std::fs::read_to_string(var("ALLOMOS_PROBE_REQUEST")).unwrap();
+        let bin = std::env::var("ALLOMOS_PROBE_BIN").ok().map(PathBuf::from);
+        let program = session_command(&id, None, &[]).unwrap();
+        let tab = open_terminal(
+            &id,
+            Path::new(&var("ALLOMOS_PROBE_PROJECT")),
+            &request,
+            &program,
+            bin.as_deref(),
+            false,
+        )
+        .unwrap();
+        println!("opened {tab:?}");
+    }
+
+    /// Task-A03-marina834: each temporary file is new, private and named apart from every other,
+    /// even within one process at the same moment.
+    #[test]
+    fn temporary_files_are_new_private_and_unique() {
+        let made: Vec<PathBuf> = (0..50)
+            .map(|_| private_temp_file("allomos-test", "txt", "请求\n".as_bytes()).unwrap())
+            .collect();
+        let mut names: Vec<_> = made.iter().collect();
+        names.sort();
+        names.dedup();
+        assert_eq!(names.len(), made.len());
+        for f in &made {
+            assert_eq!(std::fs::read(f).unwrap(), "请求\n".as_bytes());
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mode = std::fs::metadata(f).unwrap().permissions().mode();
+                assert_eq!(mode & 0o777, 0o600);
+            }
+            std::fs::remove_file(f).unwrap();
         }
     }
 

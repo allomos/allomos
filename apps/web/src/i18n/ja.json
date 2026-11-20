@@ -38,7 +38,7 @@
   "agents.antigravity_cli": "Antigravity（ターミナル）",
   "agents.how_link": "依頼を入力した状態で開きます",
   "agents.how_paste": "ターミナルが開き、依頼がクリップボードに入るので貼り付けます",
-  "agents.how_sent": "ターミナルが開き、依頼がすぐに送られます",
+  "agents.how_sent": "ターミナルが開き、依頼はすぐに {agent} に渡されて実行されます。確認が必要なときは、ターミナルのウィンドウで止まって尋ねます",
   "agents.paste_tip": "ターミナルが開いたら、{keys} で依頼を貼り付け、Enter キーで送ってください。",
   "agents.claude_app_trust": "Claude アプリが最初にこのフォルダーを信頼するか尋ねることがあります。「Trust workspace」を選んでください。選ばないと、プロジェクトなしでセッションが始まります。",
   "agents.searching": "AI エージェントを探しています…",

@@ -87,7 +87,8 @@ export function offer(found: Agent[], last: LastUsed | null, entries: string[] |
   const here = found.filter((a) => tools.includes(a.id));
   // No longer on this computer: as if not found.
   if (here.length === 0) return { kind: "all" };
-  const typedIn = here.filter((a) => a.how === "link");
+  // Given the request without pasting: typed in by a link, or sent in a terminal (Task-A03-marina834).
+  const typedIn = here.filter((a) => a.how === "link" || a.how === "sent");
   const same = typedIn.find((a) => a.id === last.tool);
   if (same) return { kind: "only", group: last.group, tools: [same.id] };
   if (typedIn.length > 0) return { kind: "only", group: last.group, tools: typedIn.map((a) => a.id) };

@@ -1,11 +1,12 @@
 //! Find the AI agents on this computer and ask them to add Allomos's instructions to a
-//! project (task A03-03). Allomos only **opens** each agent with the request typed in;
-//! the person reads it and sends it, so nothing runs or uses their plan without them.
+//! project (task A03-03). Allomos opens each agent with the request typed in for the person to
+//! send, or, for a terminal agent on macOS, given to it at once (Task-A03-marina834); the
+//! picker says which before the person chooses.
 
 use std::path::{Path, PathBuf};
 
 use allomos_core::Problem;
-use allomos_monitor::session_tab::{SessionTab, parse_opened};
+use allomos_monitor::session_tab::SessionTab;
 use serde::Serialize;
 
 // Starting terminal agents moved to the monitor crate, shared with `alm monitor` (Task-A03-cow112).
@@ -13,7 +14,7 @@ pub use allomos_monitor::terminal::{
     applescript_string, command, new_console, powershell_quote, shell_quote,
 };
 use allomos_monitor::terminal::{
-    ask_failed, find_tool, home, name, powershell_script, session_command, terminal_script,
+    ask_failed, find_tool, home, name, open_terminal, powershell_script, session_command,
     tool_dirs, workspace_dirs,
 };
 
@@ -25,8 +26,10 @@ pub struct Agent {
     pub id: String,
     /// What was found: the command's path, or the app's name.
     pub found: String,
-    /// How it will be asked: `link` (the request arrives typed in) or `paste` (a terminal opens
-    /// in the project folder and the request is on the clipboard).
+    /// How it will be asked: `link` (the request arrives typed in), `sent` (a terminal opens in
+    /// the project folder and the agent is given the request at once: the terminal agents on
+    /// macOS, Task-A03-marina834) or `paste` (a terminal opens in the project folder and the
+    /// request is on the clipboard: Windows).
     pub how: String,
 }
 
@@ -164,12 +167,9 @@ pub fn find_agents() -> Vec<Agent> {
     let home = home();
     let tools = tool_dirs(&home);
     let mut agents = Vec::new();
+    let macos = cfg!(target_os = "macos");
     if let Some(claude) = find_tool("claude", &tools) {
-        let how = if link_app("claude-cli", &home).is_some() {
-            "link"
-        } else {
-            "paste"
-        };
+        let how = terminal_how("claude_cli", macos, link_app("claude-cli", &home).is_some());
         agents.push(Agent {
             id: "claude_cli".into(),
             found: claude.display().to_string(),
@@ -187,7 +187,7 @@ pub fn find_agents() -> Vec<Agent> {
         agents.push(Agent {
             id: "codex_cli".into(),
             found: codex.display().to_string(),
-            how: "paste".into(),
+            how: terminal_how("codex_cli", macos, false).into(),
         });
     }
     if let Some(app) = link_app("codex", &home) {
@@ -204,10 +204,22 @@ pub fn find_agents() -> Vec<Agent> {
         agents.push(Agent {
             id: "antigravity_cli".into(),
             found: agy.display().to_string(),
-            how: "paste".into(),
+            how: terminal_how("antigravity_cli", macos, false).into(),
         });
     }
     agents
+}
+
+/// How a terminal agent is asked (Task-A03-marina834). On macOS every one is `sent`: a short line
+/// starts the shared start script, which gives it the request at once; Claude Code no longer goes
+/// through its `claude-cli://` link, whose Base64 command line Terminal typed and cut off at 1024
+/// bytes. On Windows, as before: Claude Code by its link when one is registered, otherwise paste.
+fn terminal_how(id: &str, macos: bool, claude_link: bool) -> &'static str {
+    match (macos, id) {
+        (true, _) => "sent",
+        (false, "claude_cli") if claude_link => "link",
+        _ => "paste",
+    }
 }
 
 /// Percent-encode a link's query value (everything but unreserved characters).
@@ -304,8 +316,8 @@ pub fn copy_text(text: &str) -> Result<(), Problem> {
     })
 }
 
-/// Open one agent in `project` with `request`: through its link, or in a new terminal window
-/// with the request on the clipboard. Either way the agent is pointed at the app's own `alm`
+/// Open one agent in `project` with `request`: through its link, or in a new terminal window that
+/// is given the request at once (macOS, Task-A03-marina834) or has it on the clipboard (Windows). Either way the agent is pointed at the app's own `alm`
 /// (Task-A03-16). Antigravity in a terminal also adds the taskbag at `taskbag` and its other
 /// project folders to its workspace (Task-A03-latch882).
 pub fn ask(agent: &Agent, project: &Path, taskbag: &Path, request: &str) -> Result<(), Problem> {
@@ -326,8 +338,9 @@ pub fn ask_with_terminal(
         return Err(ask_failed(id, "not available on this system yet"));
     }
     let own_alm = crate::alm_command::own();
-    let track_claude = track_claude && cfg!(target_os = "macos") && id == "claude_cli";
-    if agent.how == "link" && !track_claude {
+    let macos = cfg!(target_os = "macos");
+    let track_claude = track_claude && macos && id == "claude_cli";
+    if agent.how == "link" && !(macos && is_terminal_agent(id)) {
         let request = link_request(request, own_alm.as_deref());
         if let Some(url) = link(id, project, &request) {
             return open_link(&url)
@@ -336,55 +349,43 @@ pub fn ask_with_terminal(
         }
     }
     let alm_dir = own_alm.as_deref().and_then(Path::parent);
+    if !is_terminal_agent(id) {
+        return Err(ask_failed(id, "no way to open it"));
+    }
+    if macos {
+        // Every terminal agent: the request goes into a private file, the window types only a
+        // short line, and the shared start script reads, checks and removes it and starts the
+        // agent with it, as the monitor does (Task-A03-marina834). Codex gets the monitor's
+        // normal-mode command: its `workspace-write` sandbox with the taskbag and its project
+        // folders writable; Antigravity adds them to its workspace (Task-A03-latch882).
+        let dirs = if id == "claude_cli" {
+            Vec::new()
+        } else {
+            workspace_dirs(taskbag, project)
+        };
+        let program =
+            session_command(id, None, &dirs).ok_or_else(|| ask_failed(id, "no way to open it"))?;
+        let tab = open_terminal(id, project, request, &program, alm_dir, true)?;
+        return Ok(tab.filter(|_| track_claude));
+    }
+    // Windows, as before: PowerShell, with the request on the clipboard to paste.
     let dirs = if id == "antigravity_cli" {
         workspace_dirs(taskbag, project)
     } else {
         Vec::new()
     };
-    let program = match id {
-        "claude_cli" => "claude".to_string(),
-        "codex_cli" => "codex".to_string(),
-        "antigravity_cli" => "agy".to_string(),
-        _ => return Err(ask_failed(id, "no way to open it")),
-    };
-    // Antigravity's `agy` takes the request on its command line and sends it at once (the person
-    // chose this, 2026-11-09). On macOS it goes through a file, as the monitor does, so the
-    // clipboard is not used. Other agents, and Windows, still put it on the clipboard to paste.
-    let program = if id == "antigravity_cli" && !cfg!(windows) {
-        let file = std::env::temp_dir().join(format!("allomos-request-{}.md", std::process::id()));
-        std::fs::write(&file, request).map_err(|e| ask_failed(id, e))?;
-        session_command(id, &file, None, &dirs)
-            .ok_or_else(|| ask_failed(id, "no way to open it"))?
-    } else {
-        copy_to_clipboard(request).map_err(|e| ask_failed(id, e))?;
-        program
-    };
-    if cfg!(windows) {
-        let script = powershell_script(project, &agent.found, alm_dir, &dirs);
-        return new_console("powershell.exe")
-            .args(["-NoExit", "-NoLogo", "-Command", &script])
-            .spawn()
-            .map(|_| None)
-            .map_err(|e| ask_failed(id, e));
-    }
-    let line = applescript_string(&terminal_script(project, &program, alm_dir));
-    let script = if track_claude {
-        format!(
-            "tell application \"Terminal\"\nactivate\nset t to do script {line}\nset w to (first window whose tabs contains t)\nreturn (id of w as text) & \", \" & (tty of t)\nend tell"
-        )
-    } else {
-        format!("tell application \"Terminal\"\nactivate\ndo script {line}\nend tell")
-    };
-    let out = command("/usr/bin/osascript")
-        .args(["-e", &script])
-        .output()
-        .map_err(|e| ask_failed(id, e))?;
-    if !out.status.success() {
-        return Err(ask_failed(id, "Terminal did not open"));
-    }
-    Ok(track_claude
-        .then(|| parse_opened(&String::from_utf8_lossy(&out.stdout)))
-        .flatten())
+    copy_to_clipboard(request).map_err(|e| ask_failed(id, e))?;
+    let script = powershell_script(project, &agent.found, alm_dir, &dirs);
+    new_console("powershell.exe")
+        .args(["-NoExit", "-NoLogo", "-Command", &script])
+        .spawn()
+        .map(|_| None)
+        .map_err(|e| ask_failed(id, e))
+}
+
+/// Claude Code, Codex and Antigravity in a terminal.
+fn is_terminal_agent(id: &str) -> bool {
+    matches!(id, "claude_cli" | "codex_cli" | "antigravity_cli")
 }
 
 /// Open `url` with the app the system has for its scheme.
@@ -449,6 +450,40 @@ mod tests {
             "codex://threads/new?path=%2FUsers%2Fa%20b%2Fproj&prompt=x"
         );
         assert_eq!(link("codex_cli", p, "x"), None);
+    }
+
+    /// Task-A03-marina834: on macOS every terminal agent is given the request at once, Claude Code
+    /// too, even with its `claude-cli://` link registered; Windows is as before.
+    #[test]
+    fn terminal_agents_are_sent_the_request_on_macos_and_windows_is_unchanged() {
+        for id in ["claude_cli", "codex_cli", "antigravity_cli"] {
+            assert_eq!(terminal_how(id, true, true), "sent");
+            assert_eq!(terminal_how(id, true, false), "sent");
+        }
+        assert_eq!(terminal_how("claude_cli", false, true), "link");
+        assert_eq!(terminal_how("claude_cli", false, false), "paste");
+        assert_eq!(terminal_how("codex_cli", false, true), "paste");
+        assert_eq!(terminal_how("antigravity_cli", false, false), "paste");
+        assert!(is_terminal_agent("claude_cli") && !is_terminal_agent("claude_app"));
+    }
+
+    /// Task-A03-marina834: the app's terminal commands are the monitor's own (normal mode): no
+    /// `claude-cli://`, the request from the start script, and Codex in its `workspace-write`
+    /// sandbox with the taskbag writable.
+    #[test]
+    fn the_apps_terminal_commands_are_the_monitors() {
+        let dirs = [PathBuf::from("/w/tb/.allomos/taskbag")];
+        let claude = session_command("claude_cli", None, &[]).unwrap();
+        assert_eq!(claude, "claude \"$allomos_request\"");
+        assert!(!claude.contains("claude-cli://"));
+        assert_eq!(
+            session_command("codex_cli", None, &dirs).unwrap(),
+            "codex --sandbox workspace-write --add-dir '/w/tb/.allomos/taskbag' \"$allomos_request\""
+        );
+        assert_eq!(
+            session_command("antigravity_cli", None, &dirs).unwrap(),
+            "agy --add-dir '/w/tb/.allomos/taskbag' -i \"$allomos_request\""
+        );
     }
 
     #[test]

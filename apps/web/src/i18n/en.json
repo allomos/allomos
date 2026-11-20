@@ -38,7 +38,7 @@
   "agents.antigravity_cli": "Antigravity (terminal)",
   "agents.how_link": "will open with the request typed in",
   "agents.how_paste": "will open a terminal; the request will be on the clipboard to paste",
-  "agents.how_sent": "will open a terminal and send the request to it at once",
+  "agents.how_sent": "will open a terminal and hand the request to {agent} to carry out at once; when it needs you to confirm something, it stops and asks you in the terminal window",
   "agents.paste_tip": "When the terminal opens, paste the request with {keys} and press Enter to send it.",
   "agents.claude_app_trust": "The Claude app may first ask you to trust this folder: choose Trust workspace, or the session starts without the project.",
   "agents.searching": "Looking for AI agents…",

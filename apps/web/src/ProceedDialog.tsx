@@ -115,10 +115,6 @@ function TerminalLaunchNotice({ messenger, tab, children }: { messenger: Messeng
   const [save, setSave] = useState(true);
   const saving = save && !!former && hasUnpushed(former) ? former : null;
   const { agents, slow, choice: agent, setChoice: setAgent, tool } = useAgents(messenger);
-  // On macOS this flow opens Claude Code directly in Terminal so we can return to its tab.
-  const offeredAgents = /Mac/.test(navigator.userAgent)
-    ? agents?.map((a) => a.id === "claude_cli" ? { ...a, how: "paste" as const } : a) ?? null
-    : agents;
   /** The taskbag as the agent passes it to `--taskbag`; null while it is read. */
   const [taskbag, setTaskbag] = useState<string | null>(null);
   useEffect(() => {
@@ -162,7 +158,7 @@ function TerminalLaunchNotice({ messenger, tab, children }: { messenger: Messeng
       }
       const tab = await messenger.proceedWithAgent(agent, root, request);
       const name = t(AGENT_KEY[agent]);
-      const way = requestWay(offeredAgents?.find((a) => a.id === agent) ?? tool);
+      const way = requestWay(agents?.find((a) => a.id === agent) ?? tool);
       const prefix = takeOver ? "takeover.asked" : ask ? "proceed.asked_stopped" : "proceed.asked";
       const key = way === "typed" ? prefix : (`${prefix}_${way}` as const);
       const taskName = (
@@ -284,7 +280,7 @@ function TerminalLaunchNotice({ messenger, tab, children }: { messenger: Messeng
                     {t(held ? "takeover.does_held" : takeOver ? "takeover.does" : isBlocked(task) ? "proceed.does_blocked" : task.state === "waiting" ? "proceed.does_waiting" : "proceed.does")}
                   </p>
                   <p className="muted small">{t("proceed.how")}</p>
-                  <AgentPicker agents={offeredAgents} slow={slow} choice={agent} onChoose={setAgent} disabled={busy} name="proceed-agent" />
+                  <AgentPicker agents={agents} slow={slow} choice={agent} onChoose={setAgent} disabled={busy} name="proceed-agent" />
                 </>
               )}
             </>
