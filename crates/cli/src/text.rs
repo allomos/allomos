@@ -3,6 +3,7 @@
 
 use allomos_core::decision::Decision;
 use allomos_core::ops;
+use allomos_core::reopen::ReopenReason;
 use allomos_core::{Iteration, State, Task, Taskbag};
 use allomos_store::handoff;
 use allomos_store::plain_path;
@@ -132,6 +133,29 @@ pub(crate) fn indent(text: &str) -> String {
             }
         })
         .collect()
+}
+
+/// A task's reopen reasons (decision 0030 § 5), most recent first:
+/// "`{prefix}`reopen reasons:\n`{prefix}`  - `<by>` (`<at>`): `<reason>`\n".
+pub(crate) fn reopen_lines(reasons: &[ReopenReason], prefix: &str) -> String {
+    if reasons.is_empty() {
+        return String::new();
+    }
+    let mut out = format!("{prefix}reopen reasons:\n");
+    for r in reasons {
+        let who = r.by.as_deref().unwrap_or("someone");
+        let mut lines = r.reason.trim_end().lines();
+        let first = lines.next().unwrap_or_default();
+        out.push_str(&format!("{prefix}  - {who} ({}): {first}\n", r.at));
+        for line in lines {
+            if line.is_empty() {
+                out.push('\n');
+            } else {
+                out.push_str(&format!("{prefix}    {line}\n"));
+            }
+        }
+    }
+    out
 }
 
 /// A task's AI decisions to review, one per line: "  - <text> (<by>, <at>)" (Task-A03-19).

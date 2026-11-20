@@ -586,10 +586,22 @@ impl Run {
 
     /// One check's share-out: each free session slot, in the run's order, gets the first task in
     /// its agent's difficulty range: first the lost tasks in the scope (A03-husky861: a session
-    /// went quiet holding them, decision 0022), then the currently ready ones. Dispatch history
+    /// went quiet holding them, decision 0022), then the currently ready ones (reopened tasks
+    /// first within their iteration, decision 0030 § 6). Dispatch history
     /// does not affect eligibility. A task being followed, including a session waiting to claim
     /// it, or a task given up ([`MAX_FAILURES`]), is excluded.
     pub fn share(&self, bag: &Taskbag, now_secs: i64) -> Vec<(String, Task)> {
+        self.share_with_reopened(bag, now_secs, &std::collections::BTreeMap::new())
+    }
+
+    /// [`share`] with reopen reasons from the taskbag's history, so reopened ready tasks are
+    /// dispatched ahead of other ready tasks in the same iteration (decision 0030 § 6).
+    pub fn share_with_reopened(
+        &self,
+        bag: &Taskbag,
+        now_secs: i64,
+        reopened: &std::collections::BTreeMap<String, Vec<allomos_core::reopen::ReopenReason>>,
+    ) -> Vec<(String, Task)> {
         let iteration = match &self.scope {
             Scope::All => None,
             Scope::Iteration { id } => Some(id.as_str()),
@@ -606,7 +618,9 @@ impl Run {
                     && heartbeat::lost(t, now_secs, lost_after, None).is_some()
             })
             .collect();
-        for t in ops::next(bag, iteration).unwrap_or_default() {
+        let mut next = ops::next(bag, iteration).unwrap_or_default();
+        allomos_core::reopen::prioritize_reopened(&mut next, bag, reopened);
+        for t in next {
             if !left_out(t) && !ready.iter().any(|r| r.id == t.id) {
                 ready.push(t);
             }
@@ -1981,5 +1995,27 @@ mod tests {
         assert!(r.share(&bag, now / 1000).is_empty());
         r.resume("claude_cli");
         assert_eq!(r.share(&bag, now / 1000).len(), 1);
+    }
+
+    #[test]
+    fn share_with_reopened_dispatches_reopened_task_first() {
+        let mut r = run(&["claude_cli"]);
+        r.set_sessions("claude_cli", 1);
+        let bag = bag_of(vec![
+            task("A01-1", State::Ready, None),
+            task("A01-2", State::Ready, None),
+        ]);
+        let mut reopened = std::collections::BTreeMap::new();
+        reopened.insert(
+            "A01-2".to_string(),
+            vec![allomos_core::reopen::ReopenReason {
+                at: "2026-11-20T09:00:00Z".into(),
+                by: Some("will".into()),
+                reason: "fix check".into(),
+            }],
+        );
+        let shares = r.share_with_reopened(&bag, 0, &reopened);
+        assert_eq!(shares.len(), 1);
+        assert_eq!(shares[0].1.id, "A01-2");
     }
 }

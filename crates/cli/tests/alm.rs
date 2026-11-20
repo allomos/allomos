@@ -945,6 +945,172 @@ fn reopen_a_done_or_dropped_task() {
     assert!(String::from_utf8_lossy(&out.stdout).contains("reopen_note: — → Wanted after all"));
 }
 
+#[test]
+fn reopen_reasons_shown_ahead_of_handoff_and_prioritized_in_next() {
+    let repo = filled();
+    ok(&repo, &["add", "iteration", "I01", "One"]);
+    ok(&repo, &["add", "iteration", "I02", "Two"]);
+    ok(
+        &repo,
+        &["add", "task", "A01-03", "--area", "A01", "--title", "Later iteration task"],
+    );
+    ok(&repo, &["plan", "A01-01", "I01"]);
+    ok(&repo, &["plan", "A01-02", "I01"]);
+    ok(&repo, &["plan", "A01-03", "I02"]);
+    for id in ["A01-01", "A01-02", "A01-03"] {
+        ok(&repo, &["ready", id]);
+    }
+    // Drop A02-01 so only our three planned tasks are in `alm next`.
+    ok(&repo, &["drop", "A02-01"]);
+    // Finish and reopen A01-02 twice (with a handoff note), and finish and reopen A01-03 once.
+    ok(&repo, &["--as", "a", "claim", "A01-02"]);
+    ok(&repo, &["--as", "a", "note", "A01-02", "previous handoff"]);
+    ok(
+        &repo,
+        &["--as", "a", "done", "A01-02", "--without-human-check", "first try"],
+    );
+    let mut first_reopen = alm_command();
+    let out = first_reopen
+        .current_dir(&repo)
+        .env("ALLOMOS_NOW", "2026-11-18T10:00:00Z")
+        .args(["--as", "alice", "reopen", "A01-02", "--note", "first return reason"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+
+    ok(&repo, &["--as", "b", "claim", "A01-02"]);
+    ok(
+        &repo,
+        &["--as", "b", "done", "A01-02", "--without-human-check", "second try"],
+    );
+    let mut second_reopen = alm_command();
+    let out = second_reopen
+        .current_dir(&repo)
+        .env("ALLOMOS_NOW", "2026-11-19T11:30:00Z")
+        .args(["--as", "bob", "reopen", "A01-02", "--note", "second return reason"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+
+    // Reopen A01-03 in I2 (should NOT jump ahead of I1's A01-01).
+    ok(&repo, &["--as", "a", "claim", "A01-03"]);
+    ok(
+        &repo,
+        &["--as", "a", "done", "A01-03", "--without-human-check", "done"],
+    );
+    ok(
+        &repo,
+        &["--as", "alice", "reopen", "A01-03", "--note", "i2 return reason"],
+    );
+
+    // Task file itself gains no reopen fields.
+    let file = task_file(&repo, "A01-02");
+    assert!(file.get("reopen_reasons").is_none());
+    assert!(file.get("reopen_note").is_none());
+
+    // 1. alm next: A01-02 comes ahead of A01-01 in I1; I2's A01-03 stays after I1.
+    let next_json = ok(&repo, &["next"]);
+    let ids: Vec<&str> = next_json["tasks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, vec!["A01-02", "A01-01", "A01-03"]);
+    let next_reasons = next_json["tasks"][0]["reopen_reasons"].as_array().unwrap();
+    assert_eq!(next_reasons.len(), 2);
+    assert_eq!(next_reasons[0]["reason"], "second return reason");
+    assert_eq!(next_reasons[0]["by"], "bob");
+    assert_eq!(next_reasons[0]["at"], "2026-11-19T11:30:00Z");
+    assert_eq!(next_reasons[1]["reason"], "first return reason");
+    assert_eq!(next_reasons[1]["by"], "alice");
+
+    let next_out = String::from_utf8_lossy(&alm(&repo, &["next"]).stdout).into_owned();
+    let reopen_pos = next_out.find("reopen reasons:").expect("reopen reasons in next");
+    let second_pos = next_out
+        .find("bob (2026-11-19T11:30:00Z): second return reason")
+        .expect("latest reason in next");
+    let first_pos = next_out
+        .find("alice (2026-11-18T10:00:00Z): first return reason")
+        .expect("earlier reason in next");
+    let handoff_pos = next_out
+        .find("handoff note: previous handoff")
+        .expect("handoff note in next");
+    assert!(reopen_pos < second_pos && second_pos < first_pos && first_pos < handoff_pos);
+
+    // 2. alm show: reopen reasons before handoff note, most recent first.
+    let show_out = String::from_utf8_lossy(&alm(&repo, &["show", "A01-02"]).stdout).into_owned();
+    let s_reopen = show_out.find("reopen reasons:").expect("reopen reasons in show");
+    let s_second = show_out
+        .find("bob (2026-11-19T11:30:00Z): second return reason")
+        .expect("latest reason in show");
+    let s_first = show_out
+        .find("alice (2026-11-18T10:00:00Z): first return reason")
+        .expect("earlier reason in show");
+    let s_handoff = show_out
+        .find("handoff note: previous handoff")
+        .expect("handoff note in show");
+    assert!(s_reopen < s_second && s_second < s_first && s_first < s_handoff);
+    let show_json = ok(&repo, &["show", "A01-02"]);
+    assert_eq!(show_json["reopen_reasons"].as_array().unwrap().len(), 2);
+
+    // 3. alm claim: reopen reasons shown, most recent first.
+    let claim_out =
+        String::from_utf8_lossy(&alm(&repo, &["--as", "c", "claim", "A01-02"]).stdout).into_owned();
+    let c_second = claim_out
+        .find("bob (2026-11-19T11:30:00Z): second return reason")
+        .expect("latest reason in claim");
+    let c_first = claim_out
+        .find("alice (2026-11-18T10:00:00Z): first return reason")
+        .expect("earlier reason in claim");
+    assert!(c_second < c_first);
+
+    // Still shown in alm show while in_progress.
+    let show_in_progress = ok(&repo, &["show", "A01-02"]);
+    assert_eq!(
+        show_in_progress["reopen_reasons"].as_array().unwrap().len(),
+        2
+    );
+
+    // Once finished again, alm show no longer lists reopen reasons.
+    ok(
+        &repo,
+        &["--as", "c", "done", "A01-02", "--without-human-check", "fixed"],
+    );
+    let show_done_out =
+        String::from_utf8_lossy(&alm(&repo, &["show", "A01-02"]).stdout).into_owned();
+    assert!(!show_done_out.contains("reopen reasons:"));
+    let show_done_json = ok(&repo, &["show", "A01-02"]);
+    assert_eq!(show_done_json["reopen_reasons"], json!([]));
+
+    // 4. An older reopened event (written without `actor` or `sig`) still shows its reason.
+    let legacy_event = json!({
+        "at": "2026-10-26T15:15:45Z",
+        "by": "legacy-reviewer",
+        "via": "alm",
+        "command": "reopen",
+        "kind": "task",
+        "id": "A01-01",
+        "changes": [
+            { "field": "state", "from": "done", "to": "ready" },
+            { "field": "reopen_note", "to": "legacy reopen reason" }
+        ]
+    });
+    fs::write(
+        repo.join(".allomos/taskbag/events/2026-10-26-151545-000-legacy.json"),
+        serde_json::to_string_pretty(&legacy_event).unwrap(),
+    )
+    .unwrap();
+    let show_legacy =
+        String::from_utf8_lossy(&alm(&repo, &["show", "A01-01"]).stdout).into_owned();
+    assert!(show_legacy.contains("legacy-reviewer (2026-10-26T15:15:45Z): legacy reopen reason"));
+    let claim_legacy = ok(&repo, &["--as", "d", "claim", "A01-01"]);
+    assert_eq!(
+        claim_legacy["reopen_reasons"][0]["reason"],
+        "legacy reopen reason"
+    );
+}
+
 fn git(dir: &Path, args: &[&str]) -> String {
     let out = Command::new("git")
         .arg("-C")

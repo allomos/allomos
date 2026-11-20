@@ -625,7 +625,8 @@ impl Loop {
         let run = &self.record.run;
         if !run.free_agents().is_empty() && due {
             let run = &self.record.run;
-            let shares = run.share(bag, now / 1000);
+            let reopened = allomos_store::reopen::by_task(&self.record.taskbag);
+            let shares = run.share_with_reopened(bag, now / 1000, &reopened);
             // An agent with a free slot and no task in its range gets no session; the status bar
             // says so (Task-A03-wave335).
             self.record.run.no_task = run.unfilled(&shares);
