@@ -96,6 +96,17 @@ test("a failed check's screenshots: the picture type by name, the reader per tas
   await reader.changes(["abc1234"]);
   assert.equal((await reader.screenshot("A01-x", "a.png")).byteLength, 1);
   assert.deepEqual(asked, ["/bag:abc1234", "/bag:A01-x/a.png"]);
+  // Send back… with this screen (Task-A01-music456): offered only where the messenger captures.
+  assert.equal(reader.captureScreen, undefined);
+  const capturing = evidenceReader(
+    {
+      codeChanges: async () => ({ commits: [], files: [] }),
+      evidenceScreenshot: async () => new ArrayBuffer(1),
+      captureEvidenceScreen: async (root, task) => `${root}:${task}.jpg`,
+    },
+    "/bag",
+  );
+  assert.equal(await capturing.captureScreen?.("A01-x"), "/bag:A01-x.jpg");
 
   const t = (key: string, p?: Record<string, string | number>) =>
     ({ "evidence.result_fail": "Failed", "pane.check_result_shots": `${p?.n} screenshot(s)` })[key] ?? key;

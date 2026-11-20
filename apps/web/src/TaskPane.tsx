@@ -40,7 +40,8 @@ import {
   changedVersion,
   type NewIterationDraft,
 } from "./editFlow";
-import { canReopen, reopenEdit } from "./reopenFlow";
+import { canReopen, disagreeText } from "./reopenFlow";
+import { ReturnBox } from "./ReturnBox";
 import { canMakeReady, canWithdraw, expiresValue, hasPlan, withdrawnNotice } from "./approvalFlow";
 import { HeartbeatLine, TakeOverButton } from "./Heartbeat";
 import { heldFact } from "./heartbeatFlow";
@@ -158,8 +159,10 @@ export function TaskPane({
   // the task changed since, the version it has now.
   const [startVersion, setStartVersion] = useState<string | null>(null);
   const [conflict, setConflict] = useState<string | null>(null);
-  // Reopen… (Task-A01-50): the reason being written; null while the form is closed.
+  // Send back… (Task-A01-50, A01-music456): the reason being written, null while the form is
+  // closed, and what it was opened with (a disagreed AI decision's words).
   const [reason, setReason] = useState<string | null>(null);
+  const [filled, setFilled] = useState<string | null>(null);
   // Open in Claude was pressed, in the title or in the Session row (Task-A03-smile488): the app was
   // asked; whether it opened cannot be known. The note shows beside the button that was pressed.
   const [sessionAsked, setSessionAsked] = useState<"top" | "row" | null>(null);
@@ -195,21 +198,20 @@ export function TaskPane({
     setReason(null);
     setError(null);
   };
-  /** Reopen (Task-A01-50): through the same rule as `alm reopen`; refused in Rust's words. */
-  const reopen = async () => {
-    const edit = reopenEdit(reason ?? "");
-    if (!edit || busy) return;
-    setBusy(true);
-    try {
-      await onEdit(edit);
-      setReason(null);
-      setError(null);
-    } catch (e) {
-      say(e);
-    } finally {
-      setBusy(false);
-    }
+  /** Send back… opened, empty or with an AI decision's words (decision 0030 § 4). */
+  const startReturn = (text = "") => {
+    setEditing(null);
+    setAsking(null);
+    setError(null);
+    setReason(text);
+    setFilled(text || null);
   };
+  const disagree = (text: string) =>
+    canReopen(task) && (
+      <button type="button" className="link small" onClick={() => startReturn(disagreeText(text, t("pane.disagree_intro"), t("pane.disagree_why")))}>
+        {t("pane.disagree")}
+      </button>
+    );
   /** Approve (Task-A01-baker800): the description shown when Approve… was opened is the plan
    * approved; Rust refuses it (task_changed) if the task's description is no longer that. */
   const approve = async (ready: boolean) => {
@@ -741,7 +743,7 @@ export function TaskPane({
           <li key={`${d.at}-${i}`}>
             {d.kind && <span className="muted small">{t(`pane.ai_decision_kind.${d.kind}` as Key)} · </span>}
             {d.text}{" "}
-            <span className="muted small">{t("pane.ai_decision_by", { by: d.by || t("pane.history_someone"), at: localTime(d.at) })}</span>
+            <span className="muted small">{t("pane.ai_decision_by", { by: d.by || t("pane.history_someone"), at: localTime(d.at) })}</span> {disagree(d.text)}
           </li>
         ))}
       </ul>
@@ -765,12 +767,17 @@ export function TaskPane({
         {decisionDetails(task).map((d, i) => (
           <li key={`${d.at}-${i}`}>
             {d.text}{" "}
-            <span className="muted small">{t("pane.ai_decision_by", { by: d.by || t("pane.history_someone"), at: localTime(d.at) })}</span>
+            <span className="muted small">{t("pane.ai_decision_by", { by: d.by || t("pane.history_someone"), at: localTime(d.at) })}</span> {disagree(d.text)}
           </li>
         ))}
       </ul>
       <p className="muted small">{t("pane.ai_details_hint")}</p>
     </details>
+  );
+
+  const returnBox = canReopen(task) && (
+    <ReturnBox task={task} reason={reason} filled={filled} onOpen={() => startReturn()} onClose={() => setReason(null)} onReason={setReason} onEdit={onEdit}
+      capture={reader?.captureScreen} nameForm={ownerName ? null : nameForm} describe={(e) => (isProblem(e) ? problem(e) : t("error.unexpected", { detail: String(e) }))} />
   );
 
   return (
@@ -795,7 +802,7 @@ export function TaskPane({
         </button>
       </header>
       {toCheck(task) ? (
-        <EvidenceScreen task={task} ask={ask} onLink={onLink} decisions={(reviewBox || detailsBox) && <>{reviewBox}{detailsBox}</>} actions={checkBox} reader={reader} />
+        <EvidenceScreen task={task} ask={ask} onLink={onLink} decisions={(reviewBox || detailsBox) && <>{reviewBox}{detailsBox}</>} actions={<>{checkBox}{returnBox}</>} reader={reader} />
       ) : (
         <>{reviewBox}{detailsBox}</>
       )}
@@ -982,54 +989,7 @@ export function TaskPane({
           </ul>
         </div>
       )}
-      {canReopen(task) && (
-        <div className="pane-check pane-reopen">
-          {reason === null ? (
-            <button
-              type="button"
-              onClick={() => {
-                setEditing(null);
-                setAsking(null);
-                setError(null);
-                setReason("");
-              }}
-              disabled={busy}
-            >
-              {t("pane.reopen_button")}
-            </button>
-          ) : !ownerName ? (
-            nameForm()
-          ) : (
-            <div className="editor">
-              <textarea
-                value={reason}
-                rows={3}
-                placeholder={t("pane.reopen_placeholder")}
-                aria-label={t("pane.reopen_note")}
-                onChange={(e) => setReason(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") {
-                    e.preventDefault();
-                    cancel();
-                  }
-                }}
-                disabled={busy}
-                autoFocus
-              />
-              <div className="editor-buttons">
-                <button type="button" className="primary" onClick={() => void reopen()} disabled={busy || !reopenEdit(reason)}>
-                  {busy ? t("edit.saving") : t("pane.reopen_save")}
-                </button>
-                <button type="button" onClick={cancel} disabled={busy}>
-                  {t("edit.cancel")}
-                </button>
-              </div>
-              {error && <p className="banner error small">{error}</p>}
-            </div>
-          )}
-          <p className="muted small">{t("pane.reopen_hint")}</p>
-        </div>
-      )}
+      {!toCheck(task) && returnBox}
       <details className="pane-more">
         <summary>{t("pane.details")}</summary>
       <dl className="fields">

@@ -150,3 +150,28 @@ pub fn record(
         issues,
     })
 }
+
+/// Add one screenshot, the file at `path` on this computer, to task `id`'s `evidence/` folder,
+/// under the lock, and give the name it is kept under; no event is written (Send back… names it
+/// in the reopen reason, Task-A01-music456, decision 0030 § 4). Counted with the others: refused
+/// (`return_screenshots_full`) when the folder holds [`check_result::MOST_SCREENSHOTS`] already.
+pub fn add_screenshot(
+    root: &Path,
+    wait: Duration,
+    id: &str,
+    path: &Path,
+) -> Result<String, Problem> {
+    let (_lock, bag, _) = lock_for_change(root, wait)?;
+    let task = ops::find_task(&bag, id)?;
+    let kept = kept(root, &task.id);
+    if kept.len() >= check_result::MOST_SCREENSHOTS {
+        return Err(Problem::ReturnScreenshotsFull {
+            id: task.id.clone(),
+            have: kept.join(", "),
+        });
+    }
+    let (bytes, kind) = read_screenshot(path)?;
+    let name = check_result::screenshot_name(&path.to_string_lossy(), kind, &kept);
+    crate::writing::write_new_file(&evidence_dir(root, &task.id).join(&name), &bytes)?;
+    Ok(name)
+}

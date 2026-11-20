@@ -451,3 +451,32 @@ fn events_written_under_a_number_carry_it() {
             .all(|e| e.changes.iter().all(|c| c.field != "request_id"))
     );
 }
+
+/// Send back… with this screen attached (Task-A01-music456): the picture goes into the task's
+/// `evidence/` folder, named from the file, and counts with the others (at most 3 in all).
+#[test]
+fn a_sent_back_screen_is_kept_in_the_tasks_evidence_folder_counted_with_the_others() {
+    let (dir, root) = taskbag("return-shot");
+    let png = dir.join("Allomos screen.png");
+    fs::write(&png, b"\x89PNG\r\n\x1a\nxxxx").unwrap();
+    let wait = Duration::ZERO;
+    let add = |id: &str| allomos_store::check_results::add_screenshot(&root, wait, id, &png);
+    assert_eq!(add("A01-01").unwrap(), "Allomos-screen.png");
+    assert_eq!(add("A01-01").unwrap(), "Allomos-screen-2.png");
+    assert_eq!(add("A01-01").unwrap(), "Allomos-screen-3.png");
+    let kept = allomos_store::check_results::kept(&root, "A01-01");
+    assert_eq!(kept.len(), 3);
+    assert_eq!(add("A01-01").unwrap_err().code(), "return_screenshots_full");
+    assert_eq!(add("A01-99").unwrap_err().code(), "task_not_found");
+    let text = dir.join("note.txt");
+    fs::write(&text, "not a picture").unwrap();
+    let not = allomos_store::check_results::add_screenshot(&root, wait, "A01-02", &text);
+    assert_eq!(not.unwrap_err().code(), "screenshot_not_image");
+    // No event is written: the reopen reason names the picture.
+    assert!(
+        events::list(&root)
+            .0
+            .iter()
+            .all(|e| e.command != "check-result")
+    );
+}

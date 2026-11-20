@@ -344,6 +344,13 @@
   "retention_invalid": [
     "value"
   ],
+  "return_screenshots_full": [
+    "id",
+    "have"
+  ],
+  "screen_capture_failed": [
+    "detail"
+  ],
   "screenshot_needs_fail": [
     "result"
   ],

@@ -42,6 +42,9 @@ export interface CodeChanges {
 export interface EvidenceReader {
   changes(hashes: string[]): Promise<CodeChanges>;
   screenshot(task: string, file: string): Promise<ArrayBuffer>;
+  /** Send back… with this screen attached (Task-A01-music456): the one change here, made by the
+   * desktop app: this window captured into the task's evidence folder; answers the kept name. */
+  captureScreen?(task: string): Promise<string>;
 }
 
 /** The reader for the taskbag at `root`, from the desktop app's messenger. */
@@ -49,10 +52,16 @@ export function evidenceReader(
   m: {
     codeChanges(taskbag: string, hashes: string[]): Promise<CodeChanges>;
     evidenceScreenshot(taskbag: string, task: string, file: string): Promise<ArrayBuffer>;
+    captureEvidenceScreen?(taskbag: string, task: string): Promise<string>;
   },
   root: string,
 ): EvidenceReader {
-  return { changes: (hashes) => m.codeChanges(root, hashes), screenshot: (task, file) => m.evidenceScreenshot(root, task, file) };
+  const capture = m.captureEvidenceScreen;
+  return {
+    changes: (hashes) => m.codeChanges(root, hashes),
+    screenshot: (task, file) => m.evidenceScreenshot(root, task, file),
+    ...(capture && { captureScreen: (task: string) => capture.call(m, root, task) }),
+  };
 }
 
 /** The picture type of a screenshot by its file name, as `alm` names them (`.png`, `.jpg`,

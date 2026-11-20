@@ -28,6 +28,7 @@ mod monitor_update;
 mod pairing;
 mod project_settings;
 mod risk_settings;
+mod screen_capture;
 mod sessions;
 mod tab_drag;
 mod task_change;
@@ -325,6 +326,7 @@ pub fn run() {
             former_worktree::former_worktree,
             code_changes::code_changes,
             evidence_screenshot::evidence_screenshot,
+            screen_capture::capture_evidence_screen,
             monitor_runs::monitor_runs,
             monitor_runs::monitor_start,
             agent_models::agent_models,

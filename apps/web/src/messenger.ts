@@ -154,6 +154,10 @@ export interface Messenger {
    * `evidence/` folder in the taskbag. Only reads. Rejects with a Problem when this computer does
    * not have it. */
   evidenceScreenshot(taskbag: string, task: string, file: string): Promise<ArrayBuffer>;
+  /** Send back… with this screen attached (Task-A01-music456): captures the asking window into
+   * task `task`'s evidence folder; answers the kept name. Rejects with a Problem
+   * (`return_screenshots_full`, `screen_capture_failed`). */
+  captureEvidenceScreen(taskbag: string, task: string): Promise<string>;
   /** Monitor ready tasks (Task-A03-cow112): the runs of the taskbag at `root` (several may run at
    * once), as `alm monitor status --json` lists them; read again when `onMonitorsChanged` says. */
   monitorRuns(root: string): Promise<unknown[]>;
@@ -615,6 +619,7 @@ export const desktopMessenger: Messenger = {
   formerWorktree: (taskbag, folder, working) => invoke<FormerWorktree | null>("former_worktree", { taskbag, folder, working }),
   codeChanges: (taskbag, hashes) => invoke<CodeChanges>("code_changes", { taskbag, hashes }),
   evidenceScreenshot: (taskbag, task, file) => invoke<ArrayBuffer>("evidence_screenshot", { taskbag, task, file }),
+  captureEvidenceScreen: (taskbag, task) => invoke<string>("capture_evidence_screen", { taskbag, task }),
   monitorRuns: (root) => invoke<unknown[]>("monitor_runs", { root }),
   monitorStart: (root, agents, every, quiet, iteration, sessions, difficulties, models, efforts) =>
     invoke<string>("monitor_start", { root, agents, every, quiet, iteration, sessions, difficulties, models, efforts }),

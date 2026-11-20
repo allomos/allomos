@@ -214,6 +214,11 @@ problems! {
     ScreenshotTooLarge { file, size } => "screenshot_too_large", "{file} is {size}, and a screenshot may be at most 2 MB. Make it smaller first, for example as a JPEG at most 1600 points wide (on macOS: `sips -s format jpeg -s formatOptions 70 -Z 1600 <file> --out <smaller.jpg>`), or capture only the window that shows the failure; then give that file.";
     /// A screenshot file that cannot be read (Task-A01-fondue470).
     ScreenshotUnreadable { file, detail } => "screenshot_unreadable", "The screenshot {file} cannot be read: {detail}. Give the path of a picture file on this computer.";
+    /// Send back… with this screen attached, on a task whose `evidence/` folder is full
+    /// (Task-A01-music456, decision 0030 § 4).
+    ReturnScreenshotsFull { id, have } => "return_screenshots_full", "Task {id} already keeps 3 screenshots ({have}), so this screen cannot be added. Send it back without the screenshot, and say in the reason what is wrong.";
+    /// Send back… could not capture the window to attach it (Task-A01-music456).
+    ScreenCaptureFailed { detail } => "screen_capture_failed", "This window could not be captured: {detail}. On macOS, allow Allomos under System Settings › Privacy & Security › Screen & System Audio Recording and try again, or send it back without the screenshot.";
     /// A branch name that is not one: empty, with a space, or starting with `-` (Task-A03-22).
     BranchInvalid { name } => "branch_invalid", "\"{name}\" is not a branch name. Give the branch's real name, as your version control tool shows it (in Git: `git branch --show-current`, for example main).";
     /// A warning: `alm add task` or `alm claim` was not told which branch the agent is on, so the
