@@ -357,25 +357,22 @@ pub fn ask_with_terminal(
         // short line, and the shared start script reads, checks and removes it and starts the
         // agent with it, as the monitor does (Task-A03-marina834). Codex gets the monitor's
         // normal-mode command: its `workspace-write` sandbox with the taskbag and its project
-        // folders writable; Antigravity adds them to its workspace (Task-A03-latch882).
-        let dirs = if id == "claude_cli" {
-            Vec::new()
-        } else {
-            workspace_dirs(taskbag, project)
-        };
+        // folders writable; Antigravity adds them to its workspace (Task-A03-latch882); Claude
+        // Code adds them and edits there without asking (Task-A03-emu042).
+        let dirs = workspace_dirs(taskbag, project);
         let program =
             session_command(id, None, &dirs).ok_or_else(|| ask_failed(id, "no way to open it"))?;
         let tab = open_terminal(id, project, request, &program, alm_dir, true)?;
         return Ok(tab.filter(|_| track_claude));
     }
     // Windows, as before: PowerShell, with the request on the clipboard to paste.
-    let dirs = if id == "antigravity_cli" {
+    let dirs = if id == "antigravity_cli" || id == "claude_cli" {
         workspace_dirs(taskbag, project)
     } else {
         Vec::new()
     };
     copy_to_clipboard(request).map_err(|e| ask_failed(id, e))?;
-    let script = powershell_script(project, &agent.found, alm_dir, &dirs);
+    let script = powershell_script(id, project, &agent.found, alm_dir, &dirs);
     new_console("powershell.exe")
         .args(["-NoExit", "-NoLogo", "-Command", &script])
         .spawn()
@@ -473,8 +470,12 @@ mod tests {
     #[test]
     fn the_apps_terminal_commands_are_the_monitors() {
         let dirs = [PathBuf::from("/w/tb/.allomos/taskbag")];
-        let claude = session_command("claude_cli", None, &[]).unwrap();
-        assert_eq!(claude, "claude \"$allomos_request\"");
+        let claude = session_command("claude_cli", None, &dirs).unwrap();
+        // Task-A03-emu042: Claude Code edits the project and the taskbag without asking.
+        assert_eq!(
+            claude,
+            "claude --allowedTools 'Bash(alm:*),Bash(cargo test:*),Bash(cargo check:*),Bash(npm test:*),Bash(npm run test:*),Bash(pnpm test:*),Bash(yarn test:*),Bash(pytest:*),Bash(go test:*)' --add-dir '/w/tb/.allomos/taskbag' --permission-mode acceptEdits \"$allomos_request\""
+        );
         assert!(!claude.contains("claude-cli://"));
         assert_eq!(
             session_command("codex_cli", None, &dirs).unwrap(),

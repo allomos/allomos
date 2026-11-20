@@ -9,6 +9,7 @@ use std::process::Command;
 use std::time::Duration;
 
 use crate::flow::Choice;
+use crate::permissions::{add_dirs, claude_permission_args};
 use allomos_core::Problem;
 
 /// A program started without a window. On Windows a windowed app's command-line child (`claude
@@ -494,15 +495,20 @@ pub fn start_line(script: &Path) -> String {
 
 /// What a new PowerShell window runs (Windows): the same, with `$env:PATH`. The tool is started
 /// by its full path: a new window does not always get the same `PATH`.
-/// `dirs`: folders an Antigravity session adds to its workspace ([`workspace_dirs`]; empty for the
-/// other agents).
+/// `dirs`: folders an Antigravity or Claude Code session adds to its workspace
+/// ([`workspace_dirs`]; empty for the other agents); `id` the agent, for Claude's permissions.
 pub fn powershell_script(
+    id: &str,
     project: &Path,
     found: &str,
     alm_dir: Option<&Path>,
     dirs: &[PathBuf],
 ) -> String {
-    let args = add_dirs(dirs, powershell_quote);
+    let args = if id == "claude_cli" {
+        claude_permission_args(dirs, powershell_quote)
+    } else {
+        add_dirs(dirs, powershell_quote)
+    };
     let start = format!(
         "Set-Location -LiteralPath {}; & {}{}{}",
         powershell_quote(&project.display().to_string()),
@@ -565,17 +571,6 @@ pub fn workspace_dirs(taskbag: &Path, project: &Path) -> Vec<PathBuf> {
         if dir != project && !out.contains(&dir) {
             out.push(dir);
         }
-    }
-    out
-}
-
-/// `--add-dir '<dir>' ` for each of `dirs`, quoted with `quote` (the shell's or PowerShell's).
-fn add_dirs(dirs: &[PathBuf], quote: fn(&str) -> String) -> String {
-    let mut out = String::new();
-    for dir in dirs {
-        out.push_str("--add-dir ");
-        out.push_str(&quote(&dir.display().to_string()));
-        out.push(' ');
     }
     out
 }
@@ -720,7 +715,8 @@ fn antigravity_quiet_settings_from_read(
 /// app access. User settings are untouched. Antigravity adds `dirs` to its workspace
 /// ([`workspace_dirs`], Task-A03-latch882), and Codex makes them writable in its sandbox
 /// (`--add-dir`, Task-A03-bag625), so a quiet session's writes to the taskbag do not fail
-/// silently; Claude ignores them.
+/// silently; Claude Code adds them too and edits there without asking ([`claude_permission_args`](crate::permissions::claude_permission_args),
+/// Task-A03-emu042).
 pub fn session_command(id: &str, session_id: Option<&str>, dirs: &[PathBuf]) -> Option<String> {
     session_command_with_quiet(id, session_id, false, dirs, &Choice::default())
 }
@@ -762,10 +758,14 @@ fn session_command_with_quiet(
     let chosen = choice_args(id, choice, shell_quote);
     match (id, session_id) {
         ("claude_cli", Some(s)) => Some(format!(
-            "claude --session-id {} {chosen}{request}",
-            shell_quote(s)
+            "claude --session-id {} {chosen}{}{request}",
+            shell_quote(s),
+            claude_permission_args(dirs, shell_quote)
         )),
-        ("claude_cli", None) => Some(format!("claude {chosen}{request}")),
+        ("claude_cli", None) => Some(format!(
+            "claude {chosen}{}{request}",
+            claude_permission_args(dirs, shell_quote)
+        )),
         ("codex_cli", _) => Some(format!(
             "codex {CODEX_SANDBOX}{}{}{chosen}{request}",
             add_dirs(dirs, shell_quote),
@@ -828,8 +828,14 @@ fn powershell_session_with_quiet(
     let file = powershell_quote(&file.display().to_string());
     let chosen = choice_args(id, choice, powershell_quote);
     let session = match (id, session_id) {
-        ("claude_cli", Some(s)) => format!("--session-id {} {chosen}", powershell_quote(s)),
-        ("claude_cli", None) => chosen,
+        ("claude_cli", Some(s)) => format!(
+            "--session-id {} {chosen}{}",
+            powershell_quote(s),
+            claude_permission_args(dirs, powershell_quote)
+        ),
+        ("claude_cli", None) => {
+            format!("{chosen}{}", claude_permission_args(dirs, powershell_quote))
+        }
         ("codex_cli", _) => format!(
             "{CODEX_SANDBOX}{}{}{chosen}",
             add_dirs(dirs, powershell_quote),
@@ -975,6 +981,44 @@ pub fn find_terminal_agents() -> Vec<(String, PathBuf)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::permissions::CLAUDE_ALLOWED_TOOLS;
+
+    /// Task-A03-emu042: what every Claude Code session Allomos starts gets, with no extra folders.
+    const CLAUDE_TOOLS: &str = "--allowedTools 'Bash(alm:*),Bash(cargo test:*),Bash(cargo check:*),Bash(npm test:*),Bash(npm run test:*),Bash(pnpm test:*),Bash(yarn test:*),Bash(pytest:*),Bash(go test:*)' ";
+    const CLAUDE_EDITS: &str = "--allowedTools 'Bash(alm:*),Bash(cargo test:*),Bash(cargo check:*),Bash(npm test:*),Bash(npm run test:*),Bash(pnpm test:*),Bash(yarn test:*),Bash(pytest:*),Bash(go test:*)' --permission-mode acceptEdits ";
+
+    /// Task-A03-emu042: Claude Code on Windows gets the same permissions and folders, from the
+    /// monitor (request read from its file) and from the app (request pasted).
+    #[test]
+    fn claude_on_windows_edits_the_project_and_the_taskbag_without_asking() {
+        let dirs = [PathBuf::from(r"C:\tb\.allomos\taskbag")];
+        let found = r"C:\npm\claude.cmd";
+        let perms = format!(
+            r"{CLAUDE_TOOLS}--add-dir 'C:\tb\.allomos\taskbag' --permission-mode acceptEdits "
+        );
+        assert_eq!(
+            powershell_session(
+                "claude_cli",
+                Path::new(r"C:\p"),
+                found,
+                Path::new(r"C:\t\r.txt"),
+                Some("ab-1"),
+                None,
+                None,
+                &dirs,
+            ),
+            format!(
+                r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-1' {perms}$request"
+            )
+        );
+        assert_eq!(
+            powershell_script("claude_cli", Path::new(r"C:\p"), found, None, &dirs),
+            format!(
+                r"Set-Location -LiteralPath 'C:\p'; & '{found}' {}",
+                perms.trim_end()
+            )
+        );
+    }
 
     #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
@@ -1030,15 +1074,17 @@ mod tests {
         // The default: exactly the command without a choice.
         assert_eq!(
             cmd("claude_cli", &Choice::default()),
-            format!("claude --session-id 's-1' {request}")
+            format!("claude --session-id 's-1' {CLAUDE_EDITS}{request}")
         );
         assert_eq!(
             cmd("claude_cli", &pick(Some("opus"), Some("high"))),
-            format!("claude --session-id 's-1' --model 'opus' --effort 'high' {request}")
+            format!(
+                "claude --session-id 's-1' --model 'opus' --effort 'high' {CLAUDE_EDITS}{request}"
+            )
         );
         assert_eq!(
             cmd("claude_cli", &pick(None, Some("max"))),
-            format!("claude --session-id 's-1' --effort 'max' {request}")
+            format!("claude --session-id 's-1' --effort 'max' {CLAUDE_EDITS}{request}")
         );
         assert_eq!(
             cmd("codex_cli", &pick(Some("gpt-6.2-sol"), Some("xhigh"))),
@@ -1072,8 +1118,9 @@ mod tests {
             )
         };
         assert!(
-            ps("claude_cli", &pick(Some("sonnet"), Some("low")))
-                .contains("& 'C:\\bin\\x.exe' --model 'sonnet' --effort 'low' $request")
+            ps("claude_cli", &pick(Some("sonnet"), Some("low"))).contains(&format!(
+                "& 'C:\\bin\\x.exe' --model 'sonnet' --effort 'low' {CLAUDE_EDITS}$request"
+            ))
         );
         assert!(
             ps("codex_cli", &pick(None, Some("high")))
@@ -1083,7 +1130,10 @@ mod tests {
             ps("claude_cli", &Choice::default()),
             ps("claude_cli", &pick(None, None))
         );
-        assert!(ps("claude_cli", &Choice::default()).contains("& 'C:\\bin\\x.exe' $request"));
+        assert!(
+            ps("claude_cli", &Choice::default())
+                .contains(&format!("& 'C:\\bin\\x.exe' {CLAUDE_EDITS}$request"))
+        );
     }
 
     #[test]
@@ -1103,7 +1153,10 @@ mod tests {
     fn monitored_sessions_start_with_the_request_sent() {
         assert_eq!(
             session_command("claude_cli", Some("0b1c-2d"), &[]).as_deref(),
-            Some("claude --session-id '0b1c-2d' \"$allomos_request\"")
+            Some(
+                format!("claude --session-id '0b1c-2d' {CLAUDE_EDITS}\"$allomos_request\"")
+                    .as_str()
+            )
         );
         assert_eq!(
             session_command("codex_cli", Some("ignored"), &[]).as_deref(),
@@ -1156,7 +1209,7 @@ mod tests {
                 &[]
             ),
             format!(
-                r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-12' $request"
+                r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-12' {CLAUDE_EDITS}$request"
             )
         );
     }
@@ -1344,7 +1397,7 @@ mod tests {
         );
         assert_eq!(
             session_command("claude_cli", None, &several).as_deref(),
-            Some(format!("claude {request}").as_str())
+            Some(format!("claude {CLAUDE_TOOLS}--add-dir '/w/tb/.allomos/taskbag' --add-dir '/w/site' --add-dir '/w/O'\\''Neil app' --permission-mode acceptEdits {request}").as_str())
         );
         let windows_one = [PathBuf::from(r"C:\my tb\.allomos\taskbag")];
         let windows_several = [
@@ -1379,6 +1432,7 @@ mod tests {
         // Opened from the app on Windows: the request is pasted, the folders are still added.
         assert_eq!(
             powershell_script(
+                "antigravity_cli",
                 Path::new(r"C:\p"),
                 r"C:\agy\bin\agy.exe",
                 None,
@@ -1541,7 +1595,7 @@ mod tests {
         assert_eq!(
             session_command_with_quiet("claude_cli", Some("ab-12"), true, &[], &Choice::default())
                 .as_deref(),
-            Some(format!("claude --session-id 'ab-12' {request}").as_str())
+            Some(format!("claude --session-id 'ab-12' {CLAUDE_EDITS}{request}").as_str())
         );
         assert_eq!(
             session_command_with_quiet("antigravity_cli", None, true, &[], &Choice::default())
@@ -1687,7 +1741,15 @@ mod tests {
                         .split(|b| *b == 0)
                         .collect();
                     let mut want: Vec<&[u8]> = match id {
-                        "claude_cli" => vec![],
+                        // Task-A03-emu042: each permission word reaches Claude Code whole.
+                        "claude_cli" => vec![
+                            b"--allowedTools",
+                            CLAUDE_ALLOWED_TOOLS.as_bytes(),
+                            b"--add-dir",
+                            added_s.as_bytes(),
+                            b"--permission-mode",
+                            b"acceptEdits",
+                        ],
                         "codex_cli" => vec![
                             b"--sandbox",
                             b"workspace-write",
@@ -1831,6 +1893,7 @@ mod tests {
         let found = r"C:\Users\me\AppData\Roaming\npm\claude.cmd";
         assert_eq!(
             powershell_script(
+                "codex_cli",
                 Path::new(r"C:\p"),
                 found,
                 Some(Path::new(r"C:\Apps\Allomos")),
@@ -1841,7 +1904,7 @@ mod tests {
             )
         );
         assert_eq!(
-            powershell_script(Path::new(r"C:\p"), found, None, &[]),
+            powershell_script("codex_cli", Path::new(r"C:\p"), found, None, &[]),
             format!(r"Set-Location -LiteralPath 'C:\p'; & '{found}'")
         );
     }
