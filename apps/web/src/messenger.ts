@@ -17,6 +17,7 @@ import type { FormerWorktree } from "./proceedFlow";
 import type { CodeChanges } from "./evidenceFlow";
 /** What a running monitor can be asked (Task-A03-cow112), as `alm monitor` leaves it. */
 export type MonitorRequest =
+  | { action: "requeue"; id: string }
   | { action: "check" }
   | { action: "stop" }
   | { action: "undo_stop" }

@@ -40,6 +40,7 @@ import {
   lostShown,
 } from "./monitorFlow";
 import type { Current, Frequency, Pause, LastRun, LostRun, Levels, MonitorFolds, MonitorSettings, Run, RunState, Scope, TerminalAgent } from "./monitorFlow";
+import { MonitorRequeue } from "./MonitorRequeue";
 import { useAgentAccounts } from "./useAgentAccounts";
 import { isProblem } from "./types";
 import type { Task } from "./types";
@@ -224,6 +225,8 @@ export function useMonitor({
         .then(() => read())
         .catch((e) => onError(isProblem(e) ? problem(e) : String(e)));
     },
+    requeue: (run: Run, id: string) => messenger.monitorAsk(run.id, { action: "requeue", id })
+      .then(() => { window.setTimeout(() => void read(), 1_200); }),
     stop: (run: Run) => ask(run, { action: "stop" }),
     undoStop: (run: Run) => ask(run, { action: "undo_stop" }),
     stopNow: (run: Run) => ask(run, { action: "stop_now" }),
@@ -590,9 +593,7 @@ function RunPanel({
             <p key={l.id} className="muted small monitor-let-go">{t("monitor.let_go", { id: l.id, holder: l.holder })}</p>
           ))}
           {!grouped(run) && run.paused.map((p) => <PauseNote key={p.agent} pause={p} />)}
-          {run.givenUp.length > 0 && (
-            <p className="monitor-stalled small" role="status">{t("monitor.given_up", { ids: run.givenUp.join(", ") })}</p>
-          )}
+          <MonitorRequeue run={run} tasks={tasks} requeue={(id) => monitor.requeue(run, id)} onError={onError} />
           {lostShown(run).length > 0 && (
             <>
               <h4 className="monitor-sessions-title small">{t("monitor.lost_title")}</h4>

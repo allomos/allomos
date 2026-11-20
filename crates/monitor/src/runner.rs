@@ -202,6 +202,9 @@ impl Loop {
             Request::Check => {
                 run.checked = 0;
             }
+            Request::Requeue { id } => {
+                run.requeue(&id);
+            }
             Request::StopNow => self.stop_now = true,
             Request::Stop => run.stopping = true,
             Request::UndoStop => run.stopping = false,

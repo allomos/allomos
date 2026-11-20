@@ -305,6 +305,18 @@ impl Run {
         }
     }
 
+    /// Restore only this task's retry allowance. Repeated requests are harmless, even after
+    /// dispatch: only a task still given up can be reset. `share` checks its current eligibility.
+    pub fn requeue(&mut self, id: &str) -> bool {
+        if !self.given_up.iter().any(|g| g == id) {
+            return false;
+        }
+        self.given_up.retain(|g| g != id);
+        self.failures.remove(id);
+        self.checked = 0;
+        true
+    }
+
     /// One more failure of `id`'s sessions; at [`MAX_FAILURES`] the task is given up.
     fn failed(&mut self, id: &str) {
         let n = self.failures.entry(id.to_string()).or_insert(0);
@@ -1758,5 +1770,91 @@ mod tests {
         }
         let back: Run = serde_json::from_value(v).unwrap();
         assert_eq!(back, r);
+    }
+    #[test]
+    fn requeue_only_one_failed_task_when_a_slot_becomes_free() {
+        for lost in [false, true] {
+            let mut r = run(&["claude_cli"]);
+            let now = T0 + 120 * MIN;
+            let mut tasks = Vec::new();
+            for id in ["A01-7", "A01-8"] {
+                let t = if lost {
+                    held_by(id, "old", "old-sid", 0)
+                } else {
+                    task(id, State::Ready, None)
+                };
+                for n in 0..MAX_FAILURES {
+                    let at = T0 + i64::from(n) * 40 * MIN;
+                    r.take("claude_cli", &t, Some(format!("new-{n}")), None, at);
+                    if lost {
+                        let held = held_by(id, "new-holder", &format!("new-{n}"), 0);
+                        r.follow(&[held.clone()], LOST, at + MIN);
+                        assert_eq!(r.lost_ones(&[held], LOST, at + 35 * MIN).len(), 1);
+                    } else {
+                        assert_eq!(r.unclaimed(&[t.clone()], at + NOT_STARTED_MS).len(), 1);
+                    }
+                }
+                tasks.push(t);
+            }
+            assert_eq!(r.given_up, ["A01-7", "A01-8"]);
+            let bag = bag_of(tasks);
+            assert!(r.share(&bag, now / 1000).is_empty());
+            r.take(
+                "claude_cli",
+                &task("A01-9", State::Ready, None),
+                None,
+                None,
+                now,
+            );
+            assert!(r.requeue("A01-7"));
+            assert!(!r.requeue("A01-7"));
+            assert!(!r.requeue("unknown"));
+            assert_eq!(r.given_up, ["A01-8"]);
+            assert!(!r.failures.contains_key("A01-7"));
+            assert_eq!(r.failures["A01-8"], MAX_FAILURES);
+            assert_eq!(r.checked, 0);
+            assert!(r.share(&bag, now / 1000).is_empty(), "slot full");
+            r.follow(&[task("A01-9", State::Done, None)], LOST, now + MIN);
+            let shares = r.share(&bag, (now + MIN) / 1000);
+            assert_eq!(shares.len(), 1);
+            assert_eq!(shares[0].1.id, "A01-7");
+            r.take("claude_cli", &shares[0].1, None, None, now + MIN);
+            r.failures.insert("A01-7".into(), 1);
+            assert!(
+                !r.requeue("A01-7"),
+                "late duplicate leaves new attempt alone"
+            );
+            assert_eq!(r.failures["A01-7"], 1);
+            assert!(r.share(&bag, (now + MIN) / 1000).is_empty());
+        }
+    }
+
+    #[test]
+    fn requeue_preserves_current_eligibility_and_monitor_settings() {
+        let now = T0 + 60 * MIN;
+        let mut r = run(&["claude_cli"]);
+        for _ in 0..MAX_FAILURES {
+            r.failed("A01-7");
+        }
+        r.requeue("A01-7");
+        for state in [State::Done, State::Dropped, State::Waiting, State::Backlog] {
+            assert!(
+                r.share(&bag_of(vec![task("A01-7", state, None)]), now / 1000)
+                    .is_empty()
+            );
+        }
+        let held = held_by("A01-7", "alive", "alive-sid", 59);
+        assert!(r.share(&bag_of(vec![held]), now / 1000).is_empty());
+        let bag = bag_of(vec![leveled("A01-7", 2)]);
+        r.set_difficulty("claude_cli", "4-5");
+        assert!(r.share(&bag, now / 1000).is_empty());
+        r.set_difficulty("claude_cli", "1-5");
+        r.set_scope(Scope::Iteration { id: "other".into() });
+        assert!(r.share(&bag, now / 1000).is_empty());
+        r.set_scope(Scope::All);
+        r.pause("claude_cli", PauseWhy::Quota, None, now);
+        assert!(r.share(&bag, now / 1000).is_empty());
+        r.resume("claude_cli");
+        assert_eq!(r.share(&bag, now / 1000).len(), 1);
     }
 }
