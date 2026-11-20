@@ -255,6 +255,89 @@ fn change_task_under_lock(
     })
 }
 
+/// What [`change_tasks`] did (decision 0030 § 3).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChangedMany {
+    pub tasks: Vec<Task>,
+    /// Advisory problems from the rules (e.g. a label added to the table).
+    pub warnings: Vec<Problem>,
+    /// Problems found in the taskbag's files while loading it.
+    pub issues: Vec<Issue>,
+}
+
+/// Apply one rule to several tasks atomically under the taskbag's lock (decision 0030 § 3):
+/// every task is checked (including separation of duties) before anything is written; if any
+/// fails, nothing is written. Each task gets its own event, the same as changing them one by one.
+pub fn change_tasks(
+    root: &Path,
+    actor: Actor,
+    wait: Duration,
+    rule: impl FnOnce(&Taskbag) -> Result<(Vec<allomos_core::ops::Outcome>, &'static str), Problem>,
+) -> Result<ChangedMany, Problem> {
+    let (lock, bag, issues) = lock_for_change(root, wait)?;
+    let (outcomes, command) = rule(&bag)?;
+    let now = now_secs();
+    let mut prepared = Vec::with_capacity(outcomes.len());
+    for mut outcome in outcomes {
+        let before = bag.tasks.iter().find(|t| t.id == outcome.task.id);
+        let described = before.is_some_and(|b| b.description != outcome.task.description);
+        let mut changes = event::changes(before, &outcome.task, event::TASK_FIELDS);
+        changes.extend(outcome.recorded.iter().cloned());
+        if !changes.is_empty() {
+            heartbeat::along(&mut outcome.task, actor.by, now);
+        }
+        let event = actor.event(command, Kind::Task, Some(&outcome.task.id), changes);
+        prepared.push((outcome, described, event));
+    }
+    // Check separation of duties for every task before writing any of them, so a refusal for one
+    // leaves none changed.
+    for (_, _, event) in &prepared {
+        events::separate_duties(root, &events::as_written(root, event))?;
+    }
+    // A label the table does not list yet is added to it once (decision 0020, 5).
+    let mut project = bag.project.clone();
+    let mut warnings = Vec::new();
+    let mut project_added = false;
+    for (outcome, _, _) in &mut prepared {
+        let added = allomos_core::labels::add_found(&mut project, &outcome.task.labels);
+        if !added.is_empty() {
+            project_added = true;
+            outcome
+                .warnings
+                .extend(added.into_iter().map(|label| Problem::LabelAddedToTable {
+                    id: outcome.task.id.clone(),
+                    label,
+                }));
+        }
+    }
+    if project_added {
+        let event = actor.event(
+            "labels",
+            Kind::Project,
+            Some(&project.id),
+            event::changes(Some(&bag.project), &project, &[]),
+        );
+        lock.record(&event, |l| l.save_project(&project))?;
+    }
+    let mut tasks = Vec::with_capacity(prepared.len());
+    for (outcome, described, event) in prepared {
+        lock.record(&event, |l| {
+            l.save_task(&outcome.task)?;
+            if described {
+                l.save_description(&outcome.task)?;
+            }
+            Ok(())
+        })?;
+        warnings.extend(outcome.warnings);
+        tasks.push(outcome.task);
+    }
+    Ok(ChangedMany {
+        tasks,
+        warnings,
+        issues,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

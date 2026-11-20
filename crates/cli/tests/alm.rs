@@ -10500,3 +10500,298 @@ fn show_evidence_lists_every_part_in_the_apps_order() {
         assert!(full.contains(line), "{line} in {full}");
     }
 }
+
+#[test]
+fn checked_accepts_several_ids_all_or_nothing_and_records_words_on_each() {
+    // Task-A01-mosaic056, decision 0030 § 3: `alm checked <id> <id>…` records each task's check
+    // in its own event with `--words` on every one; if any ID cannot be recorded, none is;
+    // `--result partly` takes one ID only; `--result` help points to `alm reopen`.
+    let repo = filled();
+    ok(&repo, &["--as", "a", "claim", "A01-01"]);
+    ok(
+        &repo,
+        &["--as", "a", "label", "A01-01", "deployed and verified by agent"],
+    );
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "waiting for human",
+        ],
+    );
+    ok(&repo, &["--as", "b", "claim", "A01-02"]);
+    ok(
+        &repo,
+        &["--as", "b", "label", "A01-02", "locally verified by agent"],
+    );
+    ok(
+        &repo,
+        &[
+            "--as",
+            "b",
+            "done",
+            "A01-02",
+            "--without-human-check",
+            "waiting for human",
+        ],
+    );
+
+    let events_count = || {
+        fs::read_dir(repo.join(".allomos/taskbag/events"))
+            .unwrap()
+            .count()
+    };
+    let before = events_count();
+
+    // Unknown ID among valid ones: refused, nothing written.
+    let v = refused(&repo, &["--as", "will", "checked", "A01-01", "A01-99"], 1, "task_not_found");
+    assert!(
+        v["error"]["message"].as_str().unwrap().contains("A01-99"),
+        "{v}"
+    );
+    assert_eq!(events_count(), before);
+
+    // Not-done task among valid ones: refused, nothing written.
+    let v = refused(&repo, &["--as", "will", "checked", "A01-01", "A02-01"], 1, "not_done");
+    assert!(
+        v["error"]["message"].as_str().unwrap().contains("A02-01"),
+        "{v}"
+    );
+    assert_eq!(events_count(), before);
+
+    // `--result partly` takes one ID only: refused, nothing written.
+    refused(
+        &repo,
+        &[
+            "--as",
+            "will",
+            "checked",
+            "A01-01",
+            "A01-02",
+            "--result",
+            "partly",
+            "--words",
+            "almost",
+        ],
+        2,
+        "bad_usage",
+    );
+    assert_eq!(events_count(), before);
+
+    // All valid: both checked in one command, each with its own event, right label, and `--words`.
+    let before_ok = events_count();
+    let v = ok(
+        &repo,
+        &[
+            "--as",
+            "will",
+            "checked",
+            "A01-01",
+            "A01-02",
+            "--words",
+            "Checked both together",
+        ],
+    );
+    assert_eq!(v["tasks"].as_array().unwrap().len(), 2);
+    assert_eq!(events_count(), before_ok + 2);
+
+    let check_of = |id: &str| {
+        let h = ok(&repo, &["history", id]);
+        assert_eq!(h["events"][0]["command"], "checked");
+        h["events"][0]["changes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["field"] == "human_check")
+            .unwrap()["to"]
+            .clone()
+    };
+    let hc1 = check_of("A01-01");
+    assert_eq!(hc1["where"], "deployed");
+    assert_eq!(hc1["result"], "pass");
+    assert_eq!(hc1["words"], "Checked both together");
+    let hc2 = check_of("A01-02");
+    assert_eq!(hc2["where"], "local");
+    assert_eq!(hc2["result"], "pass");
+    assert_eq!(hc2["words"], "Checked both together");
+    assert!(ok(&repo, &["human"])["to_check"].as_array().unwrap().is_empty());
+
+    // Duplicate IDs collapse to one event.
+    let before_dup = events_count();
+    let v = ok(&repo, &["--as", "will", "checked", "A01-01", "A01-01"]);
+    assert_eq!(v["tasks"].as_array().unwrap().len(), 1);
+    assert_eq!(events_count(), before_dup + 1);
+
+    // Help text for `alm checked --result` mentions `alm reopen`, not `recheck`.
+    let help = alm(&repo, &["checked", "--help"]);
+    assert!(help.status.success());
+    let help_text = String::from_utf8_lossy(&help.stdout);
+    let result_line = help_text
+        .lines()
+        .find(|l| l.contains("--result"))
+        .expect("--result line in help");
+    assert!(result_line.contains("alm reopen"), "{result_line}");
+    assert!(!result_line.contains("recheck"), "{result_line}");
+}
+
+#[test]
+fn checked_many_under_separation_of_duties_refuses_all_if_one_is_self_check() {
+    let repo = filled();
+    ok(&repo, &["--as", "a", "--for", "p-alice1", "claim", "A01-01"]);
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "--for",
+            "p-alice1",
+            "done",
+            "A01-01",
+            "--without-human-check",
+            "run",
+        ],
+    );
+    ok(&repo, &["--as", "b", "--for", "p-bob001", "claim", "A01-02"]);
+    ok(
+        &repo,
+        &[
+            "--as",
+            "b",
+            "--for",
+            "p-bob001",
+            "done",
+            "A01-02",
+            "--without-human-check",
+            "run",
+        ],
+    );
+    ok(&repo, &["audit-settings", "--separation-of-duties", "on"]);
+    let before = fs::read_dir(repo.join(".allomos/taskbag/events"))
+        .unwrap()
+        .count();
+    // p-bob001 may check A01-01, but may NOT check A01-02 -> neither is recorded.
+    let v = refused(
+        &repo,
+        &[
+            "--as",
+            "will",
+            "checked",
+            "A01-01",
+            "A01-02",
+            "--checker",
+            "p-bob001",
+        ],
+        1,
+        "self_check",
+    );
+    assert!(
+        v["error"]["message"].as_str().unwrap().contains("A01-02"),
+        "{v}"
+    );
+    assert_eq!(
+        fs::read_dir(repo.join(".allomos/taskbag/events"))
+            .unwrap()
+            .count(),
+        before
+    );
+}
+
+#[test]
+fn reviewed_accepts_several_ids_all_or_nothing() {
+    // Task-A01-mosaic056, decision 0030 § 3: `alm reviewed <id> <id>…` reviews each task in its
+    // own event; if any ID does not exist or has nothing to review, none is recorded.
+    let repo = filled();
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "ai-decided",
+            "A01-01",
+            "First choice",
+            "--kind",
+            "visible",
+        ],
+    );
+    ok(
+        &repo,
+        &[
+            "--as",
+            "a",
+            "ai-decided",
+            "A01-01",
+            "Second choice",
+            "--kind",
+            "principle",
+        ],
+    );
+    ok(
+        &repo,
+        &[
+            "--as",
+            "b",
+            "ai-decided",
+            "A01-02",
+            "Third choice",
+            "--kind",
+            "visible",
+        ],
+    );
+
+    let events_count = || {
+        fs::read_dir(repo.join(".allomos/taskbag/events"))
+            .unwrap()
+            .count()
+    };
+    let before = events_count();
+
+    // Unknown ID: refused, A01-01 unchanged.
+    let v = refused(
+        &repo,
+        &["--as", "will", "reviewed", "A01-01", "A01-99"],
+        1,
+        "task_not_found",
+    );
+    assert!(
+        v["error"]["message"].as_str().unwrap().contains("A01-99"),
+        "{v}"
+    );
+    assert_eq!(events_count(), before);
+
+    // Task with nothing to review: refused, A01-01 unchanged.
+    let v = refused(
+        &repo,
+        &["--as", "will", "reviewed", "A01-01", "A02-01"],
+        1,
+        "nothing_to_review",
+    );
+    assert!(
+        v["error"]["message"].as_str().unwrap().contains("A02-01"),
+        "{v}"
+    );
+    assert_eq!(events_count(), before);
+    assert_eq!(
+        ok(&repo, &["show", "A01-01"])["ai_decisions"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+
+    // All valid (with a duplicate ID collapsed): both reviewed, one event each.
+    let v = ok(
+        &repo,
+        &["--as", "will", "reviewed", "A01-01", "A01-02", "A01-01"],
+    );
+    assert_eq!(v["tasks"].as_array().unwrap().len(), 2);
+    assert_eq!(v["tasks"][0]["reviewed"].as_array().unwrap().len(), 2);
+    assert_eq!(v["tasks"][1]["reviewed"].as_array().unwrap().len(), 1);
+    assert_eq!(events_count(), before + 2);
+    assert_eq!(ok(&repo, &["history", "A01-01"])["events"][0]["command"], "reviewed");
+    assert_eq!(ok(&repo, &["history", "A01-02"])["events"][0]["command"], "reviewed");
+    assert!(ok(&repo, &["human"])["to_review"].as_array().unwrap().is_empty());
+}
