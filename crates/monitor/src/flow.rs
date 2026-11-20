@@ -485,6 +485,8 @@ impl Run {
     /// tasks are finished, in the order they were started. A task another session holds is let
     /// go instead (A03-cart761): it leaves the sessions at work, which frees its slot, and is
     /// noted in [`Run::let_go`]; it is not among the finished ones (its tab stays open).
+    /// Stale [`Run::let_go`] entries are pruned and deduplicated by task ID on every pass
+    /// (A03-craft961).
     /// `lost_after_secs`: the project's limit for a held task's heartbeat
     /// (`heartbeat::applied(..).lost_after_secs`).
     pub fn follow(&mut self, tasks: &[Task], lost_after_secs: i64, now: i64) -> Vec<Working> {
@@ -502,10 +504,13 @@ impl Run {
                 }),
             }
         }
+        self.working = working;
+        self.let_go
+            .retain(|l| let_go_still_holds(l, tasks, &self.working));
+        dedup_let_go(&mut self.let_go);
         if self.let_go.len() > LET_GO_KEPT {
             self.let_go.drain(..self.let_go.len() - LET_GO_KEPT);
         }
-        self.working = working;
         let now_secs = now.div_euclid(1000);
         self.not_started.retain(|n| {
             tasks
@@ -854,6 +859,34 @@ fn follow_one(cur: &Working, tasks: &[Task], lost_after_secs: i64, now: i64) -> 
     Followed::Working(next)
 }
 
+/// Whether a [`LetGo`] entry still reflects the taskbag and this run (A03-craft961): the task
+/// exists, is neither done nor dropped, is still held by the recorded `holder`, and is not back
+/// in this run's `working` list.
+fn let_go_still_holds(entry: &LetGo, tasks: &[Task], working: &[Working]) -> bool {
+    if working.iter().any(|w| w.id == entry.id) {
+        return false;
+    }
+    let Some(task) = tasks.iter().find(|t| t.id == entry.id) else {
+        return false;
+    };
+    !matches!(task.state, State::Done | State::Dropped)
+        && task.holder.as_deref() == Some(entry.holder.as_str())
+}
+
+/// Keep only the latest [`LetGo`] entry per task ID, preserving relative order of the kept items
+/// (A03-craft961).
+fn dedup_let_go(entries: &mut Vec<LetGo>) {
+    let mut seen = std::collections::HashSet::with_capacity(entries.len());
+    let mut kept = Vec::with_capacity(entries.len());
+    for entry in entries.drain(..).rev() {
+        if seen.insert(entry.id.clone()) {
+            kept.push(entry);
+        }
+    }
+    kept.reverse();
+    *entries = kept;
+}
+
 /// The tab to close now that a session's task is finished: only when the task is **done**
 /// (approver, 2026-11-08); any other ending leaves it open, so the person can see why.
 pub fn tab_to_close<'a>(cur: &'a Working, tasks: &[Task]) -> Option<&'a SessionTab> {
@@ -1128,7 +1161,8 @@ mod tests {
             .map(|l| (l.id.as_str(), l.holder.as_str()))
             .collect();
         assert_eq!(noted, [("A01-1", "claude-other"), ("A01-2", "a-person")]);
-        // Done by the other session: still let go (the tab of this run's session stays open).
+        // Done by the other session: still let go (the tab of this run's session stays open, and
+        // its slot is freed), and not kept in let_go because the task is already done (A03-craft961).
         let mut r = run(&["claude_cli"]);
         r.take(
             "claude_cli",
@@ -1140,21 +1174,143 @@ mod tests {
         let mut done = claimed("A01-9", "codex-a01-9", Some("codex"), None);
         done.state = State::Done;
         assert!(r.follow(&[done], LOST, 20).is_empty());
-        assert_eq!(r.let_go.len(), 1);
+        assert!(r.working.is_empty());
+        assert!(r.let_go.is_empty());
     }
 
     /// Only the latest let-go tasks are kept to show.
     #[test]
     fn the_run_keeps_the_latest_let_go_tasks() {
         let mut r = run(&["claude_cli"]);
+        let mut tasks = Vec::new();
         for n in 0..LET_GO_KEPT + 2 {
             let id = format!("A01-{n}");
             r.take("claude_cli", &task(&id, State::Ready, None), None, None, 10);
-            r.follow(&[claimed(&id, "codex-x", Some("codex"), None)], LOST, 20);
+            tasks.push(claimed(&id, "codex-x", Some("codex"), None));
+            r.follow(&tasks, LOST, 20);
         }
         assert_eq!(r.let_go.len(), LET_GO_KEPT);
         assert_eq!(r.let_go[0].id, "A01-2");
         assert_eq!(r.taken.len(), LET_GO_KEPT + 2);
+    }
+
+    /// Stale `let_go` entries are cleared on `follow()` once the task is done, dropped, missing,
+    /// released, held by a different holder, or back in `working`, while still-valid entries stay
+    /// (A03-craft961).
+    #[test]
+    fn let_go_entries_clear_when_stale_and_stay_while_valid() {
+        let mut r = run(&["claude_cli"]);
+        r.set_sessions("claude_cli", 8);
+        let ids = [
+            "A01-stay",
+            "A01-waiting",
+            "A01-done",
+            "A01-dropped",
+            "A01-gone",
+            "A01-released",
+            "A01-changed",
+            "A01-working",
+        ];
+        // Seed let_go directly so we can test all 8 cases in one follow() without hitting LET_GO_KEPT.
+        r.let_go = ids
+            .iter()
+            .enumerate()
+            .map(|(i, id)| LetGo {
+                id: (*id).to_string(),
+                agent: "claude_cli".to_string(),
+                holder: "codex-old".to_string(),
+                at: 100 + i as i64,
+            })
+            .collect();
+        // Put A01-working back into `working` (e.g. taken over after codex-old went lost, before
+        // the new session has claimed it: taskbag still shows codex-old).
+        let working_task = held_since("A01-working", "codex-old", "2026-11-09T10:00:00Z");
+        r.take(
+            "claude_cli",
+            &working_task,
+            Some("mine-new".to_string()),
+            None,
+            200,
+        );
+
+        let mut waiting = claimed("A01-waiting", "codex-old", Some("codex"), None);
+        waiting.state = State::Waiting;
+        let mut done = claimed("A01-done", "codex-old", Some("codex"), None);
+        done.state = State::Done;
+        let mut dropped = claimed("A01-dropped", "codex-old", Some("codex"), None);
+        dropped.state = State::Dropped;
+        let tasks = [
+            claimed("A01-stay", "codex-old", Some("codex"), None),
+            waiting,
+            done,
+            dropped,
+            // A01-gone is absent from `tasks`
+            task("A01-released", State::Ready, None),
+            claimed("A01-changed", "codex-new", Some("codex"), None),
+            working_task,
+        ];
+        r.follow(&tasks, LOST, 300);
+
+        let kept: Vec<(&str, &str)> = r
+            .let_go
+            .iter()
+            .map(|l| (l.id.as_str(), l.holder.as_str()))
+            .collect();
+        assert_eq!(
+            kept,
+            [("A01-stay", "codex-old"), ("A01-waiting", "codex-old")]
+        );
+        assert_eq!(r.working.len(), 1);
+        assert_eq!(r.working[0].id, "A01-working");
+    }
+
+    /// Repeated `let_go` entries for the same task ID are deduplicated keeping the latest one,
+    /// while preserving the `LET_GO_KEPT` cap (A03-craft961).
+    #[test]
+    fn let_go_deduplicates_by_task_id_keeping_latest() {
+        let mut r = run(&["claude_cli"]);
+        // Pre-existing duplicates (e.g. loaded from an older persisted run state).
+        r.let_go = vec![
+            LetGo {
+                id: "A01-1".into(),
+                agent: "claude_cli".into(),
+                holder: "codex-a".into(),
+                at: 10,
+            },
+            LetGo {
+                id: "A01-2".into(),
+                agent: "claude_cli".into(),
+                holder: "codex-b".into(),
+                at: 20,
+            },
+            LetGo {
+                id: "A01-1".into(),
+                agent: "claude_cli".into(),
+                holder: "codex-a".into(),
+                at: 30,
+            },
+        ];
+        let tasks = [
+            claimed("A01-1", "codex-a", Some("codex"), None),
+            claimed("A01-2", "codex-b", Some("codex"), None),
+        ];
+        r.follow(&tasks, LOST, 40);
+        let noted: Vec<(&str, &str, i64)> = r
+            .let_go
+            .iter()
+            .map(|l| (l.id.as_str(), l.holder.as_str(), l.at))
+            .collect();
+        assert_eq!(noted, [("A01-2", "codex-b", 20), ("A01-1", "codex-a", 30)]);
+
+        // If A01-2 is taken again and let go again at a later time, only the new entry remains.
+        r.take("claude_cli", &task("A01-2", State::Ready, None), None, None, 50);
+        r.follow(&tasks, LOST, 60);
+        let noted: Vec<(&str, &str, i64)> = r
+            .let_go
+            .iter()
+            .map(|l| (l.id.as_str(), l.holder.as_str(), l.at))
+            .collect();
+        assert_eq!(noted, [("A01-1", "codex-a", 30), ("A01-2", "codex-b", 60)]);
     }
 
     #[test]

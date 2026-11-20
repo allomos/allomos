@@ -619,7 +619,10 @@ impl Loop {
         }
         // A slot freed by a finished, a let-go (A03-cart761) or a not-started task (A03-otter944)
         // is filled at once.
-        let freed = !finished.is_empty() || gone_any || waiting || run.let_go != before.let_go;
+        let freed = !finished.is_empty()
+            || gone_any
+            || waiting
+            || run.working.len() < before.working.len();
         let due = freed || now >= run.next_check();
         self.look_at_pauses(now);
         let run = &self.record.run;
