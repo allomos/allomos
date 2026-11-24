@@ -1,43 +1,13 @@
 # Allomos — agent working guide
 
-Allomos is developed by AI agents (Claude Code, Codex) working for the approver, **will.w.hui** (the person who decides and approves; older documents say *owner*). This file is the shared authority for every agent and is always loaded (Codex reads it directly; Claude Code imports it from `CLAUDE.md`). Keep it short: detail lives in the documents it links.
+Shared rules for every AI agent working for the approver, **will.w.hui**.
 
-**What Allomos is:** a desktop app (the hub, with every feature) plus web and mobile companions that connect to it, built as our own code ([0008](docs/decisions/0008-build-our-own.md), [0009](docs/decisions/0009-desktop-hub-with-web-and-mobile-companions.md)). It is **switching not tied to any one agent, plus approvals people can read and give on the go**: whichever agent or account does the work, its tasks, progress and handoff notes stay in the project's own git, another agent or teammate carries on where one stopped, and a person can understand and approve the work from anywhere. Fully automatic assigning and handing on ([0023](docs/decisions/0023-full-automatic-agent-orchestration.md)) is the engine; progress management (areas, lists and charts, a burndown with a forecast finish date) is kept as views, and AI skills stays as before ([0024](docs/decisions/0024-positioning-switching-not-tied-to-any-agent.md), replacing 0014). Local-only projects need no sign-in; optional cloud projects add roles and email invitations. See [docs/product/PLAN.md](docs/product/PLAN.md) and [docs/product/REQUIREMENTS.md](docs/product/REQUIREMENTS.md).
-
-## Always-on boundaries
-
-- **No external effect without the approver's exact approval**, recorded in the task's description: creating or changing hosted resources (Supabase projects, databases, hosting, DNS), applying SQL to a real target, deployments, secrets, sending email, creating GitHub repositories, adding or changing a remote, and anything touching other people's data. Approving a card authorizes only its local work.
-- **Never print or commit credentials**, tokens, cookies or local environment files (`.env*` stay ignored). Record *where* a credential lives, never its value — in the taskbag's `project-notes.md` (§ Where credentials live). Personal details (email addresses, account names, phone numbers, local network addresses) are kept out the same way: write a placeholder and how to look it up.
-- **Reference projects are read-only.** The SSR migration board and Glidelines (`glidepace-vibe-cc`), listed in [docs/REFERENCES.md](docs/REFERENCES.md), may be read and quoted; never edit, commit to, or run write operations in them.
-- **Preserve unrelated changes** in the working tree and in other sessions' worktrees.
-- **Do not upgrade dependencies incidentally**; pin versions deliberately in the card that introduces them.
-- **`alm` tells; the agent checks.** Most checking of tasks and handoffs is the agent's job: `alm` lays out the facts and asks. Before making `alm` do a check of its own, ask the approver to approve it; refusing invalid input (an unknown ID, a bad date, the holder rule) is not such a check ([CODING_RULES § How `alm` behaves](docs/workflow/CODING_RULES.md#how-alm-behaves)).
-- **Decisions are made by the approver.** A decision record with status *Open* or *Proposed* is not an approval. Do not build on an open decision beyond what the record says is safe (e.g. [0003](docs/decisions/0003-relationship-to-glidelines.md): core work is safe under every option).
-- **Routine choices are the agent's; real questions go to the approver.** Inside a card, decide names, file layout, how something is built within the card's scope, and small interface details with an obvious sensible default (anything cheap to undo); record each with `alm ai-decided`. Wording and look are reviewed before release, not before the work (approver, 2026-11-09, A00-eclair542): in a quiet run decide them, build and merge, and record them with `alm ai-decided`. Ask the approver first only about data formats, removing things, permissions and security, anything with a cost or an outside effect (above), and anything that changes the plan or another card; releases still need approval. Ask a card's open questions while planning it, before it is made ready. Before an automatic or loop run, the approver chooses quiet or normal mode from what `alm guide run-modes` prints (record it in your handoff); in a quiet run, never wait: park a real question with your proposal (`alm wait <id> --on "<the question> Proposal: <yours>"`), merge the finished work that does not depend on it, and go on with the next ready card. Details: `alm guide tasks` (step 5) and `alm guide workflow`.
-
-## AI working mode
-
-| Work | Codex | Claude |
-|---|---|---|
-| Everyday implementation, debugging, tests, docs, authorized commits | selected model, Medium reasoning | selected model, Medium effort where supported |
-| Difficult architecture, security, data-model or forecasting decisions; focused review of a risky change | same model, highest reasoning | same model, higher effort (Extra high; Max only for the hardest bounded question) |
-
-- One worker owns everyday progress within its card. Raise effort for a specific hard question, then return to routine effort. Model and effort are separate; if an effort level cannot be set, say so once and keep the actual setting; never claim a model or effort switch that did not happen.
-- Delegate only bounded, independent work with exact file ownership, acceptance criteria and minimum checks; the delegate reports to the worker, not the approver. Do not duplicate reading, implementation or review across agents.
-- A provider or session change preserves decisions, approvals and evidence; it does not authorize repeating operations.
-
-## Working procedure
-
-1. **The unit of work is one observable outcome**, written as one card: a task in Allomos's taskbag (worked with `alm`; see [Tasks: Allomos](#tasks-allomos)). Its full detail (outcome, details, rules, approvals, and evidence under an **Evidence** heading) lives in the task's description, written with `alm describe`; older tasks also keep a card file beside the task in the taskbag (`tasks/<id>/card.md`, opened by the description's `Card:` link). There are no card files in this repository. How to write one: `alm guide tasks`; terms and labels: `alm guide terms`; claiming and branches: `alm guide workflow`.
-2. **Every task is worked in a worktree of its own** (approver, 2026-10-20; replaces A00-28's current-checkout default), holding **one** card: a git worktree under `.claude/worktrees/<short-name>`, on its own branch (`claude/…`, `codex/…`) cut from the task's base branch, which `alm claim` names. The main checkout stays on the base branch: merge there, then remove the worktree and the merged branch. Claim before you work, as `alm guide workflow` says.
-3. **Status has one home: the task in Allomos's taskbag**, changed only with `alm` as [Tasks: Allomos](#tasks-allomos) describes. The description holds detail, never a second copy of state. [docs/TASK_BOARD.md](docs/TASK_BOARD.md) keeps only Now and the approver's open questions.
-4. **Labels are the only progress claims** ([0020](docs/decisions/0020-built-in-labels-and-label-table.md)): plain labels from the project's label table, several per task, with no order: *locally verified by agent*, *deployed and verified by agent*, *locally verified by human*, *deployed and verified by human* (the human check) and *AI decisions to review*. A done task with no "by human" label is *to check*. Each open card names its single next dependency.
-5. **Integration first:** connect the real flow end to end, then refine pieces behind it.
-6. **One card per outcome, including research and decision records.** Do not keep adding unrelated work to an existing card; open a new card, so each piece can be finished and reviewed on its own.
-7. **Push after every commit** (owner, 2026-10-04): push your branch to `origin` (`allomos/allomos`, moved from `mypals-ml/allomos` to the `allomos` organization 2026-10-18; renamed from `glidebox` 2026-10-06 and from `fliphopper` 2026-10-11) right after each commit, and confirm it landed (`git status -sb` shows no "ahead"). Never force-push, and never push to a remote other than `origin`.
-8. **Say who made each commit.** End every commit message with a line naming the agent, for example `Co-Authored-By: Claude …` or `Agent: codex/<session-name>`, so history shows which agent and session did the work.
-9. **Documents:** create a new file only for a **contract** (something code or agents must conform to), **evidence** (what actually ran), a **decision record**, or a **discussion record**. Status goes in the taskbag; supersede stale lines by editing them in place.
-10. **Explain in plain words.** Every report and card says what happened and why in everyday language first, defining technical terms on first use; evidence (numbers, IDs, logs) comes after.
+- **Docs:** read [docs/workflow/CODING_RULES.md](docs/workflow/CODING_RULES.md) before changing code; see [docs/README.md](docs/README.md) for product plans, requirements and decisions (a decision with status *Open* or *Proposed* is not an approval).
+- **`alm` tells; the agent checks:** never add a check to `alm` without the approver's approval; refusing invalid input is not such a check ([CODING_RULES § How `alm` behaves](docs/workflow/CODING_RULES.md#how-alm-behaves)).
+- **Dependencies:** do not upgrade dependencies incidentally; pin versions deliberately in the card that introduces them.
+- **Worktrees and commits:** put each task's worktree under `.claude/worktrees/<short-name>` on an `<agent>/…` branch; push to `origin` right after every commit (`git status -sb` shows no "ahead", never push to another remote), and end every commit message with a line naming the agent (for example `Co-Authored-By: Claude …` or `Agent: codex/<session-name>`).
+- **Approvals:** approving a card authorizes only its local work; external effects require exact approval recorded in the task's description.
+- **Credentials:** never print or commit credentials, tokens, cookies or local environment files (`.env*` stay ignored).
 
 ## Tasks: Allomos (v41)
 
@@ -273,24 +243,3 @@ Where this project is kept online (the project notes' `## Repositories`). Workin
 without the taskbag beside it, in the cloud for example, clone what is missing from here:
 - Code: https://github.com/allomos/allomos (public)
 - Taskbag: https://github.com/allomos/allomos-taskbag (private; clone it to `../allomos-taskbag` beside the code)
-
-## Read by activity
-
-| Activity | Read |
-|---|---|
-| Orient / resume | [docs/TASK_BOARD.md](docs/TASK_BOARD.md) and `alm list` / `alm next` → your task in full with its latest handoff (`alm show <id>`) → the taskbag's `project-notes.md` (Running, Pitfalls). New to the project: [docs/README.md](docs/README.md) |
-| Plan a card | [REQUIREMENTS.md](docs/product/REQUIREMENTS.md), [PLAN.md](docs/product/PLAN.md), the relevant [decisions](docs/decisions/README.md) |
-| Implement / test | the card, affected source and tests; coding rules once they exist (`docs/workflow/CODING_RULES.md`, created by the first code card) |
-| Look at prior art | [docs/REFERENCES.md](docs/REFERENCES.md) — read only the named files |
-| Record a decision or discussion | [docs/decisions/README.md](docs/decisions/README.md), [docs/discussions/](docs/discussions/) |
-| Handoff | actual diff and results; the task's handoff note and Evidence (`alm handoff <id>`); the task's label |
-
-Reuse context you already have; do not re-read unchanged documents. **The measure:** how many documents must be read before the next change. If it falls, this is working.
-
-## Verification and reporting
-
-- Status changes: `alm list --json` reports no `issues`.
-- Documentation-only changes: check links and paths, instruction consistency, and `git diff --check`.
-- Test folders for manual checks and agent trials go under `~/allomos-tests/<card>-<name>/` ([CODING_RULES](docs/workflow/CODING_RULES.md#writing-code)).
-- Code changes: run the card's named checks; record each one, and each untested gate, as pass, fail or not-run with `alm check-result <id> --name "<check>" --result pass|fail|not-run [--detail "<one sentence>"]` (decision 0029 § 5): the Evidence screen lists them, failed and not run first.
-- Report briefly: what changed, what was verified, what remains and who it waits on.

@@ -493,6 +493,7 @@ mod tests {
             None,
             false,
             &dirs,
+            None,
             &Choice::default(),
             None,
             Some(&trusted_other),
@@ -509,6 +510,7 @@ mod tests {
             None,
             false,
             &dirs,
+            None,
             &Choice::default(),
             None,
             Some(&ClaudeEnv {
@@ -526,6 +528,7 @@ mod tests {
             Some("sess-1"),
             true,
             &dirs,
+            None,
             &Choice::default(),
             None,
             Some(&trusted_other),

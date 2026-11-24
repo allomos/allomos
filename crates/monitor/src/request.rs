@@ -50,13 +50,13 @@ fn with_antigravity_push_rule(mode: String, agent: &str, quiet: bool, language: 
     }
     let instruction = match lang(language) {
         "zh-CN" => {
-            "本安静 Antigravity 会话只有单独执行普通推送 `git push origin refs/heads/<branch>`（替换成当前分支名；在工作目录里直接运行，不加 `cd … &&`、`2>&1` 或管道）才会免确认。其他推送写法（裸 `git push`、`git push origin main` 这类简写、强推、删除、镜像或清理远端分支、推标签、和别的命令写在一起）以及 `git reset --hard`、`git clean -f`、`git branch -D`、`rm -rf` 会被直接拒绝，不会弹出确认。被拒后不要换写法、换工具或用脚本绕过：改用允许的写法；确实非做不可时，用 alm wait 搁置并写明要批准的操作。其他操作仍遵守 CLI 的权限确认。"
+            "本安静 Antigravity 会话只有单独执行普通推送 `git push origin refs/heads/<branch>`（替换成当前分支名，包括合入后的 `main` 和你自己的工作分支；在工作目录里直接运行，不加 `cd … &&`、`2>&1` 或管道）才会免确认。请始终写完整的 `refs/heads/<branch>`，不要用裸 `git push` 或 `git push origin`（它们不免确认，会停下等待）。任务袋的分享请按 `alm` 打印的完整绝对路径逐条单独运行 `git -C <任务袋> add / commit / push`（沙盒拦住 `.git/` 时在沙盒外运行，不要改写成相对路径）。其他危险推送（`git push origin main` 这类简写、强推、删除、镜像或清理远端分支、推标签、冒号或多 refspec、含 `git -C` 的危险推送）以及 `git reset --hard`、`git clean -f`、`git branch -D`、`rm -rf` 会被直接拒绝，不会弹出确认。被拒后不要换写法、换工具或用脚本绕过：改用允许的写法；确实非做不可时，用 alm wait 搁置并写明要批准的操作。其他操作仍遵守 CLI 的权限确认。"
         }
         "ja" => {
-            "この静かな Antigravity セッションで確認なしに実行できる通常の push は、単独の `git push origin refs/heads/<branch>`（現在のブランチ名に置き換え、作業フォルダでそのまま実行し、`cd … &&`、`2>&1`、パイプを付けない）だけです。ほかの push の書き方（裸の `git push`、`git push origin main` のような省略形、強制 push、削除・mirror・prune、タグの push、他のコマンドとの連結）と `git reset --hard`、`git clean -f`、`git branch -D`、`rm -rf` は確認なしにすぐ拒否されます。拒否されたら、書き方や道具を変えたりスクリプトで回避したりせず、許可された書き方を使ってください。どうしても必要なら、承認が必要な操作を書いて alm wait で保留にしてください。それ以外の操作は CLI の権限確認に従ってください。"
+            "この静かな Antigravity セッションで確認なしに実行できる通常の push は、単独の `git push origin refs/heads/<branch>`（マージ後の `main` や自分の作業ブランチ名に置き換え、作業フォルダでそのまま実行し、`cd … &&`、`2>&1`、パイプを付けない）だけです。必ず完全な `refs/heads/<branch>` を使い、裸の `git push` や `git push origin` は使わないでください（自動許可されず確認で止まります）。タスクバッグの共有は、`alm` が表示する絶対パスの `git -C <タスクバッグ> add / commit / push` を 1 つずつ単独で実行してください（サンドボックスが `.git/` を止めたときはサンドボックス外で実行し、相対パスに書き換えないでください）。そのほかの危険な push（`git push origin main` のような省略形、強制 push、削除・mirror・prune、タグの push、コロンや複数 refspec、`git -C` 付きの危険な push）と `git reset --hard`、`git clean -f`、`git branch -D`、`rm -rf` は確認なしにすぐ拒否されます。拒否されたら、書き方や道具を変えたりスクリプトで回避したりせず、許可された書き方を使ってください。どうしても必要なら、承認が必要な操作を書いて alm wait で保留にしてください。それ以外の操作は CLI の権限確認に従ってください。"
         }
         _ => {
-            "In this quiet Antigravity session, only a standalone ordinary push written as `git push origin refs/heads/<branch>` (replace it with the current branch name; run it as it is in the working folder, without `cd … &&`, `2>&1` or a pipe) is auto-allowed. Other pushes (bare `git push`, short forms such as `git push origin main`, force, delete, mirror or prune, tags, a push joined to other commands) and `git reset --hard`, `git clean -f`, `git branch -D` and `rm -rf` are refused at once, without a prompt. When refused, do not work around it with other wording, tools or scripts: use the allowed form; when you truly need the action, park the task with alm wait, naming the action to approve. Keep every other operation under the CLI's normal permission checks."
+            "In this quiet Antigravity session, only a standalone ordinary push written as `git push origin refs/heads/<branch>` (replace it with the current branch name, including `main` after merging and your own working branch; run it as it is in the working folder, without `cd … &&`, `2>&1` or a pipe) is auto-allowed. Always write the full `refs/heads/<branch>` form; never use bare `git push` or `git push origin` (they are not auto-allowed and will stop for confirmation). To share taskbag changes, run each `git -C <taskbag> add / commit / push` command exactly as `alm` prints it with its absolute path, one command at a time (outside the sandbox when the sandbox blocks `.git/`; never rewrite it to a relative path). Short-form pushes (`git push origin main`, tags), force, delete, mirror, prune, colon or multiple refspecs (also after `git -C`), and `git reset --hard`, `git clean -f`, `git branch -D` and `rm -rf` are refused at once, without a prompt. When refused, do not work around it with other wording, tools or scripts: use the allowed form; when you truly need the action, park the task with alm wait, naming the action to approve. Keep every other operation under the CLI's normal permission checks."
         }
     };
     format!("{mode}\n\n{instruction}")
@@ -163,8 +163,9 @@ pub fn monitor_request(
 {usage}1. 阅读：alm show {id}（它的说明和最新的交接）。
 2. 按 AGENTS.md 的说法认领它，带上这个会话的信息：alm claim {id} --as <你的会话名> --branch {br} --session-agent {sa} --session-id {sid} --session-kind terminal，并把认领分享出去。
 3. 在它自己的工作树里做，工作树从认领时列出的基础分支切出。
-4. 用 alm label 报告进度；做完用 alm done，中途停下用 alm release --note。
-5. 用 alm handoff {id} 写交接，然后结束这个会话。只做这一个任务，不要去取下一个：「换肩」会为下一个任务另开会话。"#,
+4. 做事期间按项目的心跳间隔（默认每 10 分钟，见 alm heartbeat-settings）发一次心跳：alm beat {id} --as <你的会话名> --doing "<正在做什么>"，把心跳提交推送到任务袋，并按提示把进行中的工作（WIP）提交推送到工作分支（推送用 git push origin refs/heads/<分支名>）；长时间步骤开始前用 alm beat {id} --as <你的会话名> --busy <时长> 声明。
+5. 用 alm label 报告进度；做完用 alm done，中途停下用 alm release --note。
+6. 用 alm handoff {id} 写交接，然后结束这个会话。只做这一个任务，不要去取下一个：「换肩」会为下一个任务另开会话。"#,
                 id = id,
                 mode = mode,
                 br = branch.unwrap_or("<你的分支>"),
@@ -194,8 +195,9 @@ pub fn monitor_request(
 {usage}1. 読む：alm show {id}（説明と最新の引き継ぎ）。
 2. AGENTS.md のとおりに、このセッションの情報を付けて引き受け（alm claim {id} --as <あなたのセッション名> --branch {br} --session-agent {sa} --session-id {sid} --session-kind terminal）、その引き受けを共有してください。
 3. 専用のワークツリーで作業してください。ワークツリーは、引き受けたときに表示されるベースブランチから作ります。
-4. 進み具合は alm label で知らせ、終わったら alm done、途中でやめるなら alm release --note を使ってください。
-5. alm handoff {id} で引き継ぎを書き、このセッションを終えてください。このタスクだけを進め、次のタスクは取らないでください：次のタスクには「肩代」が新しいセッションを開きます。"#,
+4. 作業中はプロジェクトのハートビート間隔（既定は 10 分ごと、alm heartbeat-settings を参照）で alm beat {id} --as <あなたのセッション名> --doing "<作業内容>" を送り、タスクバッグにコミット・プッシュして、案内に従い進行中の作業（WIP）も作業ブランチへプッシュしてください（push は git push origin refs/heads/<ブランチ名> で）。長い手順の前には alm beat {id} --as <あなたのセッション名> --busy <時間> で知らせてください。
+5. 進み具合は alm label で知らせ、終わったら alm done、途中でやめるなら alm release --note を使ってください。
+6. alm handoff {id} で引き継ぎを書き、このセッションを終えてください。このタスクだけを進め、次のタスクは取らないでください：次のタスクには「肩代」が新しいセッションを開きます。"#,
                 id = id,
                 mode = mode,
                 br = branch.unwrap_or("<あなたのブランチ>"),
@@ -225,8 +227,9 @@ pub fn monitor_request(
 {usage}1. Read it: alm show {id} (its description and latest handoff note).
 2. Claim it as AGENTS.md says, with this session's details: alm claim {id} --as <your session name> --branch {br} --session-agent {sa} --session-id {sid} --session-kind terminal, and share the claim.
 3. Work it in a worktree of its own, cut from the base branch the claim prints.
-4. Report progress with alm label; finish with alm done, or stop with alm release --note.
-5. Write a handoff with alm handoff {id}, then end this session. Work only this task; do not take another one: Allomos opens a new session for the next."#,
+4. While working, send a heartbeat at least every project heartbeat interval (10 min by default; see alm heartbeat-settings): run alm beat {id} --as <your session name> --doing "<what you are doing>", commit and push the heartbeat to the taskbag, and push work in progress (WIP) to the working branch as prompted (push with git push origin refs/heads/<branch>); declare long steps ahead of time with alm beat {id} --as <your session name> --busy <length>.
+5. Report progress with alm label; finish with alm done, or stop with alm release --note.
+6. Write a handoff with alm handoff {id}, then end this session. Work only this task; do not take another one: Allomos opens a new session for the next."#,
                 id = id,
                 mode = mode,
                 br = branch.unwrap_or("<your branch>"),
@@ -481,6 +484,8 @@ mod tests {
         assert!(ja.contains("--session-agent antigravity"));
         assert!(ja.contains("alm wait A01-1 --on"));
         assert!(ja.contains("git push origin refs/heads/<branch>"));
+        assert!(ja.contains("git -C <タスクバッグ> add / commit / push"));
+        assert!(ja.contains("alm beat A01-1 --as"));
         let ja_normal = monitor_request(
             "A01-1",
             "x",
@@ -493,6 +498,7 @@ mod tests {
             false,
         );
         assert!(!ja_normal.contains("git push origin refs/heads/<branch>"));
+        assert!(ja_normal.contains("alm beat A01-1 --as"));
         let zh_agy = monitor_request(
             "A01-1",
             "x",
@@ -505,6 +511,8 @@ mod tests {
             false,
         );
         assert!(zh_agy.contains("git push origin refs/heads/<branch>"));
+        assert!(zh_agy.contains("git -C <任务袋> add / commit / push"));
+        assert!(zh_agy.contains("alm beat A01-1 --as"));
         // Another task language: English.
         assert!(
             monitor_request(
@@ -532,6 +540,8 @@ mod tests {
             false,
         );
         assert!(en_agy.contains("only a standalone ordinary push"));
+        assert!(en_agy.contains("git -C <taskbag> add / commit / push"));
+        assert!(en_agy.contains("alm beat A01-1 --as"));
     }
 
     #[test]
