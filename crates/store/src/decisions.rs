@@ -107,9 +107,10 @@ pub fn review_ai_decisions(
     id: &str,
 ) -> Result<Decided, Problem> {
     let mut many = review_ai_decisions_many(root, actor, wait, &[id.to_string()])?;
-    let mut one = many.reviewed.pop().ok_or_else(|| Problem::TaskNotFound {
-        id: id.to_string(),
-    })?;
+    let mut one = many
+        .reviewed
+        .pop()
+        .ok_or_else(|| Problem::TaskNotFound { id: id.to_string() })?;
     one.issues = many.issues;
     Ok(one)
 }

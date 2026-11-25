@@ -173,7 +173,9 @@ Read this before you add a task, so it fits this project.
    is the person's to decide first (data formats, removing things, permissions and security,
    anything that changes the plan or another task, anything with a cost or an outside effect).
    Nothing: make it ready (`alm ready <id>`). Something: leave it in backlog, name each open
-   question in the description's Notes with your proposal, and tell the person. **Questions are
+   question in the description's Notes with your proposal, and tell the person. With the
+   project's setting \"new tasks wait for the approver\" on (`alm new-task-settings`), leave it
+   in backlog either way and make it ready only once the approver agrees. **Questions are
    asked while planning, not while running:** whoever makes a task ready asks its open questions
    first, so a ready task carries none. A ready task that turns out to need rethinking goes
    back the same way: `alm backlog <id>` (unheld only: release a held one first), with the open

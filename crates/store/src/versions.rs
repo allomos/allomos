@@ -120,7 +120,10 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// 41: the project's two risk limits: with the first on, `alm done --without-human-check` refuses
 /// a high-risk task and the agent parks it for the check; with the second on, a quiet run does not
 /// merge a high-risk task but parks it for the approver (decision 0027 § 5, Task-A01-stable046).
-pub const SECTION_VERSION: u32 = 41;
+/// 42: making an added task ready follows the project's setting "new tasks wait for the approver"
+/// (`alm new-task-settings`): on, the agent leaves it in backlog, tells the approver its ID and
+/// makes it ready only once they agree; a goal run is the exception (Task-A00-wheat560).
+pub const SECTION_VERSION: u32 = 42;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

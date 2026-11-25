@@ -27,6 +27,7 @@ pub mod ids;
 pub mod labels;
 pub mod link;
 mod model;
+pub mod new_tasks;
 pub mod ops;
 mod problem;
 pub mod queue;
