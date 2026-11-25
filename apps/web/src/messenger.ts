@@ -10,6 +10,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import type { FolderInfo as ProjectFolderInfo } from "./folderFlow";
 import type { HeartbeatSettings } from "./heartbeatSettingsFlow";
 import type { FileSizeSettings } from "./FileSizeSettings";
+import type { NewTaskSettings } from "./NewTaskSettings";
 import type { RiskSettings } from "./riskFlow";
 import type { CodexRules } from "./codexRulesFlow";
 import type { LadderStep } from "./ladderFlow";
@@ -275,6 +276,10 @@ export interface Messenger {
   fileSizeSettings(root: string): Promise<FileSizeSettings>;
   /** Changes it (a whole number of lines), or puts it back to the default (`clear`); resolves to the settings as saved. Rejects with a Problem. */
   setFileSizeSettings(root: string, change: { limit?: string; clear?: boolean }): Promise<FileSizeSettings>;
+  /** Project settings → Tasks (Task-A00-wheat560): whether new tasks wait for the approver, as `alm new-task-settings`. */
+  newTaskSettings(root: string): Promise<NewTaskSettings>;
+  /** Turns it on or off; resolves to the setting as saved. Rejects with a Problem. */
+  setNewTaskSettings(root: string, waitForApproval: boolean): Promise<NewTaskSettings>;
   /** Project settings → Risk management (decision 0027 § 6, Task-A01-beetle749): the fixed rules for high risk, the project's own rules and its two limits. */
   riskSettings(root: string): Promise<RiskSettings>;
   /** Changes them: `rules` replaces the project's own rules, each limit given is turned on or off; resolves to the settings as saved. Rejects with a Problem. */
@@ -693,6 +698,8 @@ export const desktopMessenger: Messenger = {
   fileSizeSettings: (root) => invoke<FileSizeSettings>("file_size_settings", { root }),
   setFileSizeSettings: (root, c) =>
     invoke<FileSizeSettings>("set_file_size_settings", { root, limit: c.limit ?? null, clear: c.clear ?? false }),
+  newTaskSettings: (root) => invoke<NewTaskSettings>("new_task_settings", { root }),
+  setNewTaskSettings: (root, waitForApproval) => invoke<NewTaskSettings>("set_new_task_settings", { root, waitForApproval }),
   riskSettings: (root) => invoke<RiskSettings>("risk_settings", { root }),
   setRiskSettings: (root, c) =>
     invoke<RiskSettings>("set_risk_settings", {

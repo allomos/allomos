@@ -11052,3 +11052,43 @@ fn reviewed_accepts_several_ids_all_or_nothing() {
             .is_empty()
     );
 }
+
+/// Task-A00-wheat560: `alm new-task-settings` keeps whether new tasks wait for the approver, and
+/// `alm add task`'s next steps follow it: on, leave the task in backlog and tell the approver.
+#[test]
+fn new_task_settings_change_what_add_task_tells_the_agent() {
+    let dir = tmp("new-task-settings");
+    ok(&dir, &["init"]);
+    ok(&dir, &["task-language", "en"]);
+    ok(&dir, &["add", "area", "A01", "Core"]);
+    let v = ok(&dir, &["new-task-settings"]);
+    assert_eq!(v["wait_for_approval"], false, "{v}");
+    assert_eq!(v["new_tasks"], Value::Null, "{v}");
+
+    let v = ok(&dir, &["new-task-settings", "--wait-for-approval", "on"]);
+    assert_eq!(v["new_tasks"], json!({ "wait_for_approval": true }), "{v}");
+    let out = alm(
+        &dir,
+        &["add", "task", "A01-01", "--area", "A01", "--title", "One"],
+    );
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("Tell the approver its ID, A01-01"), "{text}");
+    assert!(text.contains("alm guide goal"), "{text}");
+    assert!(!text.contains("Nothing: make it ready"), "{text}");
+    let shown = ok(&dir, &["show", "A01-01"]);
+    assert_eq!(shown["task"]["state"], "backlog", "{shown}");
+
+    let v = ok(&dir, &["new-task-settings", "--wait-for-approval", "off"]);
+    assert_eq!(v["new_tasks"], Value::Null, "{v}");
+    let out = alm(
+        &dir,
+        &["add", "task", "A01-02", "--area", "A01", "--title", "Two"],
+    );
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains("Nothing: make it ready, `alm ready A01-02`"),
+        "{text}"
+    );
+    let project = fs::read_to_string(dir.join(".allomos/taskbag/project.json")).unwrap();
+    assert!(!project.contains("new_tasks"), "{project}");
+}

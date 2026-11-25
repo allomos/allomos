@@ -23,6 +23,7 @@ import { AppGeneralSection, ThisComputerPart } from "./AppSettings";
 import { HandoffSection } from "./HandoffSettings";
 import { HeartbeatSection } from "./HeartbeatSettings";
 import { FileSizeSection } from "./FileSizeSettings";
+import { NewTaskSection } from "./NewTaskSettings";
 import { RiskSection } from "./RiskSettings";
 import { AuditSection } from "./AuditSettings";
 import { ProjectFolders } from "./ProjectFolders";
@@ -430,6 +431,8 @@ function TaskbagSection({ messenger, taskbag, section, fileManagerKey }: { messe
             }}
           />
           <Translate messenger={messenger} root={root} />
+          <h3>{t("new_task_settings.title")}</h3>
+          <NewTaskSection messenger={messenger} root={root} />
           <h3>{t("settings.labels")}</h3>
           <LabelTable
             labels={labels}
