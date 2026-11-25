@@ -100,13 +100,15 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     // What to do next, in the task language: plan it, then make it ready
                     // unless something is the person's to decide (Task-A03-33).
                     let system: Vec<String> = sys_locale::get_locales().collect();
-                    let (language, iterations) = match taskbag_of(&root, load(&root)) {
-                        Ok((bag, _)) => (
-                            task_language(&bag.project, &system).language,
-                            bag.iterations.iter().map(iteration_heading).collect(),
-                        ),
-                        Err(_) => ("en".to_string(), Vec::new()),
-                    };
+                    let (language, iterations, wait_for_approval) =
+                        match taskbag_of(&root, load(&root)) {
+                            Ok((bag, _)) => (
+                                task_language(&bag.project, &system).language,
+                                bag.iterations.iter().map(iteration_heading).collect(),
+                                allomos_core::new_tasks::wait_for_approval(&bag.project),
+                            ),
+                            Err(_) => ("en".to_string(), Vec::new(), false),
+                        };
                     if let Some(i) = &task.iteration {
                         let why = if iteration.is_some() {
                             "as asked"
@@ -120,6 +122,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                         &task.id,
                         &iterations,
                         task.iteration.as_deref(),
+                        wait_for_approval,
                     );
                     // No difficulty given (Task-A01-actor813): alm says so and how to give it; it
                     // refuses nothing (the task counts as 3).

@@ -1,5 +1,5 @@
 //! The project's settings: `alm quota`, `alm handoff-rules`, `alm heartbeat-settings`, `alm
-//! file-size-settings`, `alm audit-settings`, `alm task-language` and `alm labels`.
+//! file-size-settings`, `alm new-task-settings`, `alm audit-settings`, `alm task-language` and `alm labels`.
 
 use std::path::Path;
 
@@ -129,6 +129,9 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
         ),
         Command::FileSizeSettings { limit, clear } => {
             file_size_settings(cli, cwd, limit.as_deref(), *clear)
+        }
+        Command::NewTaskSettings { wait_for_approval } => {
+            new_task_settings(cli, cwd, wait_for_approval.as_deref().map(|v| v == "on"))
         }
         Command::AuditSettings {
             identity,
@@ -497,6 +500,53 @@ fn file_size_settings(
             "file_size": project.file_size,
             "limit_lines": applied,
             "default_limit_lines": file_size::DEFAULT_LIMIT,
+        }),
+        text,
+    );
+    done.issues = issues;
+    Ok(done)
+}
+
+/// `alm new-task-settings` (Task-A00-wheat560): show whether new tasks stay in backlog until the
+/// approver agrees, or turn it on or off. alm keeps the setting and words `alm add task`'s next
+/// steps by it; it stops nothing.
+fn new_task_settings(cli: &Cli, cwd: &Path, on: Option<bool>) -> Result<Done, Problem> {
+    use allomos_core::new_tasks;
+    let root = locate(cli, cwd)?;
+    let (project, issues, changed) = if let Some(on) = on {
+        let lock = Lock::acquire(&root, lock_wait())?;
+        let (bag, issues) = taskbag_of(&root, lock.load())?;
+        let project = new_tasks::set_wait_for_approval(&bag.project, on);
+        let changed = project != bag.project;
+        if changed {
+            save_project(
+                &lock,
+                cli.holder.as_deref(),
+                "new-task-settings",
+                &bag.project,
+                &project,
+            )?;
+        }
+        (project, issues, changed)
+    } else {
+        let (bag, issues) = taskbag_of(&root, load(&root))?;
+        (bag.project, issues, false)
+    };
+    let waits = new_tasks::wait_for_approval(&project);
+    let mut text = String::new();
+    if on.is_some() && !changed {
+        text.push_str("Nothing changed: the setting already says that.\n");
+    }
+    text.push_str(if waits {
+        "New tasks wait for the approver: on. An agent that adds a task leaves it in backlog, tells the approver its ID and makes it ready only once they agree (`alm add task` says so). The exception: in a goal run the agent makes its tasks ready itself, since submitting the goal approved the plan in advance.\n"
+    } else {
+        "New tasks wait for the approver: off (default). An agent that adds a task makes it ready itself when nothing in it is the person's to decide; otherwise it leaves it in backlog with the open questions in its Notes. Turn it on: `alm new-task-settings --wait-for-approval on`.\n"
+    });
+    let mut done = Done::new(
+        json!({
+            "taskbag": root,
+            "new_tasks": project.new_tasks,
+            "wait_for_approval": waits,
         }),
         text,
     );

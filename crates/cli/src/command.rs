@@ -807,6 +807,17 @@ pub(crate) enum Command {
         #[arg(long)]
         clear: bool,
     },
+    /// What an agent does with a task it has just added (Task-A00-wheat560): with
+    /// --wait-for-approval on, a new task stays in backlog until the approver agrees (except in a
+    /// goal run); off (the default), the agent makes it ready itself when nothing in it is the
+    /// person's to decide. alm keeps the setting and words its next steps by it. Without options,
+    /// show it.
+    #[command(name = "new-task-settings")]
+    NewTaskSettings {
+        /// Whether new tasks stay in backlog until the approver agrees.
+        #[arg(long, value_name = "on|off", value_parser = ["on", "off"])]
+        wait_for_approval: Option<String>,
+    },
     /// The project's audit settings (decision 0021 § 6): the identity level, separation of
     /// duties, retention and the legal hold, and the outside witness. Without options, show them. The history only ever holds a pseudonym ID at every level; who is
     /// behind it is kept on this computer (local project) or in the cloud (cloud project).

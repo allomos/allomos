@@ -952,7 +952,15 @@ fn reopen_reasons_shown_ahead_of_handoff_and_prioritized_in_next() {
     ok(&repo, &["add", "iteration", "I02", "Two"]);
     ok(
         &repo,
-        &["add", "task", "A01-03", "--area", "A01", "--title", "Later iteration task"],
+        &[
+            "add",
+            "task",
+            "A01-03",
+            "--area",
+            "A01",
+            "--title",
+            "Later iteration task",
+        ],
     );
     ok(&repo, &["plan", "A01-01", "I01"]);
     ok(&repo, &["plan", "A01-02", "I01"]);
@@ -967,13 +975,27 @@ fn reopen_reasons_shown_ahead_of_handoff_and_prioritized_in_next() {
     ok(&repo, &["--as", "a", "note", "A01-02", "previous handoff"]);
     ok(
         &repo,
-        &["--as", "a", "done", "A01-02", "--without-human-check", "first try"],
+        &[
+            "--as",
+            "a",
+            "done",
+            "A01-02",
+            "--without-human-check",
+            "first try",
+        ],
     );
     let mut first_reopen = alm_command();
     let out = first_reopen
         .current_dir(&repo)
         .env("ALLOMOS_NOW", "2026-11-18T10:00:00Z")
-        .args(["--as", "alice", "reopen", "A01-02", "--note", "first return reason"])
+        .args([
+            "--as",
+            "alice",
+            "reopen",
+            "A01-02",
+            "--note",
+            "first return reason",
+        ])
         .output()
         .unwrap();
     assert!(out.status.success());
@@ -981,13 +1003,27 @@ fn reopen_reasons_shown_ahead_of_handoff_and_prioritized_in_next() {
     ok(&repo, &["--as", "b", "claim", "A01-02"]);
     ok(
         &repo,
-        &["--as", "b", "done", "A01-02", "--without-human-check", "second try"],
+        &[
+            "--as",
+            "b",
+            "done",
+            "A01-02",
+            "--without-human-check",
+            "second try",
+        ],
     );
     let mut second_reopen = alm_command();
     let out = second_reopen
         .current_dir(&repo)
         .env("ALLOMOS_NOW", "2026-11-19T11:30:00Z")
-        .args(["--as", "bob", "reopen", "A01-02", "--note", "second return reason"])
+        .args([
+            "--as",
+            "bob",
+            "reopen",
+            "A01-02",
+            "--note",
+            "second return reason",
+        ])
         .output()
         .unwrap();
     assert!(out.status.success());
@@ -996,11 +1032,25 @@ fn reopen_reasons_shown_ahead_of_handoff_and_prioritized_in_next() {
     ok(&repo, &["--as", "a", "claim", "A01-03"]);
     ok(
         &repo,
-        &["--as", "a", "done", "A01-03", "--without-human-check", "done"],
+        &[
+            "--as",
+            "a",
+            "done",
+            "A01-03",
+            "--without-human-check",
+            "done",
+        ],
     );
     ok(
         &repo,
-        &["--as", "alice", "reopen", "A01-03", "--note", "i2 return reason"],
+        &[
+            "--as",
+            "alice",
+            "reopen",
+            "A01-03",
+            "--note",
+            "i2 return reason",
+        ],
     );
 
     // Task file itself gains no reopen fields.
@@ -1026,7 +1076,9 @@ fn reopen_reasons_shown_ahead_of_handoff_and_prioritized_in_next() {
     assert_eq!(next_reasons[1]["by"], "alice");
 
     let next_out = String::from_utf8_lossy(&alm(&repo, &["next"]).stdout).into_owned();
-    let reopen_pos = next_out.find("reopen reasons:").expect("reopen reasons in next");
+    let reopen_pos = next_out
+        .find("reopen reasons:")
+        .expect("reopen reasons in next");
     let second_pos = next_out
         .find("bob (2026-11-19T11:30:00Z): second return reason")
         .expect("latest reason in next");
@@ -1040,7 +1092,9 @@ fn reopen_reasons_shown_ahead_of_handoff_and_prioritized_in_next() {
 
     // 2. alm show: reopen reasons before handoff note, most recent first.
     let show_out = String::from_utf8_lossy(&alm(&repo, &["show", "A01-02"]).stdout).into_owned();
-    let s_reopen = show_out.find("reopen reasons:").expect("reopen reasons in show");
+    let s_reopen = show_out
+        .find("reopen reasons:")
+        .expect("reopen reasons in show");
     let s_second = show_out
         .find("bob (2026-11-19T11:30:00Z): second return reason")
         .expect("latest reason in show");
@@ -1075,7 +1129,14 @@ fn reopen_reasons_shown_ahead_of_handoff_and_prioritized_in_next() {
     // Once finished again, alm show no longer lists reopen reasons.
     ok(
         &repo,
-        &["--as", "c", "done", "A01-02", "--without-human-check", "fixed"],
+        &[
+            "--as",
+            "c",
+            "done",
+            "A01-02",
+            "--without-human-check",
+            "fixed",
+        ],
     );
     let show_done_out =
         String::from_utf8_lossy(&alm(&repo, &["show", "A01-02"]).stdout).into_owned();
@@ -1101,8 +1162,7 @@ fn reopen_reasons_shown_ahead_of_handoff_and_prioritized_in_next() {
         serde_json::to_string_pretty(&legacy_event).unwrap(),
     )
     .unwrap();
-    let show_legacy =
-        String::from_utf8_lossy(&alm(&repo, &["show", "A01-01"]).stdout).into_owned();
+    let show_legacy = String::from_utf8_lossy(&alm(&repo, &["show", "A01-01"]).stdout).into_owned();
     assert!(show_legacy.contains("legacy-reviewer (2026-10-26T15:15:45Z): legacy reopen reason"));
     let claim_legacy = ok(&repo, &["--as", "d", "claim", "A01-01"]);
     assert_eq!(
@@ -2949,7 +3009,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v41)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v42)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -2959,7 +3019,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v41)", "## Tasks: Allomos (v22)")
+            brief.replace("## Tasks: Allomos (v42)", "## Tasks: Allomos (v22)")
         ),
     )
     .unwrap();
@@ -10676,7 +10736,13 @@ fn checked_accepts_several_ids_all_or_nothing_and_records_words_on_each() {
     ok(&repo, &["--as", "a", "claim", "A01-01"]);
     ok(
         &repo,
-        &["--as", "a", "label", "A01-01", "deployed and verified by agent"],
+        &[
+            "--as",
+            "a",
+            "label",
+            "A01-01",
+            "deployed and verified by agent",
+        ],
     );
     ok(
         &repo,
@@ -10714,7 +10780,12 @@ fn checked_accepts_several_ids_all_or_nothing_and_records_words_on_each() {
     let before = events_count();
 
     // Unknown ID among valid ones: refused, nothing written.
-    let v = refused(&repo, &["--as", "will", "checked", "A01-01", "A01-99"], 1, "task_not_found");
+    let v = refused(
+        &repo,
+        &["--as", "will", "checked", "A01-01", "A01-99"],
+        1,
+        "task_not_found",
+    );
     assert!(
         v["error"]["message"].as_str().unwrap().contains("A01-99"),
         "{v}"
@@ -10722,7 +10793,12 @@ fn checked_accepts_several_ids_all_or_nothing_and_records_words_on_each() {
     assert_eq!(events_count(), before);
 
     // Not-done task among valid ones: refused, nothing written.
-    let v = refused(&repo, &["--as", "will", "checked", "A01-01", "A02-01"], 1, "not_done");
+    let v = refused(
+        &repo,
+        &["--as", "will", "checked", "A01-01", "A02-01"],
+        1,
+        "not_done",
+    );
     assert!(
         v["error"]["message"].as_str().unwrap().contains("A02-01"),
         "{v}"
@@ -10733,14 +10809,7 @@ fn checked_accepts_several_ids_all_or_nothing_and_records_words_on_each() {
     refused(
         &repo,
         &[
-            "--as",
-            "will",
-            "checked",
-            "A01-01",
-            "A01-02",
-            "--result",
-            "partly",
-            "--words",
+            "--as", "will", "checked", "A01-01", "A01-02", "--result", "partly", "--words",
             "almost",
         ],
         2,
@@ -10784,7 +10853,12 @@ fn checked_accepts_several_ids_all_or_nothing_and_records_words_on_each() {
     assert_eq!(hc2["where"], "local");
     assert_eq!(hc2["result"], "pass");
     assert_eq!(hc2["words"], "Checked both together");
-    assert!(ok(&repo, &["human"])["to_check"].as_array().unwrap().is_empty());
+    assert!(
+        ok(&repo, &["human"])["to_check"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
 
     // Duplicate IDs collapse to one event.
     let before_dup = events_count();
@@ -10807,7 +10881,10 @@ fn checked_accepts_several_ids_all_or_nothing_and_records_words_on_each() {
 #[test]
 fn checked_many_under_separation_of_duties_refuses_all_if_one_is_self_check() {
     let repo = filled();
-    ok(&repo, &["--as", "a", "--for", "p-alice1", "claim", "A01-01"]);
+    ok(
+        &repo,
+        &["--as", "a", "--for", "p-alice1", "claim", "A01-01"],
+    );
     ok(
         &repo,
         &[
@@ -10821,7 +10898,10 @@ fn checked_many_under_separation_of_duties_refuses_all_if_one_is_self_check() {
             "run",
         ],
     );
-    ok(&repo, &["--as", "b", "--for", "p-bob001", "claim", "A01-02"]);
+    ok(
+        &repo,
+        &["--as", "b", "--for", "p-bob001", "claim", "A01-02"],
+    );
     ok(
         &repo,
         &[
@@ -10957,7 +11037,58 @@ fn reviewed_accepts_several_ids_all_or_nothing() {
     assert_eq!(v["tasks"][0]["reviewed"].as_array().unwrap().len(), 2);
     assert_eq!(v["tasks"][1]["reviewed"].as_array().unwrap().len(), 1);
     assert_eq!(events_count(), before + 2);
-    assert_eq!(ok(&repo, &["history", "A01-01"])["events"][0]["command"], "reviewed");
-    assert_eq!(ok(&repo, &["history", "A01-02"])["events"][0]["command"], "reviewed");
-    assert!(ok(&repo, &["human"])["to_review"].as_array().unwrap().is_empty());
+    assert_eq!(
+        ok(&repo, &["history", "A01-01"])["events"][0]["command"],
+        "reviewed"
+    );
+    assert_eq!(
+        ok(&repo, &["history", "A01-02"])["events"][0]["command"],
+        "reviewed"
+    );
+    assert!(
+        ok(&repo, &["human"])["to_review"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+}
+
+/// Task-A00-wheat560: `alm new-task-settings` keeps whether new tasks wait for the approver, and
+/// `alm add task`'s next steps follow it: on, leave the task in backlog and tell the approver.
+#[test]
+fn new_task_settings_change_what_add_task_tells_the_agent() {
+    let dir = tmp("new-task-settings");
+    ok(&dir, &["init"]);
+    ok(&dir, &["task-language", "en"]);
+    ok(&dir, &["add", "area", "A01", "Core"]);
+    let v = ok(&dir, &["new-task-settings"]);
+    assert_eq!(v["wait_for_approval"], false, "{v}");
+    assert_eq!(v["new_tasks"], Value::Null, "{v}");
+
+    let v = ok(&dir, &["new-task-settings", "--wait-for-approval", "on"]);
+    assert_eq!(v["new_tasks"], json!({ "wait_for_approval": true }), "{v}");
+    let out = alm(
+        &dir,
+        &["add", "task", "A01-01", "--area", "A01", "--title", "One"],
+    );
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("Tell the approver its ID, A01-01"), "{text}");
+    assert!(text.contains("alm guide goal"), "{text}");
+    assert!(!text.contains("Nothing: make it ready"), "{text}");
+    let shown = ok(&dir, &["show", "A01-01"]);
+    assert_eq!(shown["task"]["state"], "backlog", "{shown}");
+
+    let v = ok(&dir, &["new-task-settings", "--wait-for-approval", "off"]);
+    assert_eq!(v["new_tasks"], Value::Null, "{v}");
+    let out = alm(
+        &dir,
+        &["add", "task", "A01-02", "--area", "A01", "--title", "Two"],
+    );
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains("Nothing: make it ready, `alm ready A01-02`"),
+        "{text}"
+    );
+    let project = fs::read_to_string(dir.join(".allomos/taskbag/project.json")).unwrap();
+    assert!(!project.contains("new_tasks"), "{project}");
 }

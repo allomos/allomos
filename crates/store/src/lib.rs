@@ -27,6 +27,7 @@ use allomos_core::{
 };
 use serde::Serialize;
 
+mod added_task;
 mod agent_files;
 pub mod app_share_request;
 pub mod app_sharing;
@@ -75,6 +76,7 @@ mod update_taskbag;
 mod upgrade;
 pub mod versions;
 mod writing;
+pub use added_task::added_task_steps;
 pub use agent_files::*;
 pub use confirm::{
     ConfirmRequest, Extra as ConfirmExtra, MAX_PLAN_BYTES, REQUESTS_DIR, answer_confirm,
@@ -91,9 +93,8 @@ pub use events::Actor;
 pub use file_size::{claimed_task_steps, file_size_guide};
 pub use github_release::github_release;
 pub use guide::{
-    GOAL_PROMPT_VERSION, GUIDE_TOPICS, LOCALIZED_TOPICS, RUN_MODES_LANGUAGES, added_task_steps,
-    agent_files, discuss_request_in, goal, goal_request_in, guide, guide_topic, localized,
-    run_modes,
+    GOAL_PROMPT_VERSION, GUIDE_TOPICS, LOCALIZED_TOPICS, RUN_MODES_LANGUAGES, agent_files,
+    discuss_request_in, goal, goal_request_in, guide, guide_topic, localized, run_modes,
 };
 pub use holding::*;
 pub use loading::*;

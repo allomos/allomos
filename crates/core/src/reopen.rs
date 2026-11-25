@@ -161,6 +161,7 @@ mod tests {
                 heartbeat: None,
                 risk: None,
                 file_size: None,
+                new_tasks: None,
             },
             areas: vec![],
             iterations: vec![],
@@ -168,8 +169,7 @@ mod tests {
         };
         b.areas.push(ops::new_area(&b, "A01", "One").unwrap());
         b.areas.push(ops::new_area(&b, "A02", "Two").unwrap());
-        let mut i1 =
-            ops::new_iteration(&b, "I1", "One", ops::IterationDetails::default()).unwrap();
+        let mut i1 = ops::new_iteration(&b, "I1", "One", ops::IterationDetails::default()).unwrap();
         i1.state = IterationState::Active;
         b.iterations.push(i1);
         b.iterations
@@ -233,8 +233,20 @@ mod tests {
             ("A02-6", "A02", None, State::Ready),
         ]);
         let events = vec![
-            reopen_event("A02-2", "2026-11-20T01:00:00Z", Some("will"), None, "fix I1"),
-            reopen_event("A02-4", "2026-11-20T02:00:00Z", Some("will"), None, "fix I2"),
+            reopen_event(
+                "A02-2",
+                "2026-11-20T01:00:00Z",
+                Some("will"),
+                None,
+                "fix I1",
+            ),
+            reopen_event(
+                "A02-4",
+                "2026-11-20T02:00:00Z",
+                Some("will"),
+                None,
+                "fix I2",
+            ),
             reopen_event(
                 "A02-6",
                 "2026-11-20T03:00:00Z",
@@ -247,6 +259,9 @@ mod tests {
         let mut next = ops::next(&b, None).unwrap();
         prioritize_reopened(&mut next, &b, &reopened);
         let ids: Vec<&str> = next.iter().map(|t| t.id.as_str()).collect();
-        assert_eq!(ids, vec!["A02-2", "A01-1", "A02-4", "A01-3", "A02-6", "A01-5"]);
+        assert_eq!(
+            ids,
+            vec!["A02-2", "A01-1", "A02-4", "A01-3", "A02-6", "A01-5"]
+        );
     }
 }

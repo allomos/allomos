@@ -81,6 +81,7 @@ impl Command {
             | Command::HandoffRules { .. }
             | Command::HeartbeatSettings { .. }
             | Command::FileSizeSettings { .. }
+            | Command::NewTaskSettings { .. }
             | Command::AuditSettings { .. }
             | Command::Cards { .. }
             | Command::Upgrade { .. }
@@ -126,6 +127,9 @@ impl Command {
         }
         if let Command::FileSizeSettings { limit, clear } = self {
             return limit.is_some() || *clear;
+        }
+        if let Command::NewTaskSettings { wait_for_approval } = self {
+            return wait_for_approval.is_some();
         }
         if let Command::AuditSettings {
             identity,
@@ -271,6 +275,7 @@ impl Command {
             Command::HandoffRules { .. } => "handoff-rules",
             Command::HeartbeatSettings { .. } => "heartbeat-settings",
             Command::FileSizeSettings { .. } => "file-size-settings",
+            Command::NewTaskSettings { .. } => "new-task-settings",
             Command::AuditSettings { .. } => "audit-settings",
             Command::Handoff { .. } => "handoff",
         }

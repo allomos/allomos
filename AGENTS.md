@@ -9,7 +9,7 @@ Shared rules for every AI agent working for the approver, **will.w.hui**.
 - **Approvals:** approving a card authorizes only its local work; external effects require exact approval recorded in the task's description.
 - **Credentials:** never print or commit credentials, tokens, cookies or local environment files (`.env*` stay ignored).
 
-## Tasks: Allomos (v41)
+## Tasks: Allomos (v42)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -159,7 +159,11 @@ the project notes (below).
   which ones the task belongs to, or none, and say so: `--folder <name>` (repeatable) or
   `--no-folder`; alm does not guess. `alm folders <id> <name>…` (or `--none`) changes them later.
   Run inside a project folder, `alm next` lists only that folder's tasks (`--all-folders`: every
-  task).
+  task). Making it ready follows the project's setting "new tasks wait for the approver" (off
+  by default; `alm new-task-settings`, and `alm add task` says which applies): off, make it ready
+  yourself when it carries no open questions; on, leave it in backlog, tell the approver its ID
+  and make it ready only once they agree (meanwhile go on with other work). In a goal run you
+  make your tasks ready yourself either way: submitting the goal approved the plan in advance.
 - Change a task's title, description or handoff note: `alm title <id> "<title>"`,
   `alm describe <id> --text "<markdown>"` (or `--from <file.md>`), `alm note <id> "<text>"`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in

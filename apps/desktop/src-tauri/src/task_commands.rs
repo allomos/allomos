@@ -75,8 +75,7 @@ pub(crate) fn approve_selected_as(
             words: None,
         };
         allomos_store::change_tasks(root, actor, LOCK_WAIT, |bag| {
-            allomos_core::labels::checked_many(bag, check_ids, None, &given)
-                .map(|o| (o, "checked"))
+            allomos_core::labels::checked_many(bag, check_ids, None, &given).map(|o| (o, "checked"))
         })?;
         crate::audit::after_approval(root);
     }
@@ -1253,8 +1252,10 @@ mod tests {
 
     #[test]
     fn approve_selected_checks_and_reviews_multiple_tasks() {
-        let dir = std::env::temp_dir()
-            .join(format!("allomos-desktop-approve-selected-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!(
+            "allomos-desktop-approve-selected-{}",
+            std::process::id()
+        ));
         let _ = std::fs::remove_dir_all(&dir);
         let root = dir.join(allomos_store::DEFAULT_DIR);
         allomos_store::init(&root, "p", "P").unwrap();

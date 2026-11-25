@@ -25,6 +25,7 @@ mod monitor_menu;
 mod monitor_pause;
 mod monitor_runs;
 mod monitor_update;
+mod new_task_settings;
 mod pairing;
 mod project_settings;
 mod risk_settings;
@@ -253,6 +254,8 @@ pub fn run() {
             heartbeat_settings::set_heartbeat_settings,
             file_size_settings::file_size_settings,
             file_size_settings::set_file_size_settings,
+            new_task_settings::new_task_settings,
+            new_task_settings::set_new_task_settings,
             risk_settings::risk_settings,
             risk_settings::set_risk_settings,
             audit_settings,

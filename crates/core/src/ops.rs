@@ -1611,6 +1611,7 @@ mod tests {
                 heartbeat: None,
                 risk: None,
                 file_size: None,
+                new_tasks: None,
             },
             areas: vec![],
             iterations: vec![],

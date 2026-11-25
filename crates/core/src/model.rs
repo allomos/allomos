@@ -126,6 +126,10 @@ pub struct Project {
     /// Missing: 1000 lines. `alm` keeps and shows it; it measures no file.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file_size: Option<crate::file_size::Settings>,
+    /// What an agent does with a task it has just added (Task-A00-wheat560): with
+    /// `wait_for_approval` on, the task stays in backlog until the approver agrees. Missing: off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub new_tasks: Option<crate::new_tasks::Settings>,
     /// Fields this Allomos does not know, kept as they are and written back (Task-A01-piano403).
     #[serde(flatten)]
     pub extra: Extra,
