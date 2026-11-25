@@ -42,16 +42,26 @@ export function ModelListLine({ read, reading, onRefresh }: { read: ModelsRead |
 }
 
 /** One agent's Model and Effort lists; a list the online list offers nothing for shows Default
- * only. */
+ * only. The efforts offered follow the chosen model (A03-pony586): a model that takes no reasoning
+ * effort leaves Default as the only choice, and an effort the new model does not offer falls back
+ * to Default. */
 export function ModelPicker({ agent, name, read, picks, onChange }: { agent: TerminalAgent; name: string; read: ModelsRead | null; picks: Picks; onChange: (picks: Picks) => void }) {
   const { t } = useI18n();
-  const { models, efforts } = optionsFor(read, agent);
+  const { models, efforts } = optionsFor(read, agent, picks.model);
   const model = models.some((m) => m.value === picks.model) ? picks.model! : "";
   const effort = efforts.includes(picks.effort ?? "") ? picks.effort! : "";
   return (
     <span className="monitor-sessions monitor-models small" data-agent={agent}>
       <span className="muted">{t("monitor.model_label")}</span>{" "}
-      <select aria-label={t("monitor.model_aria", { agent: name })} value={model} onChange={(e) => onChange({ ...picks, model: e.target.value || undefined })}>
+      <select
+        aria-label={t("monitor.model_aria", { agent: name })}
+        value={model}
+        onChange={(e) => {
+          const next = optionsFor(read, agent, e.target.value || undefined);
+          const keep = next.efforts.includes(picks.effort ?? "");
+          onChange({ model: e.target.value || undefined, ...(keep && picks.effort ? { effort: picks.effort } : {}) });
+        }}
+      >
         <option value="">{t("monitor.choice_default")}</option>
         {models.map((m) => (
           <option key={m.value} value={m.value}>

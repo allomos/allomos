@@ -15,8 +15,11 @@ use serde_json::Value;
 
 /// Allomos's own list.
 pub const DEFAULT_URL: &str = "https://www.allomos.com/agents/models.json";
-/// The list's format this app reads (its `version`).
-const FORMAT: u64 = 1;
+/// The list's formats this app reads (its `version`). In format 1 an agent has one list of
+/// reasoning efforts for all its models; in format 2 (A03-pony586) a model may carry its own,
+/// because agents such as Antigravity offer different levels per model, and a model that takes no
+/// reasoning effort says so with an empty list. A model that names none uses its agent's.
+const FORMATS: [u64; 2] = [1, 2];
 /// The copy kept on this computer, in the settings folder.
 const CACHE_FILE: &str = "agent-models.json";
 const TIMEOUT_SECS: &str = "10";
@@ -26,6 +29,9 @@ const TIMEOUT_SECS: &str = "10";
 pub struct Model {
     pub value: String,
     pub label: String,
+    /// The reasoning efforts this model offers: its own when the list gives it one, else its
+    /// agent's. Empty: the model takes no reasoning effort, so the dialog offers Default only.
+    pub efforts: Vec<String>,
 }
 
 /// One agent of the list.
@@ -55,7 +61,7 @@ pub struct ModelsRead {
 /// agents with no ID; fields this app does not know are ignored.
 pub fn parse(text: &str) -> Result<Vec<ListedAgent>, &'static str> {
     let v: Value = serde_json::from_str(text).map_err(|_| "format")?;
-    if v["version"].as_u64() != Some(FORMAT) {
+    if !FORMATS.contains(&v["version"].as_u64().unwrap_or_default()) {
         return Err("format");
     }
     let agents = v["agents"].as_array().ok_or("format")?;
@@ -76,6 +82,7 @@ pub fn parse(text: &str) -> Result<Vec<ListedAgent>, &'static str> {
             if id.is_empty() {
                 return None;
             }
+            let efforts = words(&a["efforts"]);
             let models = a["models"]
                 .as_array()
                 .into_iter()
@@ -83,6 +90,7 @@ pub fn parse(text: &str) -> Result<Vec<ListedAgent>, &'static str> {
                 .filter_map(|m| {
                     let value = m["value"].as_str()?.trim();
                     plain_choice(value).then(|| Model {
+                        efforts: if m["efforts"].is_array() { words(&m["efforts"]) } else { efforts.clone() },
                         value: value.to_string(),
                         label: m["label"]
                             .as_str()
@@ -97,7 +105,7 @@ pub fn parse(text: &str) -> Result<Vec<ListedAgent>, &'static str> {
                 name: a["name"].as_str().unwrap_or(&id).to_string(),
                 id,
                 models,
-                efforts: words(&a["efforts"]),
+                efforts,
             })
         })
         .collect())
@@ -257,9 +265,9 @@ pub fn set_models_url(url: Option<String>) -> Result<(), Problem> {
 mod tests {
     use super::*;
 
-    const LIST: &str = r#"{"version":1,"updated":"2026-11-18","agents":[
+    const LIST: &str = r#"{"version":2,"updated":"2026-11-25","agents":[
         {"id":"claude_cli","name":"Claude Code","models":[{"value":"opus","label":"Opus（最新）"},{"value":"bad value"}],"efforts":["low","high"],"new":1},
-        {"id":"codex_cli","name":"Codex","models":[{"value":"gpt-6.2-sol"}],"efforts":["x;y","xhigh"]},
+        {"id":"codex_cli","name":"Codex","models":[{"value":"gpt-6.2-sol"},{"value":"gpt-6-luna","efforts":[]}],"efforts":["x;y","xhigh"]},
         {"name":"no id"}]}"#;
 
     fn dir(name: &str) -> PathBuf {
@@ -276,16 +284,40 @@ mod tests {
             agents[0].models,
             vec![Model {
                 value: "opus".into(),
-                label: "Opus（最新）".into()
+                label: "Opus（最新）".into(),
+                efforts: vec!["low".into(), "high".into()]
             }]
         );
         assert_eq!(agents[0].efforts, ["low", "high"]);
         // A model without a label is shown by its value.
         assert_eq!(agents[1].models[0].label, "gpt-6.2-sol");
         assert_eq!(agents[1].efforts, ["xhigh"]);
+        // Format 2: a model without its own efforts uses its agent's; an empty list is its own.
+        assert_eq!(agents[1].models[0].efforts, ["xhigh"]);
+        assert_eq!(agents[1].models[1].efforts, Vec::<String>::new());
         assert_eq!(parse("not json"), Err("format"));
-        assert_eq!(parse(r#"{"version":2,"agents":[]}"#), Err("format"));
+        assert_eq!(parse(r#"{"version":3,"agents":[]}"#), Err("format"));
         assert_eq!(parse(r#"{"version":1}"#), Err("format"));
+    }
+
+    #[test]
+    fn format_1_is_still_read_and_gives_every_model_its_agents_efforts() {
+        let agents = parse(
+            r#"{"version":1,"updated":"2026-11-18","agents":[
+                {"id":"antigravity_cli","name":"Antigravity","models":[{"value":"gemini-4-hydrogen","label":"Gemini 4 Hydrogen"}],"efforts":["low","high"]}]}"#,
+        )
+        .unwrap();
+        assert_eq!(agents[0].models[0].efforts, ["low", "high"]);
+    }
+
+    #[test]
+    fn a_model_keeps_only_the_efforts_that_are_one_plain_word() {
+        let agents = parse(
+            r#"{"version":2,"agents":[{"id":"a_cli","name":"A","models":[{"value":"m","efforts":["low","x y","low"]}],"efforts":["high"]}]}"#,
+        )
+        .unwrap();
+        assert_eq!(agents[0].models[0].efforts, ["low"]);
+        assert_eq!(agents[0].efforts, ["high"]);
     }
 
     #[test]

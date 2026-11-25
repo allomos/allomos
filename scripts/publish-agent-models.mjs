@@ -9,7 +9,12 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const FORMAT_VERSION = 1;
+// Format `version` 1: each agent has one list of reasoning efforts for all its models.
+// Format `version` 2 (task A03-pony586): a model may carry its own `efforts`, because agents such
+// as Antigravity offer different levels per model, and a model that takes no reasoning effort at
+// all says so with an empty list. A model without `efforts` keeps using its agent's list, so a
+// version 2 source can list only the agents whose models differ.
+export const FORMAT_VERSIONS = [1, 2];
 const ID = /^[a-z][a-z0-9_]*$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -21,7 +26,8 @@ export function check(data) {
   if (!isObject(data)) return ["the list must be a JSON object"];
   const known = new Set(["version", "updated", "agents"]);
   for (const key of Object.keys(data)) if (!known.has(key)) problems.push(`unknown field "${key}"`);
-  if (data.version !== FORMAT_VERSION) problems.push(`"version" must be ${FORMAT_VERSION}`);
+  if (!FORMAT_VERSIONS.includes(data.version))
+    problems.push(`"version" must be one of ${FORMAT_VERSIONS.join(" or ")}`);
   if (!(typeof data.updated === "string" && DATE.test(data.updated) &&
         !Number.isNaN(Date.parse(`${data.updated}T00:00:00Z`)) &&
         new Date(`${data.updated}T00:00:00Z`).toISOString().startsWith(data.updated))) {
@@ -48,12 +54,31 @@ export function check(data) {
       problems.push(`${name}: "models" must list at least one model`);
     } else {
       const values = new Set();
+      const perModel = data.version === 2;
+      const modelKeys = perModel ? ["value", "label", "efforts"] : ["value", "label"];
       agent.models.forEach((m, j) => {
-        if (!isObject(m) || !text(m.value) || !text(m.label) || Object.keys(m).length !== 2) {
-          problems.push(`${name}: model ${j + 1} must have exactly a "value" and a "label", both not empty`);
+        const keys = isObject(m) ? Object.keys(m) : [];
+        const extra = keys.filter((k) => !modelKeys.includes(k));
+        if (!isObject(m) || !text(m.value) || !text(m.label) || extra.length) {
+          problems.push(
+            perModel
+              ? `${name}: model ${j + 1} must have a "value" and a "label", both not empty, and may add "efforts"`
+              : `${name}: model ${j + 1} must have exactly a "value" and a "label", both not empty`,
+          );
         } else if (values.has(m.value)) {
           problems.push(`${name}: model "${m.value}" is listed twice`);
         } else values.add(m.value);
+        if (!perModel || !isObject(m) || m.efforts === undefined) return;
+        if (!Array.isArray(m.efforts)) {
+          problems.push(`${name}: model ${j + 1}: "efforts" must be a list (an empty one: the model takes no reasoning effort)`);
+          return;
+        }
+        const mine = new Set();
+        m.efforts.forEach((e, k) => {
+          if (!text(e)) problems.push(`${name}: model ${j + 1}: effort ${k + 1} must be a word such as medium`);
+          else if (mine.has(e)) problems.push(`${name}: model "${m.value}": effort "${e}" is listed twice`);
+          else mine.add(e);
+        });
       });
     }
     if (!Array.isArray(agent.efforts) || agent.efforts.length === 0) {
