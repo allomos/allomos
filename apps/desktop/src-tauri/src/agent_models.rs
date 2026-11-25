@@ -90,7 +90,11 @@ pub fn parse(text: &str) -> Result<Vec<ListedAgent>, &'static str> {
                 .filter_map(|m| {
                     let value = m["value"].as_str()?.trim();
                     plain_choice(value).then(|| Model {
-                        efforts: if m["efforts"].is_array() { words(&m["efforts"]) } else { efforts.clone() },
+                        efforts: if m["efforts"].is_array() {
+                            words(&m["efforts"])
+                        } else {
+                            efforts.clone()
+                        },
                         value: value.to_string(),
                         label: m["label"]
                             .as_str()
@@ -312,8 +316,9 @@ mod tests {
 
     #[test]
     fn a_model_keeps_only_the_efforts_that_are_one_plain_word() {
+        // Duplicates are the publisher's check to refuse, as they are for an agent's efforts.
         let agents = parse(
-            r#"{"version":2,"agents":[{"id":"a_cli","name":"A","models":[{"value":"m","efforts":["low","x y","low"]}],"efforts":["high"]}]}"#,
+            r#"{"version":2,"agents":[{"id":"a_cli","name":"A","models":[{"value":"m","efforts":["low","x y"]}],"efforts":["high"]}]}"#,
         )
         .unwrap();
         assert_eq!(agents[0].models[0].efforts, ["low"]);
