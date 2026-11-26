@@ -107,7 +107,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                                 bag.iterations.iter().map(iteration_heading).collect(),
                                 allomos_core::new_tasks::wait_for_approval(&bag.project),
                             ),
-                            Err(_) => ("en".to_string(), Vec::new(), false),
+                            Err(_) => ("en".to_string(), Vec::new(), true),
                         };
                     if let Some(i) = &task.iteration {
                         let why = if iteration.is_some() {

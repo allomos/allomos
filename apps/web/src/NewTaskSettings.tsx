@@ -43,7 +43,7 @@ export function NewTaskSection({ messenger, root }: { messenger: Messenger; root
         <label className="choice">
           <input
             type="checkbox"
-            checked={settings?.wait_for_approval ?? false}
+            checked={settings?.wait_for_approval ?? true}
             onChange={(e) => void change(e.target.checked)}
             disabled={busy || !settings}
           />

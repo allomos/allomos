@@ -538,9 +538,9 @@ fn new_task_settings(cli: &Cli, cwd: &Path, on: Option<bool>) -> Result<Done, Pr
         text.push_str("Nothing changed: the setting already says that.\n");
     }
     text.push_str(if waits {
-        "New tasks wait for the approver: on. An agent that adds a task leaves it in backlog, tells the approver its ID and makes it ready only once they agree (`alm add task` says so). The exception: in a goal run the agent makes its tasks ready itself, since submitting the goal approved the plan in advance.\n"
+        "New tasks wait for the approver: on (default). An agent that adds a task leaves it in backlog, tells the approver its ID and makes it ready only once they agree (`alm add task` says so). The exception: in a goal run the agent makes its tasks ready itself, since submitting the goal approved the plan in advance.\n"
     } else {
-        "New tasks wait for the approver: off (default). An agent that adds a task makes it ready itself when nothing in it is the person's to decide; otherwise it leaves it in backlog with the open questions in its Notes. Turn it on: `alm new-task-settings --wait-for-approval on`.\n"
+        "New tasks wait for the approver: off. An agent that adds a task makes it ready itself when nothing in it is the person's to decide; otherwise it leaves it in backlog with the open questions in its Notes. Turn it on: `alm new-task-settings --wait-for-approval on`.\n"
     });
     let mut done = Done::new(
         json!({

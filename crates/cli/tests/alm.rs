@@ -3193,6 +3193,7 @@ fn add_task_tells_the_next_steps() {
     // English, whatever language this computer's Allomos app shows.
     ok(&dir, &["task-language", "en"]);
     ok(&dir, &["add", "area", "A01", "Core"]);
+    ok(&dir, &["new-task-settings", "--wait-for-approval", "off"]);
 
     // No iteration yet: said, with how to add one.
     let out = alm(
@@ -11062,11 +11063,8 @@ fn new_task_settings_change_what_add_task_tells_the_agent() {
     ok(&dir, &["task-language", "en"]);
     ok(&dir, &["add", "area", "A01", "Core"]);
     let v = ok(&dir, &["new-task-settings"]);
-    assert_eq!(v["wait_for_approval"], false, "{v}");
+    assert_eq!(v["wait_for_approval"], true, "{v}");
     assert_eq!(v["new_tasks"], Value::Null, "{v}");
-
-    let v = ok(&dir, &["new-task-settings", "--wait-for-approval", "on"]);
-    assert_eq!(v["new_tasks"], json!({ "wait_for_approval": true }), "{v}");
     let out = alm(
         &dir,
         &["add", "task", "A01-01", "--area", "A01", "--title", "One"],
@@ -11079,7 +11077,9 @@ fn new_task_settings_change_what_add_task_tells_the_agent() {
     assert_eq!(shown["task"]["state"], "backlog", "{shown}");
 
     let v = ok(&dir, &["new-task-settings", "--wait-for-approval", "off"]);
-    assert_eq!(v["new_tasks"], Value::Null, "{v}");
+    assert_eq!(v["new_tasks"], json!({ "wait_for_approval": false }), "{v}");
+    let v = ok(&dir, &["new-task-settings"]);
+    assert_eq!(v["wait_for_approval"], false, "{v}");
     let out = alm(
         &dir,
         &["add", "task", "A01-02", "--area", "A01", "--title", "Two"],
@@ -11089,6 +11089,8 @@ fn new_task_settings_change_what_add_task_tells_the_agent() {
         text.contains("Nothing: make it ready, `alm ready A01-02`"),
         "{text}"
     );
-    let project = fs::read_to_string(dir.join(".allomos/taskbag/project.json")).unwrap();
-    assert!(!project.contains("new_tasks"), "{project}");
+    let v = ok(&dir, &["new-task-settings", "--wait-for-approval", "on"]);
+    assert_eq!(v["new_tasks"], json!({ "wait_for_approval": true }), "{v}");
+    let v = ok(&dir, &["new-task-settings"]);
+    assert_eq!(v["wait_for_approval"], true, "{v}");
 }

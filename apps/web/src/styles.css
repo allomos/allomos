@@ -112,7 +112,7 @@ button.primary:disabled { background: var(--line); color: var(--muted); border-c
 .settings-scope.app { background: color-mix(in srgb, var(--muted) 14%, transparent); color: var(--muted); }
 .settings-scope.taskbag { background: var(--info-bg); color: var(--info); }
 .settings-sections button.chosen { background: color-mix(in srgb, var(--accent) 16%, transparent); font-weight: 600; }
-.settings-section { display: grid; align-content: start; justify-items: start; gap: 8px; min-width: 0; min-height: 0; overflow-y: auto; padding-right: 4px; }
+.settings-section { display: grid; align-content: start; justify-items: start; gap: 8px; min-width: 0; min-height: 0; overflow-y: auto; padding-inline-end: 20px; overflow-wrap: anywhere; }
 .settings-section h3 { margin: 0; font-size: 14px; }
 .settings-section h3:not(:first-child) { margin-top: 8px; }
 .settings-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; min-width: 0; max-width: 100%; }
@@ -147,7 +147,14 @@ button.with-icon { display: inline-flex; align-items: center; gap: 6px; }
 .ladder-edit li input { flex: 1 1 auto; min-width: 0; }
 .ladder-edit li button:not(.link) { padding: 2px 8px; }
 .settings-location { color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (max-width: 520px) { .settings-body { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); } .settings-sections { grid-auto-flow: column; justify-content: start; overflow-x: auto; overflow-y: hidden; max-width: 100%; } .settings-sections button { white-space: nowrap; } }
+@media (max-width: 520px) {
+  .settings-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .settings-sections { grid-auto-flow: column; justify-content: start; min-width: 0; overflow-x: auto; overflow-y: hidden; }
+  .settings-group { grid-auto-flow: column; grid-auto-columns: max-content; align-items: center; }
+  .settings-group + .settings-group { margin: 0 0 0 10px; }
+  .settings-group-name { max-width: 120px; }
+  .settings-sections button { white-space: nowrap; }
+}
 .where-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 button.link { align-self: start; border: none; background: none; padding: 0; color: var(--accent); font-size: 0.85em; cursor: pointer; }
 button.link:hover { text-decoration: underline; }

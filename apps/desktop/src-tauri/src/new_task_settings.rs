@@ -70,12 +70,6 @@ mod tests {
         let root = dir.join(allomos_store::DEFAULT_DIR);
         allomos_store::init(&root, "p", "P").unwrap();
 
-        assert!(!new_task_settings(root.clone()).unwrap().wait_for_approval);
-        assert!(
-            set_new_task_settings(root.clone(), true)
-                .unwrap()
-                .wait_for_approval
-        );
         assert!(new_task_settings(root.clone()).unwrap().wait_for_approval);
         assert!(
             !set_new_task_settings(root.clone(), false)
@@ -83,6 +77,12 @@ mod tests {
                 .wait_for_approval
         );
         assert!(!new_task_settings(root.clone()).unwrap().wait_for_approval);
+        assert!(
+            set_new_task_settings(root.clone(), true)
+                .unwrap()
+                .wait_for_approval
+        );
+        assert!(new_task_settings(root.clone()).unwrap().wait_for_approval);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
