@@ -35,10 +35,12 @@ the project notes (below).
   lists what the task is still missing (session details, working branch, a handoff note), each
   with the command that fixes it; run it (session details: `alm session <id> --session-agent …
   --session-id …`).
-- Always work a task in a worktree of its own (a separate working copy on the task's own
-  branch; in Git: `git worktree add <folder> -b <working branch> <base>`, which the claim
-  prints), never in the main checkout: the main checkout stays on the base branch. Merge from
-  the main checkout; once merged, remove your worktree and the merged branch.
+- Always work a task in a worktree of its own under the current project's `.worktrees/`
+  directory (a separate working copy on the task's own branch; in Git:
+  `git worktree add .worktrees/<short-name> -b <working branch> <base>`, which the claim prints;
+  keep `/.worktrees/` in the project's `.gitignore`), never in the main checkout: the main
+  checkout stays on the base branch. Merge from the main checkout; once merged, remove your
+  worktree and the merged branch.
 - While you hold a task (decision 0022): pass `--as <your session name>` to every `alm` command.
   Send a heartbeat at least every 10 minutes (the project's interval, `alm heartbeat-settings`):
   `alm beat --as <your session name>` (every task you hold, in one change), and save and share it

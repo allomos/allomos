@@ -123,7 +123,9 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// 42: making an added task ready follows the project's setting "new tasks wait for the approver"
 /// (`alm new-task-settings`): on, the agent leaves it in backlog, tells the approver its ID and
 /// makes it ready only once they agree; a goal run is the exception (Task-A00-wheat560).
-pub const SECTION_VERSION: u32 = 42;
+/// 43: task worktrees live under the current project's `.worktrees/<short-name>` directory (and
+/// projects keep `/.worktrees/` in their `.gitignore`) (Task-A03-north761).
+pub const SECTION_VERSION: u32 = 43;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

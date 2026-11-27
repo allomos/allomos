@@ -175,9 +175,9 @@ pub(crate) fn branch_steps(at: &allomos_core::branch::AtClaim) -> BranchSteps {
                 // A branch that exists already (a takeover, a claim after a release) is
                 // continued, not started again from the base (Task-A01-sign613).
                 let add = if at.continues {
-                    format!("git worktree add <folder> {wq}")
+                    format!("git worktree add .worktrees/<short-name> {wq}")
                 } else {
-                    format!("git worktree add <folder> -b {wq} {b}")
+                    format!("git worktree add .worktrees/<short-name> -b {wq} {b}")
                 };
                 steps.start = vec![
                     format!("git switch {b}"),
@@ -195,7 +195,7 @@ pub(crate) fn branch_steps(at: &allomos_core::branch::AtClaim) -> BranchSteps {
                 "git pull --ff-only".to_string(),
                 format!("git merge {wq}"),
                 "git push".to_string(),
-                "git worktree remove <folder>".to_string(),
+                "git worktree remove .worktrees/<short-name>".to_string(),
                 format!("git branch -d {wq}"),
             ];
         }
@@ -228,7 +228,7 @@ pub(crate) fn branch_steps(at: &allomos_core::branch::AtClaim) -> BranchSteps {
         }
         if working.is_some_and(|w| w != base) {
             steps.text.push_str(
-                "    (run these in the main checkout, which stays on the base; then work in <folder>)\n",
+                "    (run these in the main checkout, which stays on the base; then work in .worktrees/<short-name> under the current project directory)\n",
             );
         }
     }

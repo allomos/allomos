@@ -70,7 +70,7 @@ export function proceedRequest(task: Task, taskbag: string, language: Language):
 
 1. 阅读：alm show ${id}（它的说明和最新的交接）。
 ${backlog ? `2. 它在储备中。我在「换肩」里选了「执行」，这就是批准：先把它设为就绪（alm ready ${id}）。\n` : ""}${n}. 按 AGENTS.md 的说法认领它（alm claim ${id} --as <你的会话名> --branch <你的分支> ...），并把认领分享出去。
-${n + 1}. 在它自己的工作树里做，工作树从认领时列出的基础分支切出。
+${n + 1}. 在当前项目路径的 .worktrees/<短名> 工作树里做，工作树从认领时列出的基础分支切出。
 ${n + 2}. 用 alm label 报告进度；做完用 alm done，中途停下用 alm release --note。`;
   }
   if (language === "ja") {
@@ -99,7 +99,7 @@ ${n + 2}. 用 alm label 报告进度；做完用 alm done，中途停下用 alm 
 
 1. 読む：alm show ${id}（説明と最新の引き継ぎ）。
 ${backlog ? `2. このタスクはバックログにあります。私が「肩代」で「取りかかる」を選んだので、これは承認です：まず準備完了にしてください（alm ready ${id}）。\n` : ""}${n}. AGENTS.md のとおりに引き受け（alm claim ${id} --as <あなたのセッション名> --branch <あなたのブランチ> ...）、その引き受けを共有してください。
-${n + 1}. 専用のワークツリーで作業してください。ワークツリーは、引き受けたときに表示されるベースブランチから作ります。
+${n + 1}. 現在のプロジェクト直下の .worktrees/<短い名前> ワークツリーで作業してください。ワークツリーは、引き受けたときに表示されるベースブランチから作ります。
 ${n + 2}. 進み具合は alm label で知らせ、終わったら alm done、途中でやめるなら alm release --note を使ってください。`;
   }
   if (blocked(task)) {
@@ -127,7 +127,7 @@ It cannot start now: it is waiting on: ${task.waiting_on ?? ""}. Do not claim it
 
 1. Read it: alm show ${id} (its description and latest handoff note).
 ${backlog ? `2. It is in backlog. I chose Work on it in Allomos, which approves it: make it ready (alm ready ${id}).\n` : ""}${n}. Claim it as AGENTS.md says (alm claim ${id} --as <your session name> --branch <your branch> ...), and share the claim.
-${n + 1}. Work it in a worktree of its own, cut from the base branch the claim prints.
+${n + 1}. Work it in a worktree of its own under the current project's .worktrees/<short-name>, cut from the base branch the claim prints.
 ${n + 2}. Report progress with alm label; finish with alm done, or stop with alm release --note.`;
 }
 
@@ -226,7 +226,7 @@ ${held ? `它由 ${holder} 持有，没有失联：原会话可能还在工作�
 
 1. 阅读：alm show ${id}（它的说明和最新的交接）。
 2. 按 AGENTS.md 的说法认领它${held ? "，带上 --take" : ""}，这就是接手（alm claim ${id}${flag} --as <你的会话名> --branch <你的分支> ...），并把认领分享出去。
-${save ? saveStep(3, id, holder, w!, save, language) : ""}${n}. 在原工作分支${w ? ` ${w}` : "（认领时列出）"}上继续：为它开一个你自己的工作树（git worktree add <文件夹> ${w ?? "<工作分支>"}，不带 -b）。
+${save ? saveStep(3, id, holder, w!, save, language) : ""}${n}. 在原工作分支${w ? ` ${w}` : "（认领时列出）"}上继续：在当前项目路径的 .worktrees/ 下为它开一个你自己的工作树（git worktree add .worktrees/<短名> ${w ?? "<工作分支>"}，不带 -b）。
 ${n + 1}. 只有推送过的东西才算数：从工作分支上的提交和交接说明接着做。${save ? `前一个会话的工作树里没推送的改动，第 3 步已经推送；除了第 3 步，不要改动、提交或删除那里的东西。` : `前一个会话的工作树（认领时列出）里可能有它没提交的改动，但那个文件夹只在它所在的电脑上有用：在同一台电脑上可以去看，但不要改动、提交或删除那里的东西；在另一台电脑上就看工作分支和交接说明。`}拿不准就问我。
 ${held ? `${n + 2}. 原会话要到下一次运行 alm 才知道任务被接手，在这之前它可能还会往这个分支推送：提交前先取最新的改动；如果它的提交和你的冲突，告诉我。\n${n + 3}` : `${n + 2}`}. 用 alm label 报告进度；做完用 alm done，中途停下用 alm release --note。`;
   }
@@ -237,7 +237,7 @@ ${held ? `${holder} が引き受けていて、応答なしではありません
 
 1. 読む：alm show ${id}（説明と最新の引き継ぎ）。
 2. AGENTS.md のとおりに${held ? "、--take を付けて" : ""}引き受けてください。それが引き継ぎになります（alm claim ${id}${flag} --as <あなたのセッション名> --branch <あなたのブランチ> ...）。その引き受けを共有してください。
-${save ? saveStep(3, id, holder, w!, save, language) : ""}${n}. 元の作業ブランチ${w ? ` ${w}` : "（引き受けたときに表示されます）"}で続けてください：自分専用のワークツリーを作ります（git worktree add <フォルダー> ${w ?? "<作業ブランチ>"}、-b なし）。
+${save ? saveStep(3, id, holder, w!, save, language) : ""}${n}. 元の作業ブランチ${w ? ` ${w}` : "（引き受けたときに表示されます）"}で続けてください：現在のプロジェクト直下の .worktrees/ 配下に自分専用のワークツリーを作ります（git worktree add .worktrees/<短い名前> ${w ?? "<作業ブランチ>"}、-b なし）。
 ${n + 1}. プッシュされたものだけが引き継げます：作業ブランチのコミットと引き継ぎメモから続けてください。${save ? `前のセッションのワークツリーにあったまだプッシュされていない変更は、手順 3 でプッシュ済みです。手順 3 のほかは、そこにあるものを変更・コミット・削除しないでください。` : `前のセッションのワークツリー（引き受けたときに表示されます）にはコミットされていない変更があるかもしれませんが、そのフォルダーが役に立つのは同じコンピューターの上だけです。同じコンピューターでは見てもかまいませんが、そこにあるものを変更・コミット・削除しないでください。別のコンピューターでは作業ブランチと引き継ぎメモを見てください。`}迷ったら私に聞いてください。
 ${held ? `${n + 2}. 元のセッションは次に alm を実行するまで引き継がれたことを知らないので、それまでこのブランチにプッシュするかもしれません：コミットの前に最新の変更を取り込み、そのコミットとぶつかったら私に教えてください。\n${n + 3}` : `${n + 2}`}. 進み具合は alm label で知らせ、終わったら alm done、途中でやめるなら alm release --note を使ってください。`;
   }
@@ -247,7 +247,7 @@ ${held ? `${holder} holds it and is not lost: its session may still be at work. 
 
 1. Read it: alm show ${id} (its description and latest handoff note).
 2. Claim it as AGENTS.md says${held ? ", with --take" : ""}; that is the takeover (alm claim ${id}${flag} --as <your session name> --branch <your branch> ...), and share the claim.
-${save ? saveStep(3, id, holder, w!, save, language) : ""}${n}. Go on on its working branch${w ? `, ${w}` : " (the claim prints it)"}: open a worktree of your own for it (git worktree add <folder> ${w ?? "<working branch>"}, without -b).
+${save ? saveStep(3, id, holder, w!, save, language) : ""}${n}. Go on on its working branch${w ? `, ${w}` : " (the claim prints it)"}: open a worktree of your own for it under the current project's .worktrees/ directory (git worktree add .worktrees/<short-name> ${w ?? "<working branch>"}, without -b).
 ${n + 1}. Only what was pushed counts: go on from the commits on the working branch and the handoff note. ${save ? `Step 3 pushed what the former session's worktree had not; apart from step 3, do not change, commit or delete anything there.` : `The former session's worktree (the claim prints where) may hold changes it never committed, but that folder is of use only on its own computer: on the same computer, look at them if you need to, but do not change, commit or delete anything there; on another computer, go by the working branch and the handoff note.`} If unsure, ask me.
 ${held ? `${n + 2}. That session learns of the takeover only the next time it runs alm, so it may still push to the branch until then: get the latest changes before you commit, and if its commits collide with yours, tell me.\n${n + 3}` : `${n + 2}`}. Report progress with alm label; finish with alm done, or stop with alm release --note.`;
 }

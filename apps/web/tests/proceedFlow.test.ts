@@ -39,7 +39,7 @@ test("a ready task's request, word for word", () => {
 
 1. Read it: alm show A01-41 (its description and latest handoff note).
 2. Claim it as AGENTS.md says (alm claim A01-41 --as <your session name> --branch <your branch> ...), and share the claim.
-3. Work it in a worktree of its own, cut from the base branch the claim prints.
+3. Work it in a worktree of its own under the current project's .worktrees/<short-name>, cut from the base branch the claim prints.
 4. Report progress with alm label; finish with alm done, or stop with alm release --note.`,
   );
 });
@@ -52,7 +52,7 @@ test("a backlog task's request makes it ready first", () => {
 1. Read it: alm show A01-44 (its description and latest handoff note).
 2. It is in backlog. I chose Work on it in Allomos, which approves it: make it ready (alm ready A01-44).
 3. Claim it as AGENTS.md says (alm claim A01-44 --as <your session name> --branch <your branch> ...), and share the claim.
-4. Work it in a worktree of its own, cut from the base branch the claim prints.
+4. Work it in a worktree of its own under the current project's .worktrees/<short-name>, cut from the base branch the claim prints.
 5. Report progress with alm label; finish with alm done, or stop with alm release --note.`,
   );
 });
@@ -123,7 +123,7 @@ claude/s1 holds it, but has sent no heartbeat for over 30 minutes and has no bus
 
 1. Read it: alm show A01-50 (its description and latest handoff note).
 2. Claim it as AGENTS.md says; that is the takeover (alm claim A01-50 --as <your session name> --branch <your branch> ...), and share the claim.
-3. Go on on its working branch, claude/one: open a worktree of your own for it (git worktree add <folder> claude/one, without -b).
+3. Go on on its working branch, claude/one: open a worktree of your own for it under the current project's .worktrees/ directory (git worktree add .worktrees/<short-name> claude/one, without -b).
 4. Only what was pushed counts: go on from the commits on the working branch and the handoff note. The former session's worktree (the claim prints where) may hold changes it never committed, but that folder is of use only on its own computer: on the same computer, look at them if you need to, but do not change, commit or delete anything there; on another computer, go by the working branch and the handoff note. If unsure, ask me.
 5. Report progress with alm label; finish with alm done, or stop with alm release --note.`,
   );
@@ -133,11 +133,11 @@ test("the take-over request without a recorded working branch, and in each langu
   const en = takeOverRequest(lostTask(), TB, "en", { lostAfter: 45, working: null });
   assert.match(en, /over 45 minutes/);
   assert.match(en, /its working branch \(the claim prints it\)/);
-  assert.match(en, /git worktree add <folder> <working branch>, without -b/);
+  assert.match(en, /git worktree add \.worktrees\/<short-name> <working branch>, without -b/);
   for (const language of ["zh-CN", "ja"] as const) {
     const r = takeOverRequest(lostTask(), TB, language, { lostAfter: 30, working: "claude/one" });
     assert.match(r, /alm claim A01-50 --as/, language);
-    assert.match(r, /git worktree add <[^>]+> claude\/one/, language);
+    assert.match(r, /git worktree add \.worktrees\/<[^>]+> claude\/one/, language);
     assert.match(r, /claude\/s1/, language);
     assert.match(r, /--taskbag "\.\.\/allomos-taskbag\/\.allomos\/taskbag"/, language);
     assert.doesNotMatch(r, /-b claude/, language);
@@ -160,7 +160,7 @@ claude/s1 holds it and is not lost: its session may still be at work. I asked fo
 
 1. Read it: alm show A01-50 (its description and latest handoff note).
 2. Claim it as AGENTS.md says, with --take; that is the takeover (alm claim A01-50 --take --as <your session name> --branch <your branch> ...), and share the claim.
-3. Go on on its working branch, claude/one: open a worktree of your own for it (git worktree add <folder> claude/one, without -b).
+3. Go on on its working branch, claude/one: open a worktree of your own for it under the current project's .worktrees/ directory (git worktree add .worktrees/<short-name> claude/one, without -b).
 4. Only what was pushed counts: go on from the commits on the working branch and the handoff note. The former session's worktree (the claim prints where) may hold changes it never committed, but that folder is of use only on its own computer: on the same computer, look at them if you need to, but do not change, commit or delete anything there; on another computer, go by the working branch and the handoff note. If unsure, ask me.
 5. That session learns of the takeover only the next time it runs alm, so it may still push to the branch until then: get the latest changes before you commit, and if its commits collide with yours, tell me.
 6. Report progress with alm label; finish with alm done, or stop with alm release --note.`,
@@ -202,7 +202,7 @@ claude/s1 holds it, but has sent no heartbeat for over 30 minutes and has no bus
 1. Read it: alm show A01-50 (its description and latest handoff note).
 2. Claim it as AGENTS.md says; that is the takeover (alm claim A01-50 --as <your session name> --branch <your branch> ...), and share the claim.
 3. I chose "Commit and push these changes for it first" in Allomos, so this once you may change the former holder's worktree: /work/project/.claude/worktrees/one. There, commit the files it has not committed (src/a.ts, notes.md) as one WIP commit (git -C "/work/project/.claude/worktrees/one" add -A, then git -C "/work/project/.claude/worktrees/one" commit -m "WIP: changes saved for claude/s1 before the takeover (A01-50)", with your attribution line), then push the working branch claude/one with the 1 commit it committed but did not push to origin (git -C "/work/project/.claude/worktrees/one" push origin claude/one), and make sure it is not "ahead" (git -C "/work/project/.claude/worktrees/one" status -sb). Apart from that, change or delete nothing there. If the changes you find differ from what I saw in Allomos, ask me first.
-4. Go on on its working branch, claude/one: open a worktree of your own for it (git worktree add <folder> claude/one, without -b).
+4. Go on on its working branch, claude/one: open a worktree of your own for it under the current project's .worktrees/ directory (git worktree add .worktrees/<short-name> claude/one, without -b).
 5. Only what was pushed counts: go on from the commits on the working branch and the handoff note. Step 3 pushed what the former session's worktree had not; apart from step 3, do not change, commit or delete anything there. If unsure, ask me.
 6. Report progress with alm label; finish with alm done, or stop with alm release --note.`,
   );
