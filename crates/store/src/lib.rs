@@ -49,6 +49,7 @@ mod file_size;
 pub mod folders;
 mod github_release;
 mod guide;
+mod guide_workflow;
 pub mod handoff;
 mod holding;
 pub mod identity;
