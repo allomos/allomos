@@ -28,11 +28,36 @@ test("a good list has no problems", () => assert.deepEqual(check(good()), []));
 
 test("wrong version, bad date and unknown fields are refused", () => {
   const d = good();
-  d.version = 2; d.updated = "2026-02-30"; d.extra = true;
+  d.version = 3; d.updated = "2026-02-30"; d.extra = true;
   const p = check(d);
-  has(p, '"version" must be 1');
+  has(p, '"version" must be one of 1 or 2');
   has(p, '"updated" must be a date');
   has(p, 'unknown field "extra"');
+});
+
+test("format 2 lets a model carry its own efforts, and an empty list means the model takes none", () => {
+  const d = good();
+  d.version = 2;
+  d.agents[0].models = [
+    { value: "gemini-4-neon", label: "Gemini 4 Neon", efforts: ["low", "medium", "high", "xhigh"] },
+    { value: "gpt-oss-120b", label: "GPT-OSS 120B", efforts: ["medium"] },
+    { value: "gemini-pro-orchestrator", label: "Orchestrator", efforts: [] },
+  ];
+  assert.deepEqual(check(d), []);
+});
+
+test("odd per-model efforts are refused; format 1 still refuses them as unknown keys", () => {
+  const d = good();
+  d.version = 2;
+  d.agents[0].models = [{ value: "m", label: "M", efforts: "high" }];
+  has(check(d), '"efforts" must be a list');
+  d.agents[0].models = [{ value: "m", label: "M", efforts: ["low", "low"] }];
+  has(check(d), 'effort "low" is listed twice');
+  d.agents[0].models = [{ value: "m", label: "M", efforts: [""] }];
+  has(check(d), "must be a word");
+  const v1 = good();
+  v1.agents[0].models = [{ value: "m", label: "M", efforts: ["low"] }];
+  has(check(v1), 'model 1 must have exactly a "value" and a "label"');
 });
 
 test("no agents, or an agent with no models or efforts, is refused", () => {

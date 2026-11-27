@@ -15,14 +15,51 @@ const online: ModelsRead = {
   agents: [
     { id: "claude_cli", name: "Claude Code", models: [{ value: "opus", label: "Opus" }, { value: "sonnet", label: "Sonnet" }], efforts: ["low", "high"] },
     { id: "codex_cli", name: "Codex", models: [{ value: "gpt-6.2-sol", label: "GPT-6.2 Sol" }], efforts: ["xhigh"] },
+    // Format 2 (A03-pony586): models of one agent offer different levels, and one takes none.
+    {
+      id: "antigravity_cli",
+      name: "Antigravity",
+      models: [
+        { value: "gemini-4-neon", label: "Gemini 4 Neon", efforts: ["low", "medium", "high", "xhigh"] },
+        { value: "gemini-4-carbon", label: "Gemini 4 Carbon", efforts: ["low", "medium", "high"] },
+        { value: "gpt-oss-120b", label: "GPT-OSS 120B", efforts: ["medium"] },
+        { value: "gemini-pro-orchestrator", label: "Orchestrator", efforts: [] },
+      ],
+      efforts: ["low", "medium", "high", "xhigh"],
+    },
   ],
 };
 
 test("each agent, and each of its accounts, is offered its list; an unlisted agent only Default", () => {
   assert.deepEqual(optionsFor(online, "claude_cli").efforts, ["low", "high"]);
   assert.deepEqual(optionsFor(online, "claude_cli:work").models.map((m) => m.value), ["opus", "sonnet"]);
-  assert.deepEqual(optionsFor(online, "antigravity_cli"), { models: [], efforts: [] });
+  assert.deepEqual(optionsFor(online, "grok_cli"), { models: [], efforts: [] });
   assert.deepEqual(optionsFor(null, "claude_cli"), { models: [], efforts: [] });
+});
+
+test("the efforts offered follow the chosen model: its own list, the agent's, or none", () => {
+  assert.deepEqual(optionsFor(online, "antigravity_cli", "gemini-4-carbon").efforts, ["low", "medium", "high"]);
+  assert.deepEqual(optionsFor(online, "antigravity_cli", "gpt-oss-120b").efforts, ["medium"]);
+  assert.deepEqual(optionsFor(online, "antigravity_cli", "gemini-pro-orchestrator").efforts, []);
+  // A model of an agent still listed in format 1, and an unknown model, use the agent's efforts.
+  assert.deepEqual(optionsFor(online, "claude_cli", "opus").efforts, ["low", "high"]);
+  assert.deepEqual(optionsFor(online, "antigravity_cli", "gone").efforts, ["low", "medium", "high", "xhigh"]);
+});
+
+test("an effort the chosen model does not offer is not sent", () => {
+  assert.deepEqual(
+    chosenArgs(["antigravity_cli"], { antigravity_cli: { model: "gemini-4-carbon", effort: "xhigh" } }, online),
+    { models: { antigravity_cli: "gemini-4-carbon" }, efforts: {} },
+  );
+  assert.deepEqual(
+    chosenArgs(["antigravity_cli"], { antigravity_cli: { model: "gemini-4-neon", effort: "xhigh" } }, online),
+    { models: { antigravity_cli: "gemini-4-neon" }, efforts: { antigravity_cli: "xhigh" } },
+  );
+  // A model that takes no reasoning effort sends no effort, even one the agent offers.
+  assert.deepEqual(
+    chosenArgs(["antigravity_cli"], { antigravity_cli: { model: "gemini-pro-orchestrator", effort: "high" } }, online),
+    { models: { antigravity_cli: "gemini-pro-orchestrator" }, efforts: {} },
+  );
 });
 
 test("Default sends nothing; a choice sends its value; a value the list no longer has falls back", () => {

@@ -12,6 +12,9 @@ const baseAgent = (key: string): string => key.split(":")[0];
 export interface ListedModel {
   value: string;
   label: string;
+  /** Format 2 (A03-pony586): the reasoning efforts this model offers. Absent: its agent's.
+   * Empty: the model takes no reasoning effort. */
+  efforts?: string[];
 }
 
 export interface ListedAgent {
@@ -37,10 +40,19 @@ export interface Picks {
   effort?: string;
 }
 
-/** The models and efforts the list offers an agent (an extra account's are its agent's). */
-export function optionsFor(read: ModelsRead | null, agent: TerminalAgent): { models: ListedModel[]; efforts: string[] } {
+/** The models and efforts the list offers an agent (an extra account's are its agent's). With
+ * `model`, the efforts that model offers: its own when the list gives it one, else the agent's;
+ * an empty list means the model takes no reasoning effort. */
+export function optionsFor(
+  read: ModelsRead | null,
+  agent: TerminalAgent,
+  model?: string,
+): { models: ListedModel[]; efforts: string[] } {
   const listed = read?.agents?.find((a) => a.id === baseAgent(agent));
-  return { models: listed?.models ?? [], efforts: listed?.efforts ?? [] };
+  const models = listed?.models ?? [];
+  if (model === undefined) return { models, efforts: listed?.efforts ?? [] };
+  const chosen = models.find((m) => m.value === model);
+  return { models, efforts: chosen?.efforts ?? listed?.efforts ?? [] };
 }
 
 /** What Start sends for the chosen agents: only values chosen and still offered by the list, so a
@@ -55,7 +67,7 @@ export function chosenArgs(
   for (const a of picked) {
     const p = picks[a];
     if (!p) continue;
-    const o = optionsFor(read, a);
+    const o = optionsFor(read, a, p.model);
     if (p.model && o.models.some((m) => m.value === p.model)) models[a] = p.model;
     if (p.effort && o.efforts.includes(p.effort)) efforts[a] = p.effort;
   }
