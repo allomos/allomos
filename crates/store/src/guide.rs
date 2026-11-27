@@ -2415,4 +2415,31 @@ mod tests {
                 .contains("one sentence of why with `--why`")
         );
     }
+
+    /// Worktree/branch/push/attribution/approval/credential/tidy-VCS norms live in both the
+    /// AGENTS.md section and `alm guide workflow` (Task-A03-book084).
+    #[test]
+    fn brief_and_workflow_carry_the_worktree_commit_and_tidy_vcs_norms() {
+        let workflow = guide(Some("workflow")).unwrap();
+        let section = crate::agent_section();
+        for text in [&workflow, &section] {
+            for words in [
+                "never hardcode `.claude/`",
+                "<agent>/…",
+                "git status -sb",
+                "never push to any other remote",
+                "Co-Authored-By: Claude",
+                "authorizes only its local work",
+                "Never print or commit credentials",
+                ".env*",
+                "one command at a time",
+                "never chained with",
+            ] {
+                assert!(
+                    text.to_lowercase().contains(&words.to_lowercase()),
+                    "missing `{words}`"
+                );
+            }
+        }
+    }
 }

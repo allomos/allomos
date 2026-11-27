@@ -5,11 +5,8 @@ Shared rules for every AI agent working for the approver, **will.w.hui**.
 - **Docs:** read [docs/workflow/CODING_RULES.md](docs/workflow/CODING_RULES.md) before changing code; see [docs/README.md](docs/README.md) for product plans, requirements and decisions (a decision with status *Open* or *Proposed* is not an approval).
 - **`alm` tells; the agent checks:** never add a check to `alm` without the approver's approval; refusing invalid input is not such a check ([CODING_RULES § How `alm` behaves](docs/workflow/CODING_RULES.md#how-alm-behaves)).
 - **Dependencies:** do not upgrade dependencies incidentally; pin versions deliberately in the card that introduces them.
-- **Worktrees and commits:** put each task's worktree under `.worktrees/<short-name>` on an `<agent>/…` branch; push to `origin` right after every commit (`git status -sb` shows no "ahead", never push to another remote), and end every commit message with a line naming the agent (for example `Co-Authored-By: Claude …` or `Agent: codex/<session-name>`).
-- **Approvals:** approving a card authorizes only its local work; external effects require exact approval recorded in the task's description.
-- **Credentials:** never print or commit credentials, tokens, cookies or local environment files (`.env*` stay ignored).
 
-## Tasks: Allomos (v43)
+## Tasks: Allomos (v44)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -33,12 +30,22 @@ the project notes (below).
   lists what the task is still missing (session details, working branch, a handoff note), each
   with the command that fixes it; run it (session details: `alm session <id> --session-agent …
   --session-id …`).
-- Always work a task in a worktree of its own under the current project's `.worktrees/`
-  directory (a separate working copy on the task's own branch; in Git:
+- Always work a task in a separate working copy (worktree) of its own — under the directory the
+  project or tool uses (`.worktrees/<short-name>` by default; never hardcode `.claude/`; in Git:
   `git worktree add .worktrees/<short-name> -b <working branch> <base>`, which the claim prints;
   keep `/.worktrees/` in the project's `.gitignore`), never in the main checkout: the main
-  checkout stays on the base branch. Merge from the main checkout; once merged, remove your
-  worktree and the merged branch.
+  checkout stays on the base branch. Name each working branch `<agent>/…` (for example `claude/…`,
+  `codex/…`, `antigravity/…`). Right after every code commit, share it to the default remote
+  (`origin` in Git), verify nothing is unpushed (in Git: `git status -sb` shows no "ahead"), and
+  never push to any other remote. End every code commit message with a line naming the agent (for
+  example `Co-Authored-By: Claude …` or `Agent: codex/<session-name>`). Merge from the main
+  checkout; once merged, remove your worktree and the merged branch.
+- Run version control operations tidily, one command at a time (in Git: `add`, `commit`, `switch`,
+  `merge`, `push`, `status`, `worktree remove`, `branch -d` each on its own — never chained with
+  `&&`, `;`, `||` or pipes). Keep remote sharing (`push`) separate from local steps; inside a
+  working copy, use consistent command forms rather than ad-hoc path rewrites; when sharing
+  taskbag changes, run the exact commands and paths `alm` prints, one by one, without rewriting
+  the path or appending extra status checks.
 - While you hold a task (decision 0022): pass `--as <your session name>` to every `alm` command.
   Send a heartbeat at least every 10 minutes (the project's interval, `alm heartbeat-settings`):
   `alm beat --as <your session name>` (every task you hold, in one change), and save and share it
@@ -135,10 +142,12 @@ the project notes (below).
 - Needs a human: `alm human` lists the tasks to check, to answer and to review. When the person
   says they checked one: `alm checked <id>`. When its work changes after that, you decide: send
   it back to To check with `alm recheck <id> --reason "<what changed>"`.
-- Approvals: ask the person in the conversation. Only on a job the person gave you from the
-  Allomos app (they do not see your conversation) ask with `alm confirm`, showing the evidence
-  (`--evidence <file.md>`) and naming the task (`--task <id>`); in a quiet run, `alm wait`
-  instead. A Go ahead covers only the plan shown; if the plan changes afterwards, ask again.
+- Approvals: approving or readying a task authorizes only its local work; any outside effect
+  requires exact approval from the approver recorded in the task's description. Ask the person in
+  the conversation. Only on a job the person gave you from the Allomos app (they do not see your
+  conversation) ask with `alm confirm`, showing the evidence (`--evidence <file.md>`) and naming
+  the task (`--task <id>`); in a quiet run, `alm wait` instead. A Go ahead covers only the plan
+  shown; if the plan changes afterwards, ask again.
 - Routine choices inside a task (a name, a file layout, how something is built inside the task, a
   small detail with an obvious default; anything cheap to undo) are yours: decide, carry on, and
   record each one with `alm ai-decided <id> "<what and why>"`, so the approver can review it
@@ -220,15 +229,17 @@ or stop a server or process, create or change a hosted resource or a remote repo
 pitfall that would change what the next session does, or a credential moves. Change lines in
 place and remove lines that are no longer true; then save and share that file with your version
 control tool yourself.
-Personal details are kept out like credentials: never write a person's or an account's email
-address, account or user name, phone number, home address or local network address into the
-project notes, a handoff, a task, a document or the code. Write a placeholder such as
+Credentials: never print or commit credentials, tokens, cookies or local environment files (keep
+`.env*` ignored). Personal details are kept out like credentials: never write a person's or an
+account's email address, account or user name, phone number, home address or local network address
+into the project notes, a handoff, a task, a document or the code. Write a placeholder such as
 `<CLOUDFLARE_ACCOUNT_EMAIL>` and how to look it up (for example `npx wrangler whoami`) instead;
 version history keeps whatever was written, even after it is removed.
 
 `alm` never runs your version control tool. After every change it lists the changed files for
 you to save and share with your version control tool, with the Git commands as the example
-(`git add`, `git commit`, `git push`), naming only that change's files: save and share those,
+(`git add`, `git commit`, `git push`), naming only that change's files: run each printed command
+on its own (no `&&`, `;`, `||` or pipes, and no path rewrites), save and share only those files,
 and leave other changes as they are.
 
 Allomos relies on these terms: **area** (what part of the product a task belongs to),

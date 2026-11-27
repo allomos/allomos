@@ -43,7 +43,7 @@ pub(crate) fn quoted(arg: &str) -> String {
 
 /// Said after every change's Git commands (Task-A01-flour637): what is not in the list stays
 /// where it is, whoever made it.
-pub(crate) const SAVE_AS_PRINTED: &str = "Run the commands as printed, never `git add -A`, `git add .` or `git commit -a` in the taskbag: those also take changes others have not shared yet (the person's changes in the Allomos app, other sessions' changes).\n";
+pub(crate) const SAVE_AS_PRINTED: &str = "Run each command as printed, one command at a time (no `&&`, `;`, `||` or pipes, no path rewrites or extra commands appended), and never `git add -A`, `git add .` or `git commit -a` in the taskbag: those also take changes others have not shared yet (the person's changes in the Allomos app, other sessions' changes).\n";
 
 /// Whether the session running this command is Codex for certain (Task-A01-flame635): then the
 /// Git commands alm prints are plain (`git add …`, run in the folder it names), because

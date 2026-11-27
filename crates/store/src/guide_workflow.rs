@@ -123,12 +123,26 @@ pub(crate) const WORKFLOW: &str = "# How to work the tasks
    prints which base to start from and merge into with the Git commands as the example, and says
    so when you
    are not on the base. A task without a base gets the branch you are on.
-   **Always work a task in a worktree of its own under the current project's `.worktrees/`
-   directory** (in Git: `git worktree add .worktrees/<short-name> -b <working branch> <base>`,
-   which `alm claim` prints; keep `/.worktrees/` in `.gitignore`), never in the main checkout:
-   the main checkout stays on the base branch so several sessions can work at once. Merge from
-   the main checkout, where the base is checked out. Once the task's branch is merged into its
-   base, remove your own worktree and the merged branch; never another session's.
+   **Always work a task in a separate working copy (worktree) of its own** — under the directory
+   the project or tool uses (`.worktrees/<short-name>` by default; never hardcode `.claude/`; in
+   Git: `git worktree add .worktrees/<short-name> -b <working branch> <base>`, which `alm claim`
+   prints; keep `/.worktrees/` in `.gitignore`), never in the main checkout: the main checkout
+   stays on the base branch so several sessions can work at once. Name each working branch
+   `<agent>/…` (for example `claude/…`, `codex/…`, `antigravity/…`). Right after every code
+   commit, share it to the default remote (`origin` in Git), verify nothing is unpushed (in Git:
+   `git status -sb` shows no \"ahead\"), and never push to any other remote. End every code commit
+   message with a line naming the agent (for example `Co-Authored-By: Claude …` or
+   `Agent: codex/<session-name>`). Merge from the main checkout, where the base is checked out.
+   Once the task's branch is merged into its base, remove your own worktree and the merged branch;
+   never another session's.
+   **Tidy version control operations.** Run staging, committing, branch switching, merging,
+   sharing to a remote, checking status and cleaning up a working copy one command at a time (in
+   Git: `add`, `commit`, `switch`, `merge`, `push`, `status`, `worktree remove`, `branch -d` each
+   on its own — never chained with `&&`, `;`, `||` or pipes). Keep remote sharing (`push`)
+   separate from local steps; inside a working copy, use consistent command forms rather than
+   ad-hoc path rewrites; when sharing taskbag changes, run the exact commands and paths `alm`
+   prints, one by one, without rewriting the path (for example changing `.allomos/taskbag` to the
+   repository root or a relative path) or appending extra status checks.
    **Before you plan: the size of the files you will change** (Task-A03-tide388,
    Task-A03-dapper008; `alm claim` repeats it). A source file over the project's line limit
    (`alm file-size-settings`; 1000 lines by default, tests not counted) must not be longer after
@@ -239,21 +253,23 @@ Rules:
   a hosted resource or a remote repository, learn a pitfall that would change what the next
   session does, or a credential moves; change lines in place, remove lines no longer true, and
   save and share that file with your version control tool yourself.
-- Never write credentials or personal details (a person's or an account's email address, account
-  or user name, phone number, home address, local network address) into the project notes, a
-  handoff, a task, a document or the code: write a placeholder such as
+- Never print or commit credentials, tokens, cookies or local environment files (keep `.env*`
+  ignored), and never write credentials or personal details (a person's or an account's email
+  address, account or user name, phone number, home address, local network address) into the
+  project notes, a handoff, a task, a document or the code: write a placeholder such as
   `<CLOUDFLARE_ACCOUNT_EMAIL>` and how to look it up (`npx wrangler whoami`). Version history
   keeps whatever was written, even after it is removed.
 - Every new piece of work (a new card, a new outcome) gets its own task: `alm guide tasks`, then
   `alm add task`.
 - Before adding a task or changing its title or description, run `alm task-language` and write in
   that language.
-- A change the person must agree to (an outside effect, or anything that is not a routine choice:
-  below): ask in the conversation. Only on a job the person gave you from the Allomos app (they do
-  not see your conversation) show your plan with `alm confirm` instead, with the evidence
-  (`--evidence`) and the task (`--task`), and change nothing unless it exits 0. In a quiet run,
-  park it with `alm wait` instead (step 8). A Go ahead covers only the plan shown: if it changes,
-  ask again.
+- Approving or readying a task authorizes only its local work; any outside effect requires exact
+  approval from the approver recorded in the task's description. A change the person must agree to
+  (an outside effect, or anything that is not a routine choice: below): ask in the conversation.
+  Only on a job the person gave you from the Allomos app (they do not see your conversation) show
+  your plan with `alm confirm` instead, with the evidence (`--evidence`) and the task (`--task`),
+  and change nothing unless it exits 0. In a quiet run, park it with `alm wait` instead (step 8).
+  A Go ahead covers only the plan shown: if it changes, ask again.
 - Routine choices inside a task (a name, a file layout, how something is built inside the task, a
   small detail with an obvious default; anything cheap to undo) are yours: decide, carry on, and
   record each with `alm ai-decided <id> \"<what and why>\" --kind visible|principle|detail`, so
@@ -263,6 +279,6 @@ Rules:
   first (`alm wait`). In a goal run (step 9) the plan was approved in advance; outside effects
   still go to the approver.
 - After every `alm` change, save and share the files it lists with your version control tool (it
-  prints the Git commands as the example): only that change's files. Your other work is saved as
-  usual.
+  prints the Git commands as the example): run each printed command on its own (no `&&`, `;`, `||`
+  or pipes, no path rewrites), saving only that change's files. Your other work is saved as usual.
 ";

@@ -125,7 +125,13 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// makes it ready only once they agree; a goal run is the exception (Task-A00-wheat560).
 /// 43: task worktrees live under the current project's `.worktrees/<short-name>` directory (and
 /// projects keep `/.worktrees/` in their `.gitignore`) (Task-A03-north761).
-pub const SECTION_VERSION: u32 = 43;
+/// 44: worktree directory stays project/tool-configurable (not hardcoded to `.claude/`),
+/// `<agent>/…` branch naming, immediate push to the default remote (`origin` in Git, no "ahead",
+/// never another remote), agent attribution trailer on every code commit, local-only task
+/// approvals (outside effects require exact approval in the task description), never printing or
+/// committing credentials/tokens/cookies/local env files (`.env*` ignored), and tidy one-by-one
+/// version control commands without chaining (VCS-agnostic, Git as example) (Task-A03-book084).
+pub const SECTION_VERSION: u32 = 44;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

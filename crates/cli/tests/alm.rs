@@ -3009,7 +3009,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v43)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v44)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -3019,7 +3019,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v43)", "## Tasks: Allomos (v22)")
+            brief.replace("## Tasks: Allomos (v44)", "## Tasks: Allomos (v22)")
         ),
     )
     .unwrap();
@@ -10273,7 +10273,7 @@ fn codex_gets_git_commands_without_dash_c_and_the_folder_named_first() {
     assert!(text.contains(&plain_heading), "{text}");
     assert!(!text.contains("git -C"), "{text}");
     assert!(
-        text.contains("\nSave only these files; leave other changes as they are.\nRun the commands as printed, never `git add -A`, `git add .` or `git commit -a` in the taskbag: those also take changes others have not shared yet (the person's changes in the Allomos app, other sessions' changes).\nCodex: run every Git command on a line of its own, your own Git commands too"),
+        text.contains("\nSave only these files; leave other changes as they are.\nRun each command as printed, one command at a time (no `&&`, `;`, `||` or pipes, no path rewrites or extra commands appended), and never `git add -A`, `git add .` or `git commit -a` in the taskbag: those also take changes others have not shared yet (the person's changes in the Allomos app, other sessions' changes).\nCodex: run every Git command on a line of its own, your own Git commands too"),
         "{text}"
     );
     assert!(
