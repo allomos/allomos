@@ -5,7 +5,7 @@ Shared rules for every AI agent working for the approver, **will.w.hui**.
 - **Docs:** read [docs/workflow/CODING_RULES.md](docs/workflow/CODING_RULES.md) before changing code; see [docs/README.md](docs/README.md) for product plans, requirements and decisions (a decision with status *Open* or *Proposed* is not an approval).
 - **`alm` tells; the agent checks:** never add a check to `alm` without the approver's approval; refusing invalid input is not such a check ([CODING_RULES § How `alm` behaves](docs/workflow/CODING_RULES.md#how-alm-behaves)).
 - **Dependencies:** do not upgrade dependencies incidentally; pin versions deliberately in the card that introduces them.
-- **Worktrees and commits:** put each task's worktree under `.claude/worktrees/<short-name>` on an `<agent>/…` branch; push to `origin` right after every commit (`git status -sb` shows no "ahead", never push to another remote), and end every commit message with a line naming the agent (for example `Co-Authored-By: Claude …` or `Agent: codex/<session-name>`).
+- **Worktrees and commits:** put each task's worktree under `.worktrees/<short-name>` on an `<agent>/…` branch; push to `origin` right after every commit (`git status -sb` shows no "ahead", never push to another remote), and end every commit message with a line naming the agent (for example `Co-Authored-By: Claude …` or `Agent: codex/<session-name>`).
 - **Approvals:** approving a card authorizes only its local work; external effects require exact approval recorded in the task's description.
 - **Credentials:** never print or commit credentials, tokens, cookies or local environment files (`.env*` stay ignored).
 
