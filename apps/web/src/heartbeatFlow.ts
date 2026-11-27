@@ -21,7 +21,9 @@ export function lostAfterMinutes(project?: Project | null): number {
 }
 
 export interface HeartbeatFact {
-  /** The holder's last heartbeat (UTC); null when it never beat. */
+  /** Whether the holding session was started by automatic monitoring (Task-A01-mural227). */
+  monitored: boolean;
+  /** The holder's last heartbeat (UTC); null when it never beat or is not monitored. */
   at: string | null;
   /** Whole minutes since `at`; null with no heartbeat. */
   minutes: number | null;
@@ -36,6 +38,13 @@ export interface HeartbeatFact {
   lostAfter: number;
 }
 
+/** Whether `task`'s current holder is a session started by automatic monitoring (Task-A01-mural227):
+ * only monitored sessions write heartbeats and can be marked lost. */
+export function isMonitored(task: Task): boolean {
+  if (!task.holder || !task.session?.monitored) return false;
+  return !task.session.by || task.session.by === task.holder;
+}
+
 const parse = (stamp: string | null | undefined): number | null => {
   if (!stamp) return null;
   const ms = new Date(stamp.replace(/T(\d\d:\d\d)Z$/, "T$1:00Z")).getTime();
@@ -48,25 +57,28 @@ export function intervalMinutes(project?: Project | null): number {
   return typeof m === "number" && m > 0 ? Math.floor(m) : INTERVAL_MINUTES;
 }
 
-/** The heartbeat fact of a task; null when it is not in progress or nobody holds it (no heartbeat
- * to show). `lastChange`: when the task last changed (UTC), for a holder that never beat. */
+/** The heartbeat fact of a task; null when it is not in progress, nobody holds it, or the holding
+ * session was not started by automatic monitoring (no heartbeat to show). `lastChange`: when the
+ * task last changed (UTC), for a monitored holder that never beat. */
 export function heartbeatFact(task: Task, lostAfter: number, now: Date, lastChange?: string): HeartbeatFact | null {
-  return task.state === "in_progress" ? heldFact(task, lostAfter, now, lastChange) : null;
+  return task.state === "in_progress" && isMonitored(task) ? heldFact(task, lostAfter, now, lastChange) : null;
 }
 
 /** The same fact for a holder in any state, for Take over… (Task-A01-rocket260): a waiting or blocked
- * task keeps its holder, whose last heartbeat is still worth saying; only an in-progress task can be
- * lost. Null when nobody holds it. */
+ * task keeps its holder, whose last heartbeat is still worth saying; only a monitored in-progress
+ * task can be lost. Null when nobody holds it. */
 export function heldFact(task: Task, lostAfter: number, now: Date, lastChange?: string): HeartbeatFact | null {
   if (!task.holder) return null;
-  const mine = task.heartbeat && task.heartbeat.by === task.holder ? task.heartbeat : null;
+  const monitored = isMonitored(task);
+  const mine = monitored && task.heartbeat && task.heartbeat.by === task.holder ? task.heartbeat : null;
   const at = parse(mine?.at);
   const until = parse(mine?.busy_until);
   const nowMs = now.getTime();
   const running = until !== null && until > nowMs;
   const since = at !== null || until !== null ? Math.max(at ?? -Infinity, until ?? -Infinity) : parse(lastChange);
-  const lost = task.state === "in_progress" && !running && since !== null && nowMs - since > lostAfter * 60_000;
+  const lost = monitored && task.state === "in_progress" && !running && since !== null && nowMs - since > lostAfter * 60_000;
   return {
+    monitored,
     at: at !== null ? mine!.at : null,
     minutes: at !== null ? Math.max(0, Math.floor((nowMs - at) / 60_000)) : null,
     busyUntil: running ? mine!.busy_until! : null,

@@ -125,7 +125,10 @@ use crate::{AGENT_SECTION_HEADING, PROJECT_FILE, picked_folder, tells_agents};
 /// makes it ready only once they agree; a goal run is the exception (Task-A00-wheat560).
 /// 43: task worktrees live under the current project's `.worktrees/<short-name>` directory (and
 /// projects keep `/.worktrees/` in their `.gitignore`) (Task-A03-north761).
-pub const SECTION_VERSION: u32 = 43;
+/// 44: heartbeats and lost detection apply only to sessions started by Allomos's automatic monitor
+/// (`--monitored` / `ALLOMOS_MONITORED=1`); manual sessions do not beat and are never marked lost
+/// (decision 0022, Task-A01-mural227).
+pub const SECTION_VERSION: u32 = 44;
 
 /// The taskbag's format compared with this Allomos's.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

@@ -711,11 +711,11 @@ pub fn set_session(
         return Err(Problem::SessionMissing);
     }
     let mut session = task.session.take().unwrap_or_default();
-    let keep = |new: Option<String>, old: Option<String>| new.or(old);
-    session.agent = keep(given.agent, session.agent);
-    session.id = keep(given.id, session.id);
-    session.kind = keep(given.kind, session.kind);
-    session.app_session_id = keep(given.app_session_id, session.app_session_id);
+    session.agent = given.agent.or(session.agent);
+    session.id = given.id.or(session.id);
+    session.kind = given.kind.or(session.kind);
+    session.app_session_id = given.app_session_id.or(session.app_session_id);
+    session.monitored |= given.monitored;
     session.by = session
         .by
         .or_else(|| task.holder.clone())

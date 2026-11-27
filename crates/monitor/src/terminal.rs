@@ -753,7 +753,7 @@ fn powershell_session_with_quiet(
         _ => String::new(),
     };
     let start = format!(
-        "Set-Location -LiteralPath {}; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath {file}; Remove-Item -LiteralPath {file}; & {} {session}$request",
+        "$env:{MONITORED_ENV} = '1'; Set-Location -LiteralPath {}; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath {file}; Remove-Item -LiteralPath {file}; & {} {session}$request",
         powershell_quote(&project.display().to_string()),
         powershell_quote(found)
     );
@@ -774,6 +774,11 @@ fn powershell_session_with_quiet(
     }
 }
 
+/// The environment variable set on every terminal session started by automatic monitoring
+/// (Task-A01-mural227): `alm claim` reads it so monitored sessions record `session.monitored: true`
+/// and enable heartbeats.
+pub const MONITORED_ENV: &str = "ALLOMOS_MONITORED";
+
 /// The command with an extra account's folder variable in front of it: `CLAUDE_CONFIG_DIR='<dir>'
 /// claude …` (zsh, bash), for that command only. None: the command as it is.
 pub fn with_config(program: &str, config: Option<(&str, &Path)>) -> String {
@@ -784,6 +789,11 @@ pub fn with_config(program: &str, config: Option<(&str, &Path)>) -> String {
         ),
         None => program.to_string(),
     }
+}
+
+/// The command with [`MONITORED_ENV`] set in front of it (zsh, bash), for monitored sessions only.
+pub fn with_monitored(program: &str) -> String {
+    format!("{MONITORED_ENV}=1 {program}")
 }
 
 /// A session ID only ever has letters, digits and `-` (a UUID): anything else is refused.
@@ -824,8 +834,9 @@ pub fn start_session(
     else {
         return Err(ask_failed(id, "no way to start it"));
     };
-    // An extra account's folder variable goes in front of the command, for that command only.
-    let program = with_config(&program, config);
+    // An extra account's folder variable and monitored marker go in front of the command, for
+    // that command only.
+    let program = with_monitored(&with_config(&program, config));
     if cfg!(windows) {
         let file = private_temp_file("allomos-request", "txt", request.as_bytes())
             .map_err(|e| ask_failed(id, e))?;
@@ -939,7 +950,7 @@ mod tests {
                 Some(&other_trusted),
             ),
             format!(
-                r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-1' {normal_other}$request"
+                r"$env:ALLOMOS_MONITORED = '1'; Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-1' {normal_other}$request"
             )
         );
 
@@ -962,7 +973,7 @@ mod tests {
                 Some(&auto_trusted),
             ),
             format!(
-                r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-1' {CLAUDE_TOOLS}--add-dir 'C:\tb\.allomos\taskbag' '--' $request"
+                r"$env:ALLOMOS_MONITORED = '1'; Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-1' {CLAUDE_TOOLS}--add-dir 'C:\tb\.allomos\taskbag' '--' $request"
             )
         );
 
@@ -983,7 +994,7 @@ mod tests {
                 Some(&other_trusted),
             ),
             format!(
-                r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-1' {CLAUDE_AUTO}$request"
+                r"$env:ALLOMOS_MONITORED = '1'; Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-1' {CLAUDE_AUTO}$request"
             )
         );
 
@@ -1171,7 +1182,7 @@ mod tests {
                 None,
                 &[]
             ),
-            r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\agy\bin\agy.exe' -i $request"
+            r"$env:ALLOMOS_MONITORED = '1'; Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\agy\bin\agy.exe' -i $request"
         );
         assert_eq!(
             powershell_session(
@@ -1184,7 +1195,7 @@ mod tests {
                 None,
                 &[]
             ),
-            r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\npm\codex.cmd' --sandbox workspace-write $request"
+            r"$env:ALLOMOS_MONITORED = '1'; Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\npm\codex.cmd' --sandbox workspace-write $request"
         );
         assert_eq!(session_command("claude_app", None, &[]), None);
         assert!(plain_session_id("8f0e5a52-1c2d-4e3f-9a0b-1c2d3e4f5a6b"));
@@ -1207,7 +1218,7 @@ mod tests {
                 Some(&other),
             ),
             format!(
-                r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-12' {CLAUDE_EDITS}$request"
+                r"$env:ALLOMOS_MONITORED = '1'; Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & '{found}' --session-id 'ab-12' {CLAUDE_EDITS}$request"
             )
         );
     }
@@ -1301,7 +1312,7 @@ mod tests {
             PathBuf::from(r"C:\tb\.allomos\taskbag"),
             PathBuf::from(r"C:\site"),
         ];
-        let start = r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\agy\bin\agy.exe'";
+        let start = r"$env:ALLOMOS_MONITORED = '1'; Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\agy\bin\agy.exe'";
         for (dirs, args) in [
             (&windows_one[..], r"--add-dir 'C:\my tb\.allomos\taskbag' "),
             (
@@ -1449,7 +1460,7 @@ mod tests {
                 .as_str()
             )
         );
-        let start = r"Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\npm\codex.cmd' --sandbox workspace-write";
+        let start = r"$env:ALLOMOS_MONITORED = '1'; Set-Location -LiteralPath 'C:\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\t\r.txt'; Remove-Item -LiteralPath 'C:\t\r.txt'; & 'C:\npm\codex.cmd' --sandbox workspace-write";
         let windows_one = [PathBuf::from(r"C:\my tb\.allomos\taskbag")];
         let windows_several = [
             PathBuf::from(r"C:\tb\.allomos\taskbag"),
@@ -1575,7 +1586,7 @@ mod tests {
                 None,
             ),
             format!(
-                "Set-Location -LiteralPath 'C:\\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\\t\\r.txt'; Remove-Item -LiteralPath 'C:\\t\\r.txt'; & 'C:\\npm\\codex.cmd' --sandbox workspace-write --ask-for-approval never --config sandbox_workspace_write.network_access=true {app_access}$request"
+                "$env:ALLOMOS_MONITORED = '1'; Set-Location -LiteralPath 'C:\\p'; $request = Get-Content -Raw -Encoding UTF8 -LiteralPath 'C:\\t\\r.txt'; Remove-Item -LiteralPath 'C:\\t\\r.txt'; & 'C:\\npm\\codex.cmd' --sandbox workspace-write --ask-for-approval never --config sandbox_workspace_write.network_access=true {app_access}$request"
             )
         );
     }
@@ -1599,7 +1610,7 @@ mod tests {
                 Some(("CODEX_HOME", Path::new(r"C:\acct"))),
                 &[]
             )
-            .starts_with(r"${env:CODEX_HOME} = 'C:\acct'; Set-Location -LiteralPath 'C:\p';"),
+            .starts_with(r"${env:CODEX_HOME} = 'C:\acct'; $env:ALLOMOS_MONITORED = '1'; Set-Location -LiteralPath 'C:\p';"),
             true
         );
     }

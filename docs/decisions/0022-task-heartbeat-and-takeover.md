@@ -124,3 +124,5 @@ No reminder or escalation when a task is lost several times in a row (discussed 
 2026-11-11, will.w.hui: amended § 6: a person may take over any held task from the app (task `A01-rocket260`).
 
 2026-11-11, will.w.hui: amended § 6: work in progress is pushed at each heartbeat, by a project setting that is on by default, and a heartbeat can say what the session is doing (task `A01-butter895`).
+
+2026-11-27, will.w.hui: amended scope (task `A01-mural227`): heartbeats and lost detection apply only to tasks held by sessions started by Allomos's automatic monitor (`ALLOMOS_MONITORED=1` / `alm claim --monitored`, recorded as `session.monitored: true`). Manually started sessions do not write heartbeats on claim, task edits, or `alm beat`, and are never marked lost or offered for automatic takeover; when a task changes hands, the current holder's `session.monitored` decides. Legacy tasks without `session.monitored` (even with historical `heartbeat` fields) are treated as manual and never marked lost.

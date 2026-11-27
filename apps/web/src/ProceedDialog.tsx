@@ -195,7 +195,13 @@ function TerminalLaunchNotice({ messenger, tab, children }: { messenger: Messeng
   const taskT = useTaskT();
   const stateWord = <span className={`state-word tint s-${task.state}-text`}>{taskT(`state.${task.state}`)}</span>;
   const named = <strong>{task.id}</strong>;
-  const silence = fact && (fact.minutes !== null ? t("takeover.silent_for", { ago: agoText(fact.minutes, t) }) : t("takeover.never_beat"));
+  const silence =
+    fact &&
+    (!fact.monitored
+      ? t("takeover.manual_session")
+      : fact.minutes !== null
+        ? t("takeover.silent_for", { ago: agoText(fact.minutes, t) })
+        : t("takeover.never_beat"));
   const found = held
     ? rich("takeover.found_held", {
         id: named,

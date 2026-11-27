@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { INTERVAL_MINUTES, LOST_AFTER_MINUTES, agoText, clockText, doingText, heartbeatFact, heartbeatText, heldFact, intervalMinutes, lostAfterMinutes } from "../src/heartbeatFlow.ts";
+import { INTERVAL_MINUTES, LOST_AFTER_MINUTES, agoText, clockText, doingText, heartbeatFact, heartbeatText, heldFact, intervalMinutes, isMonitored, lostAfterMinutes } from "../src/heartbeatFlow.ts";
 import type { Project, Task } from "../src/types.ts";
 import en from "../src/i18n/en.json" with { type: "json" };
 import zh from "../src/i18n/zh-CN.json" with { type: "json" };
@@ -20,6 +20,7 @@ const held: Task = {
   area: "A01",
   state: "in_progress",
   holder: "s1",
+  session: { by: "s1", monitored: true },
   waiting_on: null,
   next_dependency: null,
   iteration: null,
@@ -106,7 +107,7 @@ test("the line says what the holder is doing, with its time", () => {
   assert.equal(heartbeatText(fact, now, t), `12 min ago (${local}) · doing: write the dialog's tests (${said})`);
   assert.equal(doingText(fact, now, tz), `正在做：write the dialog's tests（${said}）`);
   // A former holder's words are not this holder's.
-  const former = { ...doing, holder: "s2" };
+  const former = { ...doing, holder: "s2", session: { by: "s2", monitored: true } };
   assert.equal(heartbeatFact(former, 30, now)!.doing, null);
   // Without a time, the words alone.
   const noTime = { ...held, heartbeat: { at: "2026-11-09T10:00:00Z", by: "s1", doing: "x" } };
@@ -137,4 +138,20 @@ test("the heartbeat interval: the project's, or the default", () => {
   assert.equal(intervalMinutes(null), INTERVAL_MINUTES);
   assert.equal(intervalMinutes({ heartbeat: { interval_minutes: 5 } } as Project), 5);
   assert.equal(intervalMinutes({ heartbeat: { interval_minutes: 0 } } as Project), INTERVAL_MINUTES);
+});
+
+// Task-A01-mural227: only sessions started by automatic monitoring use heartbeats and can be lost.
+test("manual or legacy sessions have no heartbeat fact and are never lost", () => {
+  const later = at("2026-11-09T12:00:00Z");
+  const manualNoSession: Task = { ...held, session: null };
+  const manualFalse: Task = { ...held, session: { by: "s1", monitored: false } };
+  const handedOffToManual: Task = { ...held, holder: "s2", session: { by: "s1", monitored: true } };
+  for (const task of [manualNoSession, manualFalse, handedOffToManual]) {
+    assert.equal(isMonitored(task), false);
+    assert.equal(heartbeatFact(task, 30, later, "2026-11-09T09:00:00Z"), null);
+    const fact = heldFact(task, 30, later, "2026-11-09T09:00:00Z")!;
+    assert.equal(fact.monitored, false);
+    assert.equal(fact.lost, false);
+    assert.equal(fact.at, null);
+  }
 });

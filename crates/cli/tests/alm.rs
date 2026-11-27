@@ -50,6 +50,7 @@ fn alm(dir: &Path, args: &[&str]) -> Output {
         .current_dir(dir)
         .args(args)
         .env_remove("ALLOMOS_HOLDER")
+        .env_remove("ALLOMOS_MONITORED")
         .env_remove("ALLOMOS_LOCK_WAIT_MS")
         .env_remove("CLAUDECODE")
         .env_remove("CLAUDE_CODE_ENTRYPOINT")
@@ -672,7 +673,7 @@ fn a_beat_saved_as_printed_leaves_unshared_changes_alone() {
         ok(&repo, &["ready", id]);
     }
     let t0 = "2026-11-09T14:00:00Z";
-    ok_at(&repo, t0, &["--as", "s1", "claim", "A01-01"]);
+    ok_at(&repo, t0, &["--as", "s1", "claim", "A01-01", "--monitored"]);
     assert!(git(&["add", "-A"]).unwrap().status.success());
     assert!(
         git(&["commit", "-q", "-m", "start"])
@@ -3009,7 +3010,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
 
     // The agent renews it from `alm brief`: no more warning.
     let brief = ok(&repo, &["brief"])["brief"].as_str().unwrap().to_string();
-    assert!(brief.starts_with("## Tasks: Allomos (v43)"), "{brief}");
+    assert!(brief.starts_with("## Tasks: Allomos (v44)"), "{brief}");
     fs::write(repo.join("AGENTS.md"), format!("# Rules\n\n{brief}")).unwrap();
     let v = ok(&repo, &["next"]);
     assert_eq!(v["warnings"], json!([]));
@@ -3019,7 +3020,7 @@ fn an_out_of_date_section_warns_the_agent_on_every_call() {
         repo.join("AGENTS.md"),
         format!(
             "# Rules\n\n{}",
-            brief.replace("## Tasks: Allomos (v43)", "## Tasks: Allomos (v22)")
+            brief.replace("## Tasks: Allomos (v44)", "## Tasks: Allomos (v22)")
         ),
     )
     .unwrap();
@@ -3447,6 +3448,7 @@ fn alm_at(dir: &Path, now: &str, args: &[&str]) -> Output {
         .current_dir(dir)
         .args(args)
         .env_remove("ALLOMOS_HOLDER")
+        .env_remove("ALLOMOS_MONITORED")
         .env_remove("ALLOMOS_LOCK_WAIT_MS")
         .env("ALLOMOS_NOW", now)
         .output()
@@ -8500,6 +8502,7 @@ fn witness_at(dir: &Path, now: &str, args: &[&str]) -> Value {
         .arg("--json")
         .args(args)
         .env_remove("ALLOMOS_HOLDER")
+        .env_remove("ALLOMOS_MONITORED")
         .env_remove("ALLOMOS_LOCK_WAIT_MS")
         .env("ALLOMOS_NOW", now)
         .env("ALLOMOS_TSA_REPLY", "offline")
@@ -8659,6 +8662,7 @@ fn beats_say_what_a_session_is_doing_and_remind_to_push_work() {
             "main",
             "--working",
             "claude/x",
+            "--monitored",
         ],
     );
     let events = event_count(&repo);
@@ -8725,7 +8729,15 @@ fn beats_say_what_a_session_is_doing_and_remind_to_push_work() {
     let v = ok_at(
         &repo,
         later,
-        &["--as", "s2", "claim", "A01-01", "--branch", "main"],
+        &[
+            "--as",
+            "s2",
+            "claim",
+            "A01-01",
+            "--branch",
+            "main",
+            "--monitored",
+        ],
     );
     assert_eq!(v["took_over"]["doing"], "write the dialog tests", "{v}");
     assert_eq!(v["took_over"]["doing_at"], t1);
@@ -8773,9 +8785,9 @@ fn holders_beat_and_their_changes_beat_along() {
         ok(&repo, &["ready", id]);
     }
     let t0 = "2026-11-09T14:00:00Z";
-    ok_at(&repo, t0, &["--as", "s1", "claim", "A01-01"]);
-    ok_at(&repo, t0, &["--as", "s1", "claim", "A01-02"]);
-    ok_at(&repo, t0, &["--as", "s2", "claim", "A02-01"]);
+    ok_at(&repo, t0, &["--as", "s1", "claim", "A01-01", "--monitored"]);
+    ok_at(&repo, t0, &["--as", "s1", "claim", "A01-02", "--monitored"]);
+    ok_at(&repo, t0, &["--as", "s2", "claim", "A02-01", "--monitored"]);
     // A claim is the first heartbeat.
     assert_eq!(
         task_file(&repo, "A01-01")["heartbeat"],
@@ -8939,10 +8951,18 @@ fn next_lists_lost_tasks_and_busy_windows() {
     ok_at(
         &repo,
         t0,
-        &["--as", "s1", "claim", "A01-01", "--branch", "claude/one"],
+        &[
+            "--as",
+            "s1",
+            "claim",
+            "A01-01",
+            "--branch",
+            "claude/one",
+            "--monitored",
+        ],
     );
-    ok_at(&repo, t0, &["--as", "s2", "claim", "A01-02"]);
-    ok_at(&repo, t0, &["--as", "s3", "claim", "A02-01"]);
+    ok_at(&repo, t0, &["--as", "s2", "claim", "A01-02", "--monitored"]);
+    ok_at(&repo, t0, &["--as", "s3", "claim", "A02-01", "--monitored"]);
     ok_at(&repo, t0, &["--as", "s2", "beat", "A01-02", "--busy", "2h"]);
     // A02-01 waits: no holder, never lost.
     ok_at(
@@ -9171,6 +9191,7 @@ fn claim_takes_over_a_lost_task() {
             "claude-code",
             "--session-id",
             "x",
+            "--monitored",
         ],
     );
 
@@ -9179,7 +9200,15 @@ fn claim_takes_over_a_lost_task() {
     let (code, v) = fj_at(
         &repo,
         "2026-11-09T10:30:00Z",
-        &["--as", "s2", "claim", "A01-01", "--branch", "main"],
+        &[
+            "--as",
+            "s2",
+            "claim",
+            "A01-01",
+            "--branch",
+            "main",
+            "--monitored",
+        ],
     );
     assert_eq!(
         (code, v["error"]["code"].as_str()),
@@ -9193,7 +9222,15 @@ fn claim_takes_over_a_lost_task() {
     let v = ok_at(
         &repo,
         t1,
-        &["--as", "s2", "claim", "A01-01", "--branch", "main"],
+        &[
+            "--as",
+            "s2",
+            "claim",
+            "A01-01",
+            "--branch",
+            "main",
+            "--monitored",
+        ],
     );
     assert_eq!(v["warnings"][0]["code"], "took_over_lost", "{v}");
     assert_eq!(v["warnings"][0]["params"]["previous"], "s1");
@@ -9249,6 +9286,7 @@ fn claim_takes_over_a_lost_task() {
                 "main",
                 "--working",
                 "claude/one",
+                "--monitored",
             ],
         )
         .stdout,
@@ -9268,13 +9306,29 @@ fn claim_takes_over_a_lost_task() {
     refused_at(
         &repo,
         "2026-11-09T11:40:00Z",
-        &["--as", "s3", "claim", "A01-01", "--branch", "main"],
+        &[
+            "--as",
+            "s3",
+            "claim",
+            "A01-01",
+            "--branch",
+            "main",
+            "--monitored",
+        ],
         "task_held",
     );
     let v = ok_at(
         &repo,
         "2026-11-09T12:00:00Z",
-        &["--as", "s3", "claim", "A01-01", "--branch", "main"],
+        &[
+            "--as",
+            "s3",
+            "claim",
+            "A01-01",
+            "--branch",
+            "main",
+            "--monitored",
+        ],
     );
     assert_eq!(v["warnings"][0]["code"], "took_over_lost", "{v}");
     assert_eq!(v["took_over"]["from"], "s2");
@@ -9299,12 +9353,28 @@ fn claim_takes_over_a_lost_task() {
     ok_at(
         &repo,
         "2026-11-09T12:00:00Z",
-        &["--as", "s1", "claim", "A01-02", "--branch", "main"],
+        &[
+            "--as",
+            "s1",
+            "claim",
+            "A01-02",
+            "--branch",
+            "main",
+            "--monitored",
+        ],
     );
     let out = alm_at(
         &repo,
         "2026-11-09T13:00:00Z",
-        &["--as", "s4", "claim", "A01-02", "--branch", "main"],
+        &[
+            "--as",
+            "s4",
+            "claim",
+            "A01-02",
+            "--branch",
+            "main",
+            "--monitored",
+        ],
     );
     let text = String::from_utf8(out.stdout).unwrap();
     assert!(text.contains("taken over from: s1 (lost)"), "{text}");
@@ -9336,6 +9406,7 @@ fn a_session_coming_back_is_told_of_the_takeover_and_refused() {
                 "main",
                 "--working",
                 "claude/one",
+                "--monitored",
             ],
         )
     };
@@ -9463,6 +9534,7 @@ fn a_session_coming_back_is_refused_after_the_taker_finished() {
                 "main",
                 "--working",
                 "claude/one",
+                "--monitored",
             ],
         )
     };
@@ -10254,6 +10326,7 @@ fn codex_gets_git_commands_without_dash_c_and_the_folder_named_first() {
         "codex",
         "--session-id",
         "s1",
+        "--monitored",
     ];
     let v = ok(&repo, &claim[..4]);
     assert!(
@@ -11093,4 +11166,102 @@ fn new_task_settings_change_what_add_task_tells_the_agent() {
     assert_eq!(v["new_tasks"], json!({ "wait_for_approval": true }), "{v}");
     let v = ok(&dir, &["new-task-settings"]);
     assert_eq!(v["wait_for_approval"], true, "{v}");
+}
+
+/// Task-A01-mural227: only sessions started by automatic monitoring (`--monitored` or
+/// `ALLOMOS_MONITORED=1`) write heartbeats and can be marked lost; manual claims and edits write
+/// no heartbeat, `alm beat` writes nothing for them, handoffs follow the current holder's origin,
+/// and legacy tasks with historical heartbeats are never marked lost.
+#[test]
+fn manual_claims_do_not_beat_and_handoff_follows_current_session() {
+    let repo = filled();
+    for id in ["A01-01", "A01-02"] {
+        ok(&repo, &["ready", id]);
+    }
+    let t0 = "2026-11-09T14:00:00Z";
+    // Manual claim: no heartbeat written, edits write no heartbeat, alm beat writes nothing.
+    ok_at(&repo, t0, &["--as", "m1", "claim", "A01-01"]);
+    assert!(task_file(&repo, "A01-01").get("heartbeat").is_none());
+    ok_at(
+        &repo,
+        "2026-11-09T14:05:00Z",
+        &["--as", "m1", "label", "A01-01", "locally verified by agent"],
+    );
+    assert!(task_file(&repo, "A01-01").get("heartbeat").is_none());
+    let v = ok_at(
+        &repo,
+        "2026-11-09T14:15:00Z",
+        &["--as", "m1", "beat", "A01-01"],
+    );
+    assert_eq!(v["beats"][0]["written"], false, "{v}");
+    assert_eq!(v["beats"][0]["monitored"], false, "{v}");
+    assert_eq!(v["changed_files"], json!([]), "{v}");
+    assert_eq!(v["push_work"], json!([]), "{v}");
+    let v = ok_at(&repo, "2026-11-09T14:15:00Z", &["--as", "m1", "beat"]);
+    assert_eq!(v["beats"][0]["monitored"], false, "{v}");
+    assert_eq!(v["changed_files"], json!([]), "{v}");
+    // Never lost, even hours later, and cannot be taken over without --take.
+    let v = ok_at(&repo, "2026-11-09T18:00:00Z", &["next"]);
+    assert_eq!(v["lost"], json!([]), "{v}");
+    refused_at(
+        &repo,
+        "2026-11-09T18:00:00Z",
+        &["--as", "m2", "claim", "A01-01"],
+        "task_held",
+    );
+
+    // Monitored claim via ALLOMOS_MONITORED=1: enables heartbeat and lost detection.
+    let out = alm_command()
+        .current_dir(&repo)
+        .env("ALLOMOS_NOW", t0)
+        .env("ALLOMOS_MONITORED", "1")
+        .args(["--json", "--as", "mon1", "claim", "A01-02"])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{out:?}");
+    assert_eq!(
+        task_file(&repo, "A01-02")["session"]["monitored"],
+        json!(true)
+    );
+    assert_eq!(
+        task_file(&repo, "A01-02")["heartbeat"],
+        json!({ "at": t0, "by": "mon1" })
+    );
+    let v = ok_at(&repo, "2026-11-09T15:00:00Z", &["next"]);
+    assert_eq!(v["lost"][0]["id"], "A01-02", "{v}");
+
+    // Handoff from monitored -> manual: loses monitored status, no longer beats or goes lost.
+    ok_at(
+        &repo,
+        "2026-11-09T15:00:00Z",
+        &["--as", "m2", "claim", "A01-02"],
+    );
+    assert!(
+        task_file(&repo, "A01-02")
+            .get("session")
+            .and_then(|s| s.get("monitored"))
+            .is_none()
+    );
+    let v = ok_at(
+        &repo,
+        "2026-11-09T15:10:00Z",
+        &["--as", "m2", "beat", "A01-02"],
+    );
+    assert_eq!(v["beats"][0]["monitored"], false, "{v}");
+    assert_eq!(v["changed_files"], json!([]), "{v}");
+    let v = ok_at(&repo, "2026-11-09T18:00:00Z", &["next"]);
+    assert_eq!(v["lost"], json!([]), "{v}");
+
+    // Handoff from manual -> monitored: re-enables heartbeat and lost detection.
+    ok_at(
+        &repo,
+        "2026-11-09T18:00:00Z",
+        &["--as", "mon2", "claim", "A01-02", "--take", "--monitored"],
+    );
+    assert_eq!(
+        task_file(&repo, "A01-02")["heartbeat"],
+        json!({ "at": "2026-11-09T18:00:00Z", "by": "mon2" })
+    );
+    let v = ok_at(&repo, "2026-11-09T19:00:00Z", &["next"]);
+    assert_eq!(v["lost"][0]["id"], "A01-02", "{v}");
 }

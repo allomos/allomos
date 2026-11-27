@@ -97,6 +97,15 @@ pub(crate) fn beat(
                     "ago_seconds": ago, "due": due,
                 }));
             }
+            Beat::NotMonitored { task } => {
+                text.push_str(&format!(
+                    "{}: not started by automatic monitor, so no heartbeat was written.\n",
+                    task.id,
+                ));
+                list.push(json!({
+                    "id": task.id, "written": false, "monitored": false,
+                }));
+            }
         }
     }
     if beaten.beats.is_empty() {
@@ -138,7 +147,14 @@ fn push_work_reminder(
     me: &str,
     text: &mut String,
 ) -> Vec<Value> {
-    if beats.is_empty() {
+    let active: Vec<&Task> = beats
+        .iter()
+        .filter_map(|b| match b {
+            heartbeat::Beat::Written(task) | heartbeat::Beat::TooSoon { task, .. } => Some(task),
+            heartbeat::Beat::NotMonitored { .. } => None,
+        })
+        .collect();
+    if active.is_empty() {
         return Vec::new();
     }
     let branches = allomos_store::branches(root);
@@ -146,8 +162,7 @@ fn push_work_reminder(
         "Also save and share your work in progress on the working branch, half-finished too, with WIP in the commit message: only what is pushed reaches a session on another computer (project setting, `alm heartbeat-settings`). Nothing new since the last time: nothing to do. For Git, in that branch's worktree, never in the taskbag (there, save only the files a change lists):\n",
     );
     let mut list = Vec::new();
-    for b in beats {
-        let (heartbeat::Beat::Written(task) | heartbeat::Beat::TooSoon { task, .. }) = b;
+    for task in active {
         let working = branches.get(&task.id).and_then(|b| b.working.clone());
         let branch = working.as_deref().unwrap_or("<its working branch>");
         let commands = [
@@ -206,12 +221,12 @@ pub(crate) fn settings(
         text.push_str("Nothing changed: the heartbeat settings already say that.\n");
     }
     text.push_str(&format!(
-        "Heartbeat interval: {}{}: a session holding a task beats at least this often (`alm beat`).\n",
+        "Heartbeat interval: {}{}: a session started by automatic monitoring beats at least this often (`alm beat`).\n",
         heartbeat::plain_duration(applied.interval_secs),
         mark(written.interval_minutes),
     ));
     text.push_str(&format!(
-        "Lost after: {}{}: a held task with no heartbeat for longer, and no busy window running, is listed as lost in `alm next`.\n",
+        "Lost after: {}{}: a monitored held task with no heartbeat for longer, and no busy window running, is listed as lost in `alm next`.\n",
         heartbeat::plain_duration(applied.lost_after_secs),
         mark(written.lost_after_minutes),
     ));
@@ -256,7 +271,7 @@ pub(crate) fn held(root: &Path, bag: &Taskbag, tasks: &[&Task], now: i64) -> Hel
     // The last recorded change dates a task whose holder never beat; read only when needed.
     let needs_history = tasks.iter().any(|t| {
         t.state == State::InProgress
-            && t.holder.is_some()
+            && heartbeat::is_monitored(t)
             && t.heartbeat.as_ref().map(|h| &h.by) != t.holder.as_ref()
     });
     let last = if needs_history {

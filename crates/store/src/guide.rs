@@ -619,23 +619,22 @@ const WORKFLOW: &str = "# How to work the tasks
    `git merge --abort`, then `git pull --rebase` and `git rebase --skip`), and take another
    ready task: alm names the next one in `alm next`'s order, and you choose. Claiming a task
    that is held already is refused (`task_held`) with the same pointer to the next ready task.
-   **While you hold a task: heartbeats** (decision 0022). These rules need nothing but reading
-   them and running commands, so every agent follows them, whatever its tool. Pass `--as <your
+   **While you hold a task: heartbeats** (decision 0022, Task-A01-mural227). Pass `--as <your
    session name>` to every `alm` command (or set ALLOMOS_HOLDER), reading ones too: that is how
-   `alm` tells you when a task was taken over from you. Send a heartbeat at least every 10
-   minutes (the project's interval; `alm heartbeat-settings` shows it): `alm beat --as <your
-   session name>` beats every task you hold in one change; save and share it as `alm` prints,
-   since a heartbeat counts only once shared. Save only the files it lists, with the commands as
-   printed: never `git add -A`, `git add .` or `git commit -a` in the taskbag, which also take
-   changes others have not shared yet (the person's changes in the Allomos app, other sessions'
-   changes), often without the events that record them. Under half the interval after the last one it
-   writes nothing, so running it often costs nothing. Any change you make to your task (`label`,
-   `note`, `handoff`, …) beats along with it; reading never does. Before a long step that runs
-   no `alm` command for longer than the interval (a long build, a long test run, waiting for a
-   slow tool), declare it first: `alm beat <id> --busy <length>`, as long as you judge it needs
-   (no upper limit; `alm next` shows it to everyone), and `alm beat <id> --busy 0m` when it ends
-   early. Without heartbeats or a busy window, after the project's limit (30 minutes by default)
-   your task is lost and another session may take it over.
+   `alm` tells you when a task was taken over from you. Heartbeats apply only to sessions started by
+   Allomos's automatic monitor (`alm claim --monitored` / `ALLOMOS_MONITORED=1`); manual sessions
+   need no heartbeats and are never lost. In a monitored session, send a heartbeat at least every
+   10 minutes (`alm heartbeat-settings`): `alm beat --as <your session name>` beats every monitored
+   task you hold in one change; save and share it as `alm` prints, since a heartbeat counts only
+   once shared. Save only the files it lists, with the commands as printed: never `git add -A`,
+   `git add .` or `git commit -a` in the taskbag, which also take changes others have not shared yet
+   (the person's changes in the Allomos app, other sessions' changes), often without their events.
+   Under half the interval after the last one (or on manual tasks) it writes nothing. Any change to
+   a monitored task (`label`, `note`, `handoff`, …) beats along with it; reading never does. Before
+   a long quiet step (long build, test run, slow tool), declare it first: `alm beat <id> --busy
+   <length>` (no upper limit; `alm next` shows it to everyone), and `alm beat <id> --busy 0m` when
+   it ends early. Without heartbeats or a busy window, after the project's limit (30 minutes by
+   default) a monitored task is lost and another session may take it over.
    **While you hold a task: keep it ready for a takeover** (Task-A01-butter895). Whoever takes it
    over may be on another computer, and only what is pushed reaches it: commits not pushed,
    changes not committed and your conversation stay behind. So after each small step, update the
@@ -1089,13 +1088,13 @@ contradictions.
    (in Git: `git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`).
    Leave every other change as it is. Share (push) as the project's rules say; when they say
    nothing, only when the person asks.
-5. **Set up an automatic heartbeat, if your tool can run commands by itself.** A session holding
-   a task beats at least every 10 minutes and shares each beat. A tool that runs a command after
-   each step or on a timer does it without anyone remembering: Claude Code with a hook in the
-   project's `.claude/settings.json` (for example on `PostToolUse`), Codex with a hook or its
-   `notify` program where your version has one, any other tool with what it offers. Set it up in
-   the project's own settings for that tool, not in the person's home folder, as a small script
-   kept in the project that:
+5. **Set up an automatic heartbeat, if your tool can run commands by itself.** A monitored session
+   beats at least every 10 minutes and shares each beat (manual sessions need no heartbeat; `alm
+   beat` writes nothing for them). A tool that runs a command after each step or on a timer does it
+   without anyone remembering: Claude Code with a hook in `.claude/settings.json` (for example on
+   `PostToolUse`), Codex with a hook or `notify` where supported, any other tool with what it
+   offers. Put it in the project's own settings for that tool, not the home folder, as a small
+   project script that:
    - finds the session name: the task in progress whose recorded session is this one
      (`alm list --state in_progress --json`: its `session.id` is this session's ID, which Claude
      Code gives as `CLAUDE_CODE_SESSION_ID` and Codex as `CODEX_THREAD_ID`; its `holder` is the
@@ -1168,11 +1167,11 @@ Allomos 时（为做设置的智能体，以及已有的每个智能体文件）
    在任务包里：`project-notes.md`
    （用 Git 时：`git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`）。
    其他改动保持原样。按项目规则共享（推送）；规则没说时，只在用户要求时共享。
-5. **你的工具能自己运行命令时，设置自动心跳。** 持有任务的会话至少每 10 分钟写一次心跳，并把
-   每次心跳分享出去。能在每一步之后或按定时运行命令的工具，可以不靠谁记得就做到：Claude Code 用
-   项目的 `.claude/settings.json` 里的 hook（例如挂在 `PostToolUse` 上），Codex 在你的版本支持时用
-   hook 或它的 `notify` 程序，其他工具用它提供的办法。设置在项目里这个工具自己的设置中，不要放在
-   用户的主文件夹；做成项目里的一个小脚本，它：
+5. **你的工具能自己运行命令时，设置自动心跳。** 由自动监测启动的会话至少每 10 分钟写一次心跳并
+   分享（手动会话不写心跳，`alm beat` 对它们什么都不写）。能在每一步之后或按定时运行命令的工具，
+   可以不靠谁记得就做到：Claude Code 用项目的 `.claude/settings.json` 里的 hook（例如挂在
+   `PostToolUse` 上），Codex 在你的版本支持时用 hook 或它的 `notify` 程序，其他工具用它提供的办法。
+   设置在项目里这个工具自己的设置中，不要放在用户的主文件夹；做成项目里的一个小脚本，它：
    - 找出会话名：记录的会话就是本会话的那个进行中任务（`alm list --state in_progress --json`：
      它的 `session.id` 是本会话的 ID，Claude Code 给的是 `CLAUDE_CODE_SESSION_ID`，Codex 给的是
      `CODEX_THREAD_ID`；它的 `holder` 就是会话名），或者设了 `ALLOMOS_HOLDER` 时用它；两者都没有
@@ -1246,11 +1245,11 @@ AGENTS.md を指していないときです。ほかの作業の前に行いま�
    （Git なら：`git -C <taskbag> add project-notes.md && git -C <taskbag> commit -m \"Agents set up\" -- project-notes.md`）。
    ほかの変更はそのままにします。共有（プッシュ）はプロジェクトのルールに従い、ルールに何もなければ
    ユーザーに頼まれたときだけにします。
-5. **ツールが自分でコマンドを実行できるなら、自動のハートビートを設定します。** タスクを持つ
-   セッションは少なくとも 10 分ごとにハートビートを書き、そのたびに共有します。一歩ごとや時間を
-   決めてコマンドを実行できるツールなら、だれかが覚えていなくてもできます。Claude Code ならプロ
-   ジェクトの `.claude/settings.json` の hook（たとえば `PostToolUse`）、Codex なら使っている版に
-   あれば hook か `notify` のプログラム、ほかのツールはそのツールにある方法で。設定するのはその
+5. **ツールが自分でコマンドを実行できるなら、自動のハートビートを設定します。** 自動監視で起動し
+   たセッションは少なくとも 10 分ごとにハートビートを書き共有します（手動セッションには書かれません）。
+   一歩ごとや時間を決めてコマンドを実行できるツールなら、だれかが覚えていなくてもできます。Claude Code
+   ならプロジェクトの `.claude/settings.json` の hook（たとえば `PostToolUse`）、Codex なら使っている
+   版にあれば hook か `notify` のプログラム、ほかのツールはそのツールにある方法で。設定するのはその
    ツールのプロジェクト内の設定で、ユーザーのホームフォルダーではありません。プロジェクトに置く
    小さなスクリプトにして、次のことをさせます。
    - セッション名を見つけます：記録されたセッションがこのセッションである進行中のタスク

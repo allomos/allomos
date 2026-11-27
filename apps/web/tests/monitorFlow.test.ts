@@ -417,6 +417,7 @@ test("notStartedShown hides tasks that are done, dropped, claimed, or otherwise 
     task("A01-lost", {
       state: "in_progress",
       holder: "codex/old",
+      session: { by: "codex/old", monitored: true },
       iteration: "I-water",
       heartbeat: { by: "codex/old", at: "2026-11-19T23:50:00Z" },
     }),

@@ -620,6 +620,11 @@ pub struct AgentSession {
     /// absolute, so no user name is written): where **Resume in terminal** opens.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub folder: Option<String>,
+    /// Whether this session was started by Allomos's automatic monitor (`alm claim --monitored` or
+    /// `ALLOMOS_MONITORED=1`, Task-A01-mural227). Only monitored sessions write heartbeats and can
+    /// be marked lost; missing or false means a manually started session.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub monitored: bool,
     /// Fields this Allomos does not know, kept as they are.
     #[serde(flatten)]
     pub extra: Extra,
@@ -632,6 +637,7 @@ impl AgentSession {
             && self.id.is_none()
             && self.kind.is_none()
             && self.app_session_id.is_none()
+            && !self.monitored
     }
 }
 
