@@ -175,9 +175,9 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             let folders_text = (!task.folders.is_empty()).then(|| task.folders.join(", "));
             let difficulty_text = allomos_core::difficulty::text(&task);
             let labels_text = (!task.labels.is_empty()).then(|| task.labels.join(", "));
-            let heartbeat_text = task
-                .heartbeat
-                .as_ref()
+            let heartbeat_text = allomos_core::heartbeat::is_monitored(&task)
+                .then(|| task.heartbeat.as_ref())
+                .flatten()
                 .map(|h| heartbeat::heartbeat_line(h, allomos_store::now_secs()));
             let doing_text = allomos_core::heartbeat::doing(&task)
                 .map(|(w, at)| heartbeat::doing_line(w, at, allomos_store::now_secs()));

@@ -116,8 +116,14 @@ export function HandoverDialog({
   const finished = task.state === "done" || task.state === "dropped";
   const still = !finished && task.holder === holder && !!holder;
   const fact = still ? heldFact(task, lostAfter, now, lastChange) : null;
-  const silence = fact && (fact.minutes !== null ? t("takeover.silent_for", { ago: agoText(fact.minutes, t) }) : t("takeover.never_beat"));
-  const gone = !!fact && (fact.at === null || fact.lost);
+  const silence =
+    fact &&
+    (!fact.monitored
+      ? t("takeover.manual_session")
+      : fact.minutes !== null
+        ? t("takeover.silent_for", { ago: agoText(fact.minutes, t) })
+        : t("takeover.never_beat"));
+  const gone = !!fact && fact.monitored && (fact.at === null || fact.lost);
   const way = handoverOpen(task, canOpenSession);
 
   return (

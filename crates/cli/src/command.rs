@@ -438,6 +438,11 @@ pub(crate) enum Command {
         /// The desktop app's ID for your session (in the Claude desktop app, its `local_…` ID).
         #[arg(long, value_name = "ID")]
         app_session_id: Option<String>,
+        /// Mark this claim as started by Allomos's automatic monitor (also enabled when
+        /// `ALLOMOS_MONITORED=1` is set; Task-A01-mural227). Only monitored sessions write
+        /// heartbeats and can be marked lost.
+        #[arg(long)]
+        monitored: bool,
     },
     /// Change the branch a task starts from and merges into (its base), by its real name.
     Base {

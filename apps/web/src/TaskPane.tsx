@@ -44,7 +44,7 @@ import { canReopen, disagreeText } from "./reopenFlow";
 import { ReturnBox } from "./ReturnBox";
 import { canMakeReady, canWithdraw, expiresValue, hasPlan, withdrawnNotice } from "./approvalFlow";
 import { HeartbeatLine, TakeOverButton } from "./Heartbeat";
-import { heldFact } from "./heartbeatFlow";
+import { heldFact, isMonitored } from "./heartbeatFlow";
 import { paneFocus, type FocusPart } from "./paneFocusFlow";
 import { HandoverButton } from "./HandoverDialog";
 import { ACTIVE_MINUTES, paneAgent, titleOpen, session, sessionPlace } from "./sessionFlow";
@@ -651,10 +651,10 @@ export function TaskPane({
     [t("pane.agent"), agentText, null],
     [t("pane.check"), t(`check.${check(task)}`), null],
     [t("pane.session"), sessionText, null, t("pane.session_title", { minutes: ACTIVE_MINUTES }), sessionButton],
-    // Task-A01-kernel761: a held, in-progress task's last heartbeat, busy window and Lost tag.
+    // Task-A01-kernel761, Task-A01-mural227: a monitored, held, in-progress task's last heartbeat, busy window and Lost tag.
     [
       t("pane.heartbeat"),
-      task.state === "in_progress" && task.holder ? <HeartbeatLine task={task} lostAfter={lostAfter} lastChange={lastChange} withTag /> : null,
+      task.state === "in_progress" && isMonitored(task) ? <HeartbeatLine task={task} lostAfter={lostAfter} lastChange={lastChange} withTag /> : null,
       null,
     ],
     [t("pane.waiting_on"), task.waiting_on, "waiting_on"],

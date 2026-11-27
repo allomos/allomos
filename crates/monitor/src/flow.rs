@@ -755,6 +755,7 @@ fn seen_of(task: Option<&Task>) -> String {
 /// older `alm`) is timed by its task's changes instead.
 fn beats_for(task: &Task) -> bool {
     task.state == State::InProgress
+        && allomos_core::heartbeat::is_monitored(task)
         && task
             .holder
             .as_ref()
@@ -966,17 +967,19 @@ mod tests {
         Run::start(Scope::All, agents.clone(), agents, true, 30, 1_000_000)
     }
 
-    /// Task-A03 (account switch): a task its old session held, last heartbeat at `at` (UTC).
+    /// Task-A03 (account switch): a task its old monitored session held, last heartbeat at `at` (UTC).
     fn held_since(id: &str, holder: &str, at: &str) -> Task {
         serde_json::from_value(serde_json::json!({
             "id": id, "title": id, "area": "A01", "state": "in_progress",
-            "holder": holder, "heartbeat": { "at": at, "by": holder }
+            "holder": holder,
+            "session": { "by": holder, "monitored": true },
+            "heartbeat": { "at": at, "by": holder }
         }))
         .unwrap()
     }
 
-    /// A task held by a quiet session (its heartbeat is over the limit) is offered again, so a
-    /// new session takes it over; one still beating is not.
+    /// A task held by a quiet monitored session (its heartbeat is over the limit) is offered again,
+    /// so a new session takes it over; one still beating or held by a manual session is not.
     #[test]
     fn a_lost_task_is_offered_to_a_new_session() {
         let r = run(&["claude_cli"]);
@@ -990,15 +993,22 @@ mod tests {
         assert_eq!(quiet.len(), 1);
         assert_eq!(quiet[0].1.id, "A01-9");
         assert!(r.share(&bag, beat + 5 * 60).is_empty());
+
+        // Task-A01-mural227: a manually held task (even with an old heartbeat) is never lost.
+        let mut manual = held_since("A01-10", "manual/session", "2026-11-09T10:00:00Z");
+        manual.session = None;
+        let manual_bag = bag_of(vec![manual]);
+        assert!(r.share(&manual_bag, beat + 2 * 3600).is_empty());
     }
 
-    /// A task held by `holder`, with what its session passed at `alm claim`.
+    /// A task held by `holder`, with what its monitored session passed at `alm claim`.
     fn claimed(id: &str, holder: &str, agent: Option<&str>, session_id: Option<&str>) -> Task {
         let mut t = task(id, State::InProgress, Some(holder));
         t.session = Some(allomos_core::AgentSession {
             by: Some(holder.to_string()),
             agent: agent.map(String::from),
             id: session_id.map(String::from),
+            monitored: true,
             ..Default::default()
         });
         t
@@ -1725,7 +1735,9 @@ mod tests {
         }
         serde_json::from_value(serde_json::json!({
             "id": "A01-7", "title": "A01-7", "area": "A01", "state": "in_progress",
-            "holder": "me", "heartbeat": beat
+            "holder": "me",
+            "session": { "by": "me", "monitored": true },
+            "heartbeat": beat
         }))
         .unwrap()
     }

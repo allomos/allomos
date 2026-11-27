@@ -160,12 +160,26 @@ pub struct Lost {
     pub doing_at: Option<String>,
 }
 
+/// Whether `task`'s current holder is a session started by Allomos's automatic monitor
+/// (Task-A01-mural227). Only monitored sessions write heartbeats and can be marked lost; a manual
+/// session (missing or false `session.monitored`) never beats and is never lost. When a task
+/// changes hands, `alm claim` replaces `session`, so this always reflects the current holder.
+pub fn is_monitored(task: &Task) -> bool {
+    let Some(holder) = task.holder.as_deref() else {
+        return false;
+    };
+    let Some(session) = task.session.as_ref() else {
+        return false;
+    };
+    session.monitored && session.by.as_deref().is_none_or(|by| by == holder)
+}
+
 /// Whether `task` is lost at `now` (seconds since 1970, UTC). `last_change`: the time of the
 /// task's newest recorded event, used when the holder never beat. A task that is not
-/// `in_progress` or has no holder (waiting, released, ready, done, dropped) is never
-/// lost, nor one whose silence cannot be dated.
+/// `in_progress`, has no holder (waiting, released, ready, done, dropped), or is not held by a
+/// monitored session is never lost, nor one whose silence cannot be dated.
 pub fn lost(task: &Task, now: i64, lost_after: i64, last_change: Option<&str>) -> Option<Lost> {
-    if task.state != State::InProgress {
+    if task.state != State::InProgress || !is_monitored(task) {
         return None;
     }
     let holder = task.holder.as_deref()?;
@@ -198,7 +212,7 @@ pub fn lost(task: &Task, now: i64, lost_after: i64, last_change: Option<&str>) -
 
 /// The end of the busy window the holder of `task` declared, while it still runs at `now`.
 pub fn busy_until(task: &Task, now: i64) -> Option<String> {
-    if task.state != State::InProgress {
+    if task.state != State::InProgress || !is_monitored(task) {
         return None;
     }
     let holder = task.holder.as_deref()?;
@@ -210,8 +224,12 @@ pub fn busy_until(task: &Task, now: i64) -> Option<String> {
 }
 
 /// What the holder of `task` last said it is doing (`alm beat --doing`, Task-A01-butter895): its
-/// words and when it said them, in UTC; `None` while it said nothing.
+/// words and when it said them, in UTC; `None` while it said nothing or the holder is not
+/// monitored.
 pub fn doing(task: &Task) -> Option<(&str, Option<&str>)> {
+    if !is_monitored(task) {
+        return None;
+    }
     let holder = task.holder.as_deref()?;
     let h = task.heartbeat.as_ref().filter(|h| h.by == holder)?;
     Some((h.doing.as_deref()?, h.doing_at.as_deref()))
@@ -253,15 +271,19 @@ pub enum Beat {
         /// When the next heartbeat is due (the last one plus the interval), in UTC.
         due: String,
     },
+    /// The holding session was not started by the automatic monitor: nothing is written
+    /// (Task-A01-mural227).
+    NotMonitored { task: Task },
 }
 
 /// `alm beat` for one task, by the session `me`, at `now` (seconds since 1970, UTC). Only the
-/// holder of an `in_progress` task beats (`not_held`, `task_held`). `busy`: a busy window of that
-/// many seconds from now (`0` ends the one running); a declared window is always written. `doing`:
-/// what the session is doing now, put on one line (empty takes it off); new words are always
-/// written. Without either, a heartbeat younger than half of `interval` (seconds) is not written
-/// again: [`Beat::TooSoon`]. A plain beat keeps a busy window that is still running and what the
-/// session said it is doing.
+/// holder of an `in_progress` task beats (`not_held`, `task_held`), and only when the holding
+/// session was started by Allomos's automatic monitor (`Beat::NotMonitored` otherwise). `busy`: a
+/// busy window of that many seconds from now (`0` ends the one running); a declared window is
+/// always written. `doing`: what the session is doing now, put on one line (empty takes it off);
+/// new words are always written. Without either, a heartbeat younger than half of `interval`
+/// (seconds) is not written again: [`Beat::TooSoon`]. A plain beat keeps a busy window that is
+/// still running and what the session said it is doing.
 pub fn beat(
     task: &Task,
     me: &str,
@@ -281,6 +303,9 @@ pub fn beat(
             id: task.id.clone(),
             holder: task.holder.clone().unwrap_or_default(),
         });
+    }
+    if !is_monitored(task) {
+        return Ok(Beat::NotMonitored { task: task.clone() });
     }
     let last = task
         .heartbeat
@@ -341,6 +366,9 @@ pub fn beat(
 pub fn along(task: &mut Task, me: Option<&str>, now: i64) {
     if task.state != State::InProgress || task.holder.is_none() {
         task.heartbeat = None;
+        return;
+    }
+    if !is_monitored(task) {
         return;
     }
     let Some(me) = me else { return };
@@ -490,7 +518,25 @@ mod tests {
 
     fn held(by: &str) -> Task {
         let mut t: Task = serde_json::from_value(serde_json::json!({
-            "id": "A01-01", "title": "t", "area": "A01", "state": "in_progress", "holder": by
+            "id": "A01-01",
+            "title": "t",
+            "area": "A01",
+            "state": "in_progress",
+            "holder": by,
+            "session": { "by": by, "monitored": true }
+        }))
+        .unwrap();
+        t.description.clear();
+        t
+    }
+
+    fn manual_held(by: &str) -> Task {
+        let mut t: Task = serde_json::from_value(serde_json::json!({
+            "id": "A01-01",
+            "title": "t",
+            "area": "A01",
+            "state": "in_progress",
+            "holder": by
         }))
         .unwrap();
         t.description.clear();
@@ -566,6 +612,7 @@ mod tests {
         // A heartbeat of another session (the one before a takeover) does not count.
         let mut other = t.clone();
         other.holder = Some("s2".into());
+        other.session.as_mut().unwrap().by = Some("s2".into());
         assert!(matches!(
             beat(&other, "s2", t0() + 10, None, None, INTERVAL_SECS).unwrap(),
             Beat::Written(_)
@@ -616,6 +663,7 @@ mod tests {
         // A new holder starts without them.
         let mut taken = t.clone();
         taken.holder = Some("s2".to_string());
+        taken.session.as_mut().unwrap().by = Some("s2".into());
         assert_eq!(doing(&taken), None);
         along(&mut taken, Some("s2"), t0() + 500);
         assert_eq!(taken.heartbeat.as_ref().unwrap().doing, None);
@@ -837,6 +885,7 @@ mod tests {
             panic!()
         };
         other.holder = Some("s2".into());
+        other.session.as_mut().unwrap().by = Some("s2".into());
         assert_eq!(
             lost(&other, t0() + 1_801, LOST_AFTER_SECS, Some(T0))
                 .unwrap()
@@ -869,5 +918,48 @@ mod tests {
         t.state = State::Waiting;
         along(&mut t, Some("s1"), t0() + 5);
         assert_eq!(t.heartbeat, None);
+    }
+
+    #[test]
+    fn manual_sessions_never_beat_and_are_never_lost() {
+        let mut t = manual_held("s1");
+        assert!(!is_monitored(&t));
+        assert!(matches!(
+            beat(&t, "s1", t0(), Some(3_600), Some("work"), INTERVAL_SECS).unwrap(),
+            Beat::NotMonitored { .. }
+        ));
+        along(&mut t, Some("s1"), t0());
+        assert_eq!(t.heartbeat, None);
+        assert_eq!(lost(&t, t0() + 9_999, LOST_AFTER_SECS, Some(T0)), None);
+
+        // Legacy task with historical heartbeat: still not monitored, never lost, not updated.
+        let Ok(Beat::Written(mut legacy)) = beat(
+            &held("s1"),
+            "s1",
+            t0(),
+            Some(3_600),
+            Some("old work"),
+            INTERVAL_SECS,
+        ) else {
+            panic!()
+        };
+        legacy.session = None;
+        let old_hb = legacy.heartbeat.clone();
+        assert!(!is_monitored(&legacy));
+        assert_eq!(lost(&legacy, t0() + 9_999, LOST_AFTER_SECS, Some(T0)), None);
+        assert_eq!(busy_until(&legacy, t0() + 10), None);
+        assert_eq!(doing(&legacy), None);
+        assert!(matches!(
+            beat(&legacy, "s1", t0() + 600, None, None, INTERVAL_SECS).unwrap(),
+            Beat::NotMonitored { .. }
+        ));
+        along(&mut legacy, Some("s1"), t0() + 600);
+        assert_eq!(legacy.heartbeat, old_hb);
+
+        // Handoff from monitored holder to another holder without monitored session: no longer monitored.
+        let mut handed = held("s1");
+        handed.holder = Some("s2".into());
+        assert!(!is_monitored(&handed));
+        assert_eq!(lost(&handed, t0() + 9_999, LOST_AFTER_SECS, Some(T0)), None);
     }
 }

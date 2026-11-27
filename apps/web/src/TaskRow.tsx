@@ -13,6 +13,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { useI18n, useTaskT } from "./i18n";
 import { HeartbeatLine, LostTag, TakeOverButton } from "./Heartbeat";
+import { isMonitored } from "./heartbeatFlow";
 import { LabelChips } from "./LabelChips";
 import { DescriptionHit, Highlight } from "./Search";
 import { canProceed } from "./proceedFlow";
@@ -145,8 +146,8 @@ export function TaskRow({
       )}
     </span>,
   ]);
-  // Task-A01-kernel761: a held, in-progress task's last heartbeat and busy window.
-  if (task.state === "in_progress" && task.holder)
+  // Task-A01-kernel761, Task-A01-mural227: a monitored, held, in-progress task's last heartbeat and busy window.
+  if (task.state === "in_progress" && isMonitored(task))
     facts.push([t("pane.heartbeat"), <HeartbeatLine task={task} lostAfter={lostAfter} lastChange={modified} />]);
   const main = (
     <>

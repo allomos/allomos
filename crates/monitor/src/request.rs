@@ -161,7 +161,7 @@ pub fn monitor_request(
 {mode}
 
 {usage}1. 阅读：alm show {id}（它的说明和最新的交接）。
-2. 按 AGENTS.md 的说法认领它，带上这个会话的信息：alm claim {id} --as <你的会话名> --branch {br} --session-agent {sa} --session-id {sid} --session-kind terminal，并把认领分享出去。
+2. 按 AGENTS.md 的说法认领它，带上这个会话的信息：alm claim {id} --as <你的会话名> --branch {br} --session-agent {sa} --session-id {sid} --session-kind terminal --monitored，并把认领分享出去。
 3. 在当前项目路径的 .worktrees/<短名> 工作树里做，工作树从认领时列出的基础分支切出。
 4. 做事期间按项目的心跳间隔（默认每 10 分钟，见 alm heartbeat-settings）发一次心跳：alm beat {id} --as <你的会话名> --doing "<正在做什么>"，把心跳提交推送到任务袋，并按提示把进行中的工作（WIP）提交推送到工作分支（推送用 git push origin refs/heads/<分支名>）；长时间步骤开始前用 alm beat {id} --as <你的会话名> --busy <时长> 声明。
 5. 用 alm label 报告进度；做完用 alm done，中途停下用 alm release --note。
@@ -193,7 +193,7 @@ pub fn monitor_request(
 {mode}
 
 {usage}1. 読む：alm show {id}（説明と最新の引き継ぎ）。
-2. AGENTS.md のとおりに、このセッションの情報を付けて引き受け（alm claim {id} --as <あなたのセッション名> --branch {br} --session-agent {sa} --session-id {sid} --session-kind terminal）、その引き受けを共有してください。
+2. AGENTS.md のとおりに、このセッションの情報を付けて引き受け（alm claim {id} --as <あなたのセッション名> --branch {br} --session-agent {sa} --session-id {sid} --session-kind terminal --monitored）、その引き受けを共有してください。
 3. 現在のプロジェクト直下の .worktrees/<短い名前> ワークツリーで作業してください。ワークツリーは、引き受けたときに表示されるベースブランチから作ります。
 4. 作業中はプロジェクトのハートビート間隔（既定は 10 分ごと、alm heartbeat-settings を参照）で alm beat {id} --as <あなたのセッション名> --doing "<作業内容>" を送り、タスクバッグにコミット・プッシュして、案内に従い進行中の作業（WIP）も作業ブランチへプッシュしてください（push は git push origin refs/heads/<ブランチ名> で）。長い手順の前には alm beat {id} --as <あなたのセッション名> --busy <時間> で知らせてください。
 5. 進み具合は alm label で知らせ、終わったら alm done、途中でやめるなら alm release --note を使ってください。
@@ -225,7 +225,7 @@ pub fn monitor_request(
 {mode}
 
 {usage}1. Read it: alm show {id} (its description and latest handoff note).
-2. Claim it as AGENTS.md says, with this session's details: alm claim {id} --as <your session name> --branch {br} --session-agent {sa} --session-id {sid} --session-kind terminal, and share the claim.
+2. Claim it as AGENTS.md says, with this session's details: alm claim {id} --as <your session name> --branch {br} --session-agent {sa} --session-id {sid} --session-kind terminal --monitored, and share the claim.
 3. Work it in a worktree of its own under the current project's .worktrees/<short-name>, cut from the base branch the claim prints.
 4. While working, send a heartbeat at least every project heartbeat interval (10 min by default; see alm heartbeat-settings): run alm beat {id} --as <your session name> --doing "<what you are doing>", commit and push the heartbeat to the taskbag, and push work in progress (WIP) to the working branch as prompted (push with git push origin refs/heads/<branch>); declare long steps ahead of time with alm beat {id} --as <your session name> --busy <length>.
 5. Report progress with alm label; finish with alm done, or stop with alm release --note.

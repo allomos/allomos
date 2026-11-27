@@ -59,6 +59,8 @@ export interface AgentSession {
   app_session_id?: string;
   /** The folder `alm claim` ran in, relative to the folder holding `.allomos/`. */
   folder?: string;
+  /** Whether this session was started by automatic monitoring (Task-A01-mural227). */
+  monitored?: boolean;
 }
 
 /** A held task's last heartbeat as task.json keeps it (crates/core/src/heartbeat.rs). */

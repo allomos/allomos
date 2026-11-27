@@ -11,6 +11,13 @@ use crate::{
     reopen_lines, task_json, task_line,
 };
 
+/// Whether `ALLOMOS_MONITORED` is set to a truthy value (`1`, `true`, `yes`).
+fn env_monitored() -> bool {
+    std::env::var("ALLOMOS_MONITORED")
+        .ok()
+        .is_some_and(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
+}
+
 /// Runs the commands this module holds; `execute` in `lib.rs` sends only those here.
 pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
     let me = cli.holder.as_deref();
@@ -24,6 +31,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
             session_id,
             session_kind,
             app_session_id,
+            monitored,
         } => {
             let root = locate(cli, cwd)?;
             // The taskbag is updated before any task is worked (Task-A03-27, approver
@@ -50,6 +58,7 @@ pub(crate) fn execute(cli: &Cli, cwd: &Path) -> Result<Done, Problem> {
                     kind: non_blank(session_kind),
                     app_session_id: non_blank(app_session_id),
                     folder: claim_folder(&root, cwd),
+                    monitored: *monitored || env_monitored(),
                     ..Default::default()
                 }),
             )?;

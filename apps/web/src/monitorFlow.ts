@@ -673,10 +673,11 @@ const parseUtc = (stamp: string | null | undefined): number | null => {
   return Number.isNaN(ms) ? null : ms;
 };
 
-/** Whether `task` is in progress with a holder whose heartbeat has passed the lost limit and has
- * no busy window running (mirrors `heartbeatFlow.ts` and `crates/core/src/heartbeat.rs`). */
+/** Whether `task` is in progress with a monitored holder whose heartbeat has passed the lost limit
+ * and has no busy window running (mirrors `heartbeatFlow.ts` and `crates/core/src/heartbeat.rs`). */
 function isLostTask(task: Task, now: number, lostAfterMinutes = 30): boolean {
-  if (task.state !== "in_progress" || !task.holder) return false;
+  if (task.state !== "in_progress" || !task.holder || !task.session?.monitored) return false;
+  if (task.session.by && task.session.by !== task.holder) return false;
   const mine = task.heartbeat && task.heartbeat.by === task.holder ? task.heartbeat : null;
   const at = parseUtc(mine?.at);
   const until = parseUtc(mine?.busy_until);

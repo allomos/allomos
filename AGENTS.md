@@ -9,7 +9,7 @@ Shared rules for every AI agent working for the approver, **will.w.hui**.
 - **Approvals:** approving a card authorizes only its local work; external effects require exact approval recorded in the task's description.
 - **Credentials:** never print or commit credentials, tokens, cookies or local environment files (`.env*` stay ignored).
 
-## Tasks: Allomos (v43)
+## Tasks: Allomos (v44)
 
 This project's tasks, progress and handoff notes live in Allomos's taskbag
 (`.allomos/taskbag/`). Work them with the `alm` command; never edit those files by hand, except
@@ -40,12 +40,16 @@ the project notes (below).
   checkout stays on the base branch. Merge from the main checkout; once merged, remove your
   worktree and the merged branch.
 - While you hold a task (decision 0022): pass `--as <your session name>` to every `alm` command.
-  Send a heartbeat at least every 10 minutes (the project's interval, `alm heartbeat-settings`):
-  `alm beat --as <your session name>` (every task you hold, in one change), and save and share it
-  like any change: a heartbeat counts only once shared. A change you make to your task beats
-  along with it; reading never does. Before a long step that runs no `alm` command (a long build
+  Heartbeats apply only to sessions started by Allomos's automatic monitor (`alm claim --monitored`
+  or `ALLOMOS_MONITORED=1`); manually started sessions do not send heartbeats and are never marked
+  lost. In a monitored session, send a heartbeat at least every 10 minutes (the project's interval,
+  `alm heartbeat-settings`):
+  `alm beat --as <your session name>` (every monitored task you hold, in one change), and save and
+  share it like any change: a heartbeat counts only once shared. A change you make to a monitored
+  task beats along with it; reading never does, and `alm beat` writes nothing for manual tasks.
+  Before a long step that runs no `alm` command (a long build
   or test run), declare it: `alm beat <id> --busy <length>`, as long as you judge it needs
-  (`--busy 0m` ends it early). A held task silent past the project's limit (30 minutes by
+  (`--busy 0m` ends it early). A monitored held task silent past the project's limit (30 minutes by
   default) with no busy window is lost: `alm next` lists it under "Lost, can be taken over" with
   the command. Take one over only to continue its work: claiming it is the takeover; go on on its
   working branch, and look at the former holder's worktree but change nothing there (that folder
