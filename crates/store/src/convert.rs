@@ -48,7 +48,9 @@ pub const MOVE_IN_REQUEST_VERSION: u32 = 4;
 /// app no longer runs Git, decision 0017).
 /// 3: the request is the setup part only: it no longer asks the agent to find the project's tasks
 /// (Update the Taskbag… does that, Task-A03-radish933).
-pub const CONNECT_REQUEST_VERSION: u32 = 3;
+/// 4: the setup part no longer triggers the file-size check or a task for it: setting up a folder
+/// or project stays about version control, AGENTS.md and the agent rule files (Task-A03-bath616).
+pub const CONNECT_REQUEST_VERSION: u32 = 4;
 
 /// The heading of the popup `alm confirm` shows, as the request tells the agent to write it.
 const CONFIRM_TITLE: &str = "Move tasks into Allomos";
@@ -580,6 +582,15 @@ mod tests {
             assert!(r.contains("`git init`"), "{language}");
             assert!(r.contains("../../README-allomos.md"), "{language}");
             assert!(!r.contains("--push"), "{language}");
+            // Setting up a folder or project triggers no file-size check and adds no task for it
+            // (Task-A03-bath616): the request is version control, AGENTS.md and agent files only.
+            assert!(!r.contains("guide file-size"), "{language}");
+            assert!(
+                !r.contains("File size check")
+                    && !r.contains("文件大小检查")
+                    && !r.contains("ファイルサイズの確認"),
+                "{language}"
+            );
             // Where the section comes from is said once, at the end.
             let source = section_source(language, &taskbag);
             assert_eq!(r.matches(&source).count(), 1, "{language}");
